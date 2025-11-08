@@ -1,5 +1,4 @@
-mod rope_buffer;
 mod history;
+mod rope_buffer;
 
 pub use rope_buffer::RopeBuffer;
-pub use history::{History, Action};

@@ -5,7 +5,7 @@ use crate::cursor::Cursor;
 use crate::input::{handle_key_event, Command, Direction};
 use crate::search::Search;
 use crate::terminal::Terminal;
-use crate::view::{View, Selection};
+use crate::view::{Selection, View};
 use anyhow::Result;
 use std::path::Path;
 
@@ -34,7 +34,7 @@ impl Editor {
         let terminal = Terminal::new()?;
         let view = View::new(&terminal);
         let clipboard = ClipboardManager::new()?;
-        
+
         let mut comment_handler = CommentHandler::new();
         if let Some(path) = file_path {
             comment_handler.detect_from_path(path);
@@ -60,10 +60,16 @@ impl Editor {
         Terminal::clear_screen()?;
 
         while !self.should_quit {
-            self.view.render(&self.buffer, &self.cursor, self.selection.as_ref(), self.message.as_deref(), &self.comment_handler)?;
+            self.view.render(
+                &self.buffer,
+                &self.cursor,
+                self.selection.as_ref(),
+                self.message.as_deref(),
+                &self.comment_handler,
+            )?;
 
             let key_event = Terminal::read_key()?;
-            
+
             if let Some(command) = handle_key_event(key_event, self.has_selection()) {
                 self.handle_command(command)?;
             }
@@ -78,17 +84,17 @@ impl Editor {
         if !matches!(command, Command::Quit) {
             self.quit_times = 0;
         }
-        
+
         match command {
             // 字符輸入
             Command::Insert(ch) => {
                 if self.has_selection() {
                     self.delete_selection();
                 }
-                
+
                 let pos = self.cursor.char_position(&self.buffer);
                 self.buffer.insert_char(pos, ch);
-                
+
                 if ch == '\n' {
                     self.cursor.row += 1;
                     self.cursor.col = 0;
@@ -97,7 +103,7 @@ impl Editor {
                     self.cursor.col += 1;
                     self.cursor.desired_col = self.cursor.col;
                 }
-                
+
                 self.selection = None;
             }
 
@@ -113,13 +119,15 @@ impl Editor {
                 } else if self.cursor.row > 0 {
                     // 刪除換行符，合併到上一行
                     self.cursor.row -= 1;
-                    let prev_line_len = self.buffer.get_line_content(self.cursor.row)
-                        .trim_end_matches(|c| c == '\n' || c == '\r')
+                    let prev_line_len = self
+                        .buffer
+                        .get_line_content(self.cursor.row)
+                        .trim_end_matches(['\n', '\r'])
                         .chars()
                         .count();
                     self.cursor.col = prev_line_len;
                     self.cursor.desired_col = self.cursor.col;
-                    
+
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.delete_char(pos);
                 }
@@ -178,14 +186,16 @@ impl Editor {
                 self.selection = None;
             }
             Command::PageUp => {
-                self.cursor.move_page_up(&self.buffer, self.view.screen_rows);
+                self.cursor
+                    .move_page_up(&self.buffer, self.view.screen_rows);
                 self.selection = None;
             }
             Command::PageDown => {
-                self.cursor.move_page_down(&self.buffer, self.view.screen_rows);
+                self.cursor
+                    .move_page_down(&self.buffer, self.view.screen_rows);
                 self.selection = None;
             }
-            
+
             Command::MoveToFileStart => {
                 self.cursor.row = 0;
                 self.cursor.col = 0;
@@ -224,8 +234,12 @@ impl Editor {
                     Direction::Right => self.cursor.move_right(&self.buffer),
                     Direction::Home => self.cursor.move_to_line_start(),
                     Direction::End => self.cursor.move_to_line_end(&self.buffer),
-                    Direction::PageUp => self.cursor.move_page_up(&self.buffer, self.view.screen_rows),
-                    Direction::PageDown => self.cursor.move_page_down(&self.buffer, self.view.screen_rows),
+                    Direction::PageUp => self
+                        .cursor
+                        .move_page_up(&self.buffer, self.view.screen_rows),
+                    Direction::PageDown => self
+                        .cursor
+                        .move_page_down(&self.buffer, self.view.screen_rows),
                 }
 
                 if let Some(sel) = &mut self.selection {
@@ -235,8 +249,10 @@ impl Editor {
 
             Command::SelectAll => {
                 let last_line = self.buffer.line_count().saturating_sub(1);
-                let last_col = self.buffer.get_line_content(last_line)
-                    .trim_end_matches(|c| c == '\n' || c == '\r')
+                let last_col = self
+                    .buffer
+                    .get_line_content(last_line)
+                    .trim_end_matches(['\n', '\r'])
                     .chars()
                     .count();
 
@@ -267,14 +283,14 @@ impl Editor {
                 } else {
                     // 複製當前整行（完整內容，包括尾部空格和換行符）
                     let line_text = self.buffer.get_line_full(self.cursor.row);
-                    
+
                     // 確保以換行符結尾（用於識別整行貼上）
                     let line_with_newline = if line_text.ends_with('\n') {
                         line_text
                     } else {
                         format!("{}\n", line_text)
                     };
-                    
+
                     if let Err(e) = self.clipboard.set_text(&line_with_newline) {
                         self.message = Some(format!("Copy failed: {}", e));
                     }
@@ -292,14 +308,14 @@ impl Editor {
                 } else {
                     // 剪切當前整行（完整內容）
                     let line_text = self.buffer.get_line_full(self.cursor.row);
-                    
+
                     // 確保以換行符結尾
                     let line_with_newline = if line_text.ends_with('\n') {
                         line_text
                     } else {
                         format!("{}\n", line_text)
                     };
-                    
+
                     if let Err(e) = self.clipboard.set_text(&line_with_newline) {
                         self.message = Some(format!("Cut failed: {}", e));
                     } else {
@@ -309,7 +325,9 @@ impl Editor {
                             self.cursor.row -= 1;
                         }
                         // 如果刪除後超出範圍,調整到最後一行
-                        if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
+                        if self.cursor.row >= self.buffer.line_count()
+                            && self.buffer.line_count() > 0
+                        {
                             self.cursor.row = self.buffer.line_count() - 1;
                         }
                         self.cursor.col = 0;
@@ -323,16 +341,16 @@ impl Editor {
                     if self.has_selection() {
                         self.delete_selection();
                     }
-                    
+
                     // 檢查是否為整行貼上（文字以換行結尾）
                     let is_whole_line = text.ends_with('\n');
-                    
+
                     if is_whole_line {
                         // 整行貼上：在光標所在行的開始處插入
                         // 這樣會將原行內容推到下一行
                         let line_start = self.buffer.line_to_char(self.cursor.row);
                         self.buffer.insert(line_start, &text);
-                        
+
                         // 光標移動到新插入行的開始
                         self.cursor.col = 0;
                         self.cursor.desired_col = 0;
@@ -340,7 +358,7 @@ impl Editor {
                         // 普通貼上：在光標位置插入
                         let pos = self.cursor.char_position(&self.buffer);
                         self.buffer.insert(pos, &text);
-                        
+
                         // 移動到貼上內容末尾
                         for ch in text.chars() {
                             if ch == '\n' {
@@ -372,7 +390,10 @@ impl Editor {
                     } else {
                         // 第一次按 Ctrl+Q，顯示警告
                         self.quit_times = 1;
-                        self.message = Some("Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+S to save".to_string());
+                        self.message = Some(
+                            "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+S to save"
+                                .to_string(),
+                        );
                     }
                 } else {
                     self.should_quit = true;
@@ -386,7 +407,7 @@ impl Editor {
                     let row = self.buffer.char_to_line(pos);
                     let line_start = self.buffer.line_to_char(row);
                     let col = pos - line_start;
-                    
+
                     self.cursor.row = row;
                     self.cursor.col = col;
                     self.cursor.desired_col = col;
@@ -402,7 +423,7 @@ impl Editor {
                     let row = self.buffer.char_to_line(pos);
                     let line_start = self.buffer.line_to_char(row);
                     let col = pos - line_start;
-                    
+
                     self.cursor.row = row;
                     self.cursor.col = col;
                     self.cursor.desired_col = col;
@@ -419,7 +440,7 @@ impl Editor {
                     if !query.is_empty() {
                         self.search.set_query(query.clone());
                         self.search.find_matches(&self.buffer);
-                        
+
                         if self.search.match_count() > 0 {
                             if let Some((row, col)) = self.search.next_match() {
                                 self.cursor.row = row;
@@ -443,9 +464,11 @@ impl Editor {
                         self.cursor.row = row;
                         self.cursor.col = col;
                         self.cursor.desired_col = col;
-                        self.message = Some(format!("Match {}/{}", 
+                        self.message = Some(format!(
+                            "Match {}/{}",
                             (self.search.match_count() + 1) % self.search.match_count() + 1,
-                            self.search.match_count()));
+                            self.search.match_count()
+                        ));
                     }
                 } else {
                     self.message = Some("No active search".to_string());
@@ -458,9 +481,11 @@ impl Editor {
                         self.cursor.row = row;
                         self.cursor.col = col;
                         self.cursor.desired_col = col;
-                        self.message = Some(format!("Match {}/{}", 
+                        self.message = Some(format!(
+                            "Match {}/{}",
                             (self.search.match_count() + 1) % self.search.match_count() + 1,
-                            self.search.match_count()));
+                            self.search.match_count()
+                        ));
                     }
                 } else {
                     self.message = Some("No active search".to_string());
@@ -481,7 +506,7 @@ impl Editor {
                     if let Some(sel) = self.selection {
                         let (start_row, _) = sel.start.min(sel.end);
                         let (end_row, _) = sel.start.max(sel.end);
-                        
+
                         // 檢查是否有任何一行沒有註解
                         let mut has_uncommented = false;
                         for row in start_row..=end_row {
@@ -491,14 +516,14 @@ impl Editor {
                                 break;
                             }
                         }
-                        
+
                         // 如果有任何一行沒註解，全部加註解；否則全部取消註解
                         let should_add_comment = has_uncommented;
-                        
+
                         // 從後往前處理，避免行號變化
                         for row in (start_row..=end_row).rev() {
                             let line_content = self.buffer.get_line_content(row);
-                            
+
                             let new_line = if should_add_comment {
                                 // 全部加註解（即使已經有註解的也保持不變）
                                 if self.comment_handler.is_commented(&line_content) {
@@ -510,7 +535,7 @@ impl Editor {
                                 // 全部取消註解
                                 self.comment_handler.remove_comment(&line_content)
                             };
-                            
+
                             if let Some(new_line) = new_line {
                                 // 計算行的起始和結束位置
                                 let line_start = self.buffer.line_to_char(row);
@@ -519,32 +544,39 @@ impl Editor {
                                 } else {
                                     self.buffer.len_chars()
                                 };
-                                
+
                                 // 刪除舊行（包括換行符）
                                 self.buffer.delete_range(line_start, line_end);
-                                
+
                                 // 插入新行（保留換行符）
-                                let new_line_with_newline = if line_content.ends_with('\n') || line_content.ends_with("\r\n") {
-                                    format!("{}\n", new_line.trim_end_matches(|c| c == '\n' || c == '\r'))
+                                let new_line_with_newline = if line_content.ends_with('\n')
+                                    || line_content.ends_with("\r\n")
+                                {
+                                    format!("{}\n", new_line.trim_end_matches(['\n', '\r']))
                                 } else {
-                                    new_line.trim_end_matches(|c| c == '\n' || c == '\r').to_string()
+                                    new_line.trim_end_matches(['\n', '\r']).to_string()
                                 };
                                 self.buffer.insert(line_start, &new_line_with_newline);
                             }
                         }
-                        
+
                         // 保留選擇狀態（不清除選取）
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
                         self.cursor.desired_col = 0;
-                        
-                        let action = if should_add_comment { "Added" } else { "Removed" };
+
+                        let action = if should_add_comment {
+                            "Added"
+                        } else {
+                            "Removed"
+                        };
                         self.message = Some(format!("{} comments", action));
                     }
                 } else {
                     // 單行：直接切換註解
                     let line_content = self.buffer.get_line_content(self.cursor.row);
-                    if let Some(new_line) = self.comment_handler.toggle_line_comment(&line_content) {
+                    if let Some(new_line) = self.comment_handler.toggle_line_comment(&line_content)
+                    {
                         // 計算行的起始和結束位置
                         let line_start = self.buffer.line_to_char(self.cursor.row);
                         let line_end = if self.cursor.row + 1 < self.buffer.line_count() {
@@ -552,18 +584,19 @@ impl Editor {
                         } else {
                             self.buffer.len_chars()
                         };
-                        
+
                         // 刪除舊行（包括換行符）
                         self.buffer.delete_range(line_start, line_end);
-                        
+
                         // 插入新行（保留換行符）
-                        let new_line_with_newline = if line_content.ends_with('\n') || line_content.ends_with("\r\n") {
-                            format!("{}\n", new_line.trim_end_matches(|c| c == '\n' || c == '\r'))
-                        } else {
-                            new_line.trim_end_matches(|c| c == '\n' || c == '\r').to_string()
-                        };
+                        let new_line_with_newline =
+                            if line_content.ends_with('\n') || line_content.ends_with("\r\n") {
+                                format!("{}\n", new_line.trim_end_matches(['\n', '\r']))
+                            } else {
+                                new_line.trim_end_matches(['\n', '\r']).to_string()
+                            };
                         self.buffer.insert(line_start, &new_line_with_newline);
-                        
+
                         self.message = Some("Toggled comment".to_string());
                     }
                 }
@@ -576,13 +609,13 @@ impl Editor {
                     if let Some(sel) = self.selection {
                         let (start_row, _) = sel.start.min(sel.end);
                         let (end_row, _) = sel.start.max(sel.end);
-                        
+
                         // 從後往前處理，避免行號變化
                         for row in (start_row..=end_row).rev() {
                             let line_start = self.buffer.line_to_char(row);
                             self.buffer.insert(line_start, "    ");
                         }
-                        
+
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
@@ -604,21 +637,23 @@ impl Editor {
                     if let Some(sel) = self.selection {
                         let (start_row, _) = sel.start.min(sel.end);
                         let (end_row, _) = sel.start.max(sel.end);
-                        
+
                         // 從後往前處理，避免行號變化
                         for row in (start_row..=end_row).rev() {
                             let line_content = self.buffer.get_line_content(row);
-                            let spaces_to_remove = line_content.chars()
+                            let spaces_to_remove = line_content
+                                .chars()
                                 .take_while(|&c| c == ' ')
                                 .take(4)
                                 .count();
-                            
+
                             if spaces_to_remove > 0 {
                                 let line_start = self.buffer.line_to_char(row);
-                                self.buffer.delete_range(line_start, line_start + spaces_to_remove);
+                                self.buffer
+                                    .delete_range(line_start, line_start + spaces_to_remove);
                             }
                         }
-                        
+
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
@@ -627,17 +662,20 @@ impl Editor {
                 } else {
                     // 單行：刪除光標前最多 4 個空格
                     let line_content = self.buffer.get_line_content(self.cursor.row);
-                    let before_cursor: String = line_content.chars().take(self.cursor.col).collect();
-                    let spaces_to_remove = before_cursor.chars()
+                    let before_cursor: String =
+                        line_content.chars().take(self.cursor.col).collect();
+                    let spaces_to_remove = before_cursor
+                        .chars()
                         .rev()
                         .take_while(|&c| c == ' ')
                         .take(4)
                         .count();
-                    
+
                     if spaces_to_remove > 0 {
                         let line_start = self.buffer.line_to_char(self.cursor.row);
                         let delete_start = line_start + self.cursor.col - spaces_to_remove;
-                        self.buffer.delete_range(delete_start, delete_start + spaces_to_remove);
+                        self.buffer
+                            .delete_range(delete_start, delete_start + spaces_to_remove);
                         self.cursor.col -= spaces_to_remove;
                         self.cursor.desired_col = self.cursor.col;
                     }
@@ -646,7 +684,9 @@ impl Editor {
 
             // 跳轉到行
             Command::GoToLine => {
-                if let Ok(Some(line_str)) = crate::dialog::prompt("Go to line:", self.terminal.size()) {
+                if let Ok(Some(line_str)) =
+                    crate::dialog::prompt("Go to line:", self.terminal.size())
+                {
                     if let Ok(line_num) = line_str.trim().parse::<usize>() {
                         if line_num > 0 && line_num <= self.buffer.line_count() {
                             self.cursor.row = line_num - 1;
@@ -679,12 +719,16 @@ impl Editor {
 
             for row in start_row..=end_row {
                 let line = self.buffer.get_line_content(row);
-                let line = line.trim_end_matches(|c| c == '\n' || c == '\r');
+                let line = line.trim_end_matches(['\n', '\r']);
 
                 if row == start_row && row == end_row {
                     // 單行選擇
                     let chars: Vec<char> = line.chars().collect();
-                    text.push_str(&chars[start_col..end_col.min(chars.len())].iter().collect::<String>());
+                    text.push_str(
+                        &chars[start_col..end_col.min(chars.len())]
+                            .iter()
+                            .collect::<String>(),
+                    );
                 } else if row == start_row {
                     // 第一行
                     let chars: Vec<char> = line.chars().collect();

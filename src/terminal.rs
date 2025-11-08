@@ -38,11 +38,13 @@ impl Terminal {
         self.size
     }
 
+    #[allow(dead_code)]
     pub fn update_size(&mut self) -> Result<()> {
         self.size = terminal::size()?;
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn flush() -> Result<()> {
         io::stdout().flush()?;
         Ok(())
@@ -51,11 +53,13 @@ impl Terminal {
     pub fn read_key() -> Result<KeyEvent> {
         loop {
             let event = event::read()?;
-            
+
             match event {
                 Event::Key(key_event) => {
                     // 處理正常的 Press 和 Repeat 事件
-                    if key_event.kind == KeyEventKind::Press || key_event.kind == KeyEventKind::Repeat {
+                    if key_event.kind == KeyEventKind::Press
+                        || key_event.kind == KeyEventKind::Repeat
+                    {
                         return Ok(key_event);
                     }
                 }
@@ -72,11 +76,13 @@ impl Terminal {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_cursor_position(x: u16, y: u16) -> Result<()> {
         execute!(io::stdout(), cursor::MoveTo(x, y))?;
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn hide_cursor() -> Result<()> {
         execute!(io::stdout(), cursor::Hide)?;
         Ok(())

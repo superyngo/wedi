@@ -26,15 +26,15 @@ impl Search {
 
     pub fn find_matches(&mut self, buffer: &RopeBuffer) {
         self.matches.clear();
-        
+
         if self.query.is_empty() {
             return;
         }
 
         for line_idx in 0..buffer.line_count() {
             let line_content = buffer.get_line_content(line_idx);
-            let line_content = line_content.trim_end_matches(|c| c == '\n' || c == '\r');
-            
+            let line_content = line_content.trim_end_matches(['\n', '\r']);
+
             let mut start = 0;
             while let Some(pos) = line_content[start..].find(&self.query) {
                 let actual_pos = start + pos;
@@ -48,7 +48,7 @@ impl Search {
         if self.matches.is_empty() {
             return None;
         }
-        
+
         let result = self.matches[self.current_match];
         self.current_match = (self.current_match + 1) % self.matches.len();
         Some(result)
@@ -58,13 +58,13 @@ impl Search {
         if self.matches.is_empty() {
             return None;
         }
-        
+
         if self.current_match == 0 {
             self.current_match = self.matches.len() - 1;
         } else {
             self.current_match -= 1;
         }
-        
+
         Some(self.matches[self.current_match])
     }
 

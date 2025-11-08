@@ -96,7 +96,7 @@ fn main() -> Result<()> {
 
     // 創建並運行編輯器
     let mut editor = Editor::new(Some(&args.file))?;
-    
+
     // 設置 panic hook 以確保終端正常恢復
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {

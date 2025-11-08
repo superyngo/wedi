@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
     Rust,
@@ -24,9 +25,10 @@ pub enum FileType {
 }
 
 impl FileType {
+    #[allow(dead_code)]
     pub fn from_path(path: &Path) -> Self {
         let extension = path.extension().and_then(|s| s.to_str());
-        
+
         match extension {
             Some("rs") => FileType::Rust,
             Some("py") => FileType::Python,

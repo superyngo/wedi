@@ -2,8 +2,8 @@ use crate::buffer::RopeBuffer;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Cursor {
-    pub row: usize,        // 邏輯行號 (0-based)
-    pub col: usize,        // 邏輯列號 (0-based)
+    pub row: usize,         // 邏輯行號 (0-based)
+    pub col: usize,         // 邏輯列號 (0-based)
     pub desired_col: usize, // 上下移動時保持的列
 }
 
@@ -82,6 +82,7 @@ impl Cursor {
         self.adjust_col_to_desired(buffer);
     }
 
+    #[allow(dead_code)]
     pub fn move_to_line(&mut self, buffer: &RopeBuffer, line: usize) {
         self.row = line.min(buffer.line_count().saturating_sub(1));
         self.adjust_col_to_desired(buffer);
@@ -103,7 +104,7 @@ impl Cursor {
         if let Some(line) = buffer.line(row) {
             let text = line.to_string();
             // 移除末尾的換行符
-            let text = text.trim_end_matches(|c| c == '\n' || c == '\r');
+            let text = text.trim_end_matches(['\n', '\r']);
             text.chars().count()
         } else {
             0

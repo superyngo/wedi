@@ -1,6 +1,7 @@
 // 配置管理
 // 這個模組將在後續階段實現
 
+#[allow(dead_code)]
 pub struct Config {
     pub tab_width: usize,
     pub line_numbers: bool,
@@ -8,6 +9,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             tab_width: 4,

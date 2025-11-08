@@ -34,7 +34,7 @@ impl RopeBuffer {
             // 文件不存在，創建空緩衝區（將在保存時創建文件）
             (Rope::new(), true)
         };
-        
+
         Ok(Self {
             rope,
             file_path: Some(path.to_path_buf()),
@@ -46,7 +46,7 @@ impl RopeBuffer {
 
     pub fn insert_char(&mut self, pos: usize, ch: char) {
         let pos = pos.min(self.rope.len_chars());
-        
+
         // 記錄到歷史
         if !self.in_undo_redo {
             self.history.push(Action::Insert {
@@ -54,14 +54,14 @@ impl RopeBuffer {
                 text: ch.to_string(),
             });
         }
-        
+
         self.rope.insert_char(pos, ch);
         self.modified = true;
     }
 
     pub fn insert(&mut self, pos: usize, text: &str) {
         let pos = pos.min(self.rope.len_chars());
-        
+
         // 記錄到歷史
         if !self.in_undo_redo {
             self.history.push(Action::Insert {
@@ -69,7 +69,7 @@ impl RopeBuffer {
                 text: text.to_string(),
             });
         }
-        
+
         self.rope.insert(pos, text);
         self.modified = true;
     }
@@ -78,7 +78,7 @@ impl RopeBuffer {
         if pos < self.rope.len_chars() {
             // 獲取要刪除的字符
             let deleted_char = self.rope.char(pos).to_string();
-            
+
             // 記錄到歷史
             if !self.in_undo_redo {
                 self.history.push(Action::Delete {
@@ -86,7 +86,7 @@ impl RopeBuffer {
                     text: deleted_char,
                 });
             }
-            
+
             self.rope.remove(pos..pos + 1);
             self.modified = true;
         }
@@ -95,10 +95,10 @@ impl RopeBuffer {
     pub fn delete_range(&mut self, start: usize, end: usize) {
         if start < end && start < self.rope.len_chars() {
             let end = end.min(self.rope.len_chars());
-            
+
             // 獲取要刪除的文本
             let deleted_text = self.rope.slice(start..end).to_string();
-            
+
             // 記錄到歷史
             if !self.in_undo_redo {
                 self.history.push(Action::DeleteRange {
@@ -107,7 +107,7 @@ impl RopeBuffer {
                     text: deleted_text,
                 });
             }
-            
+
             self.rope.remove(start..end);
             self.modified = true;
         }
@@ -121,10 +121,10 @@ impl RopeBuffer {
             } else {
                 self.rope.len_chars()
             };
-            
+
             // 獲取要刪除的行
             let deleted_line = self.rope.slice(start..end).to_string();
-            
+
             // 記錄到歷史
             if !self.in_undo_redo {
                 self.history.push(Action::DeleteRange {
@@ -133,7 +133,7 @@ impl RopeBuffer {
                     text: deleted_line,
                 });
             }
-            
+
             self.rope.remove(start..end);
             self.modified = true;
         }
@@ -160,16 +160,26 @@ impl RopeBuffer {
     }
 
     pub fn save(&mut self) -> Result<()> {
-        if let Some(path) = &self.file_path {
-            fs::write(path, self.rope.to_string())
-                .with_context(|| format!("Failed to write file: {}", path.display()))?;
+        if let Some(path) = &self.file_path.clone() {
+            let contents = self.rope.to_string();
+            std::fs::write(path, contents)?;
             self.modified = false;
             Ok(())
         } else {
-            anyhow::bail!("No file path specified")
+            anyhow::bail!("No file path set")
         }
     }
 
+    #[allow(dead_code)]
+    pub fn save_to(&mut self, path: &Path) -> Result<()> {
+        let contents = self.rope.to_string();
+        std::fs::write(path, contents)?;
+        self.modified = false;
+        self.file_path = Some(path.to_path_buf());
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     pub fn save_as(&mut self, path: &Path) -> Result<()> {
         fs::write(path, self.rope.to_string())
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
@@ -182,6 +192,7 @@ impl RopeBuffer {
         self.modified
     }
 
+    #[allow(dead_code)]
     pub fn file_path(&self) -> Option<&Path> {
         self.file_path.as_deref()
     }
@@ -222,7 +233,7 @@ impl RopeBuffer {
     pub fn undo(&mut self) -> Option<usize> {
         if let Some(action) = self.history.undo() {
             self.in_undo_redo = true;
-            
+
             let result_pos = match action {
                 Action::Insert { pos, text } => {
                     // 撤銷插入 = 刪除
@@ -243,7 +254,7 @@ impl RopeBuffer {
                     Some(start)
                 }
             };
-            
+
             self.in_undo_redo = false;
             result_pos
         } else {
@@ -254,7 +265,7 @@ impl RopeBuffer {
     pub fn redo(&mut self) -> Option<usize> {
         if let Some(action) = self.history.redo() {
             self.in_undo_redo = true;
-            
+
             let result_pos = match action {
                 Action::Insert { pos, text } => {
                     // 重做插入
@@ -275,7 +286,7 @@ impl RopeBuffer {
                     Some(start)
                 }
             };
-            
+
             self.in_undo_redo = false;
             result_pos
         } else {
@@ -283,10 +294,12 @@ impl RopeBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn can_undo(&self) -> bool {
         self.history.can_undo()
     }
 
+    #[allow(dead_code)]
     pub fn can_redo(&self) -> bool {
         self.history.can_redo()
     }

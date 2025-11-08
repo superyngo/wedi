@@ -31,13 +31,19 @@ pub fn handle_key_event(event: KeyEvent, _has_selection: bool) -> Option<Command
         (KeyCode::Home, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::Home)),
         (KeyCode::End, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::End)),
         (KeyCode::PageUp, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::PageUp)),
-        (KeyCode::PageDown, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::PageDown)),
+        (KeyCode::PageDown, KeyModifiers::SHIFT) => {
+            Some(Command::ExtendSelection(Direction::PageDown))
+        }
 
         // Ctrl+Shift 快速選擇
-        (KeyCode::Left, m) if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) => {
+        (KeyCode::Left, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
             Some(Command::ExtendSelection(Direction::Home))
         }
-        (KeyCode::Right, m) if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) => {
+        (KeyCode::Right, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
             Some(Command::ExtendSelection(Direction::End))
         }
 

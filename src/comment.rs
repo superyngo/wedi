@@ -5,8 +5,9 @@ use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommentStyle {
-    Line(String),           // 單行註解，如 "//"
-    Block(String, String),  // 塊註解，如 "/*" 和 "*/"
+    Line(String), // 單行註解，如 "//"
+    #[allow(dead_code)]
+    Block(String, String), // 塊註解，如 "/*" 和 "*/"
 }
 
 pub struct CommentHandler {
@@ -20,17 +21,17 @@ impl CommentHandler {
 
     pub fn detect_from_path(&mut self, path: &Path) {
         let extension = path.extension().and_then(|s| s.to_str());
-        
+
         self.style = match extension {
-            // C-style comments: // 
-            Some("rs") | Some("c") | Some("cpp") | Some("cc") | Some("cxx") | Some("h") | Some("hpp") 
-            | Some("java") | Some("js") | Some("ts") | Some("jsx") | Some("tsx") 
+            // C-style comments: //
+            Some("rs") | Some("c") | Some("cpp") | Some("cc") | Some("cxx") | Some("h")
+            | Some("hpp") | Some("java") | Some("js") | Some("ts") | Some("jsx") | Some("tsx")
             | Some("go") | Some("cs") | Some("php") | Some("swift") | Some("kt") => {
                 Some(CommentStyle::Line("//".to_string()))
             }
             // Hash/Pound comments: #
-            Some("py") | Some("sh") | Some("bash") | Some("rb") | Some("pl") 
-            | Some("yaml") | Some("yml") | Some("toml") | Some("ps1") | Some("r") => {
+            Some("py") | Some("sh") | Some("bash") | Some("rb") | Some("pl") | Some("yaml")
+            | Some("yml") | Some("toml") | Some("ps1") | Some("r") => {
                 Some(CommentStyle::Line("#".to_string()))
             }
             // SQL-style comments: --
@@ -38,13 +39,9 @@ impl CommentHandler {
                 Some(CommentStyle::Line("--".to_string()))
             }
             // Batch/CMD comments: REM
-            Some("bat") | Some("cmd") => {
-                Some(CommentStyle::Line("REM".to_string()))
-            }
+            Some("bat") | Some("cmd") => Some(CommentStyle::Line("REM".to_string())),
             // Vim comments: "
-            Some("vim") | Some("vimrc") => {
-                Some(CommentStyle::Line("\"".to_string()))
-            }
+            Some("vim") | Some("vimrc") => Some(CommentStyle::Line("\"".to_string())),
             // 默認使用 # 註解（適用於大多數腳本語言和配置文件）
             _ => Some(CommentStyle::Line("#".to_string())),
         };
@@ -54,7 +51,7 @@ impl CommentHandler {
         match &self.style {
             Some(CommentStyle::Line(prefix)) => {
                 let trimmed = line.trim_start();
-                
+
                 // 檢查是否已有註解（註解符號後面可能有或沒有空格）
                 if trimmed.starts_with(prefix) {
                     // 取消註解：移除 "prefix " 或 "prefix"
@@ -64,7 +61,7 @@ impl CommentHandler {
                     } else {
                         after_prefix
                     };
-                    
+
                     // 如果取消註解後是空字串，不保留前導空格
                     if uncommented.is_empty() {
                         Some(String::new())
@@ -79,7 +76,12 @@ impl CommentHandler {
                         Some(format!("{} ", prefix))
                     } else {
                         let leading_spaces = line.len() - line.trim_start().len();
-                        Some(format!("{}{} {}", " ".repeat(leading_spaces), prefix, trimmed))
+                        Some(format!(
+                            "{}{} {}",
+                            " ".repeat(leading_spaces),
+                            prefix,
+                            trimmed
+                        ))
                     }
                 }
             }
@@ -103,13 +105,18 @@ impl CommentHandler {
         match &self.style {
             Some(CommentStyle::Line(prefix)) => {
                 let trimmed = line.trim_start();
-                
+
                 // 如果是空行，不保留前導空格
                 if trimmed.is_empty() {
                     Some(format!("{} ", prefix))
                 } else {
                     let leading_spaces = line.len() - line.trim_start().len();
-                    Some(format!("{}{} {}", " ".repeat(leading_spaces), prefix, trimmed))
+                    Some(format!(
+                        "{}{} {}",
+                        " ".repeat(leading_spaces),
+                        prefix,
+                        trimmed
+                    ))
                 }
             }
             _ => None,
@@ -121,7 +128,7 @@ impl CommentHandler {
         match &self.style {
             Some(CommentStyle::Line(prefix)) => {
                 let trimmed = line.trim_start();
-                
+
                 if trimmed.starts_with(prefix) {
                     let after_prefix = trimmed.strip_prefix(prefix)?;
                     let uncommented = if after_prefix.starts_with(' ') {
@@ -129,7 +136,7 @@ impl CommentHandler {
                     } else {
                         after_prefix
                     };
-                    
+
                     // 如果取消註解後是空字串，不保留前導空格
                     if uncommented.is_empty() {
                         Some(String::new())
@@ -153,9 +160,7 @@ impl CommentHandler {
     /// 返回 Some(index) 表示從該位置開始是註解
     pub fn find_comment_start(&self, line: &str) -> Option<usize> {
         match &self.style {
-            Some(CommentStyle::Line(prefix)) => {
-                line.find(prefix)
-            }
+            Some(CommentStyle::Line(prefix)) => line.find(prefix),
             _ => None,
         }
     }

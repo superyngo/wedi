@@ -3,7 +3,5 @@
 
 mod detector;
 
-pub use detector::FileType;
-
 #[allow(unused_imports)]
 use detector::*;

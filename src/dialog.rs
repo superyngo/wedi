@@ -3,7 +3,7 @@
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEventKind},
     execute, queue,
     style::{self, Color},
     terminal::{self, ClearType},
@@ -63,7 +63,7 @@ pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<Str
                 if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
                     continue;
                 }
-                
+
                 match key_event.code {
                     KeyCode::Enter => {
                         // 確認輸入
@@ -93,6 +93,7 @@ pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<Str
 }
 
 /// 顯示確認對話框
+#[allow(dead_code)]
 pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
     let (cols, rows) = terminal_size;
     let dialog_row = rows.saturating_sub(2);
@@ -138,7 +139,7 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
                 if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
                     continue;
                 }
-                
+
                 match key_event.code {
                     KeyCode::Char('y') | KeyCode::Char('Y') => return Ok(true),
                     KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => return Ok(false),

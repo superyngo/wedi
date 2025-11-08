@@ -4,10 +4,8 @@ use crate::cursor::Cursor;
 use crate::terminal::Terminal;
 use anyhow::Result;
 use crossterm::{
-    cursor,
-    execute,
-    queue,
-    style::{self, Color, Attribute, SetBackgroundColor},
+    cursor, execute, queue,
+    style::{self, Attribute, Color},
 };
 use std::io::{self, Write};
 
@@ -18,7 +16,7 @@ pub struct Selection {
 }
 
 pub struct View {
-    pub offset_row: usize,  // 視窗頂部顯示的行號
+    pub offset_row: usize, // 視窗頂部顯示的行號
     pub show_line_numbers: bool,
     pub screen_rows: usize,
     pub screen_cols: usize,
@@ -35,13 +33,21 @@ impl View {
         }
     }
 
+    #[allow(dead_code)]
     pub fn update_size(&mut self, terminal: &Terminal) {
         let (cols, rows) = terminal.size();
         self.screen_rows = rows.saturating_sub(1) as usize;
         self.screen_cols = cols as usize;
     }
 
-    pub fn render(&mut self, buffer: &RopeBuffer, cursor: &Cursor, selection: Option<&Selection>, message: Option<&str>, comment_handler: &CommentHandler) -> Result<()> {
+    pub fn render(
+        &mut self,
+        buffer: &RopeBuffer,
+        cursor: &Cursor,
+        selection: Option<&Selection>,
+        message: Option<&str>,
+        comment_handler: &CommentHandler,
+    ) -> Result<()> {
         self.scroll_if_needed(cursor);
 
         let mut stdout = io::stdout();
@@ -69,7 +75,7 @@ impl View {
         // 渲染文本行
         for screen_row in 0..self.screen_rows {
             let file_row = self.offset_row + screen_row;
-            
+
             queue!(stdout, cursor::MoveTo(0, screen_row as u16))?;
 
             if file_row < buffer.line_count() {
@@ -84,28 +90,29 @@ impl View {
                 // 顯示行內容
                 if let Some(line) = buffer.line(file_row) {
                     let line_str = line.to_string();
-                    let line_str = line_str.trim_end_matches(|c| c == '\n' || c == '\r');
-                    
+                    let line_str = line_str.trim_end_matches(['\n', '\r']);
+
                     // 查找註解符號的起始位置
                     let comment_start = comment_handler.find_comment_start(line_str);
-                    
+
                     // 處理Tab鍵顯示為空格
                     let displayed_line = line_str.replace('\t', "    ");
-                    
+
                     // 截斷超出屏幕的部分，並處理選擇高亮
                     let available_width = self.screen_cols.saturating_sub(line_num_width);
-                    
+
                     if let Some(((start_row, start_col), (end_row, end_col))) = sel_range {
                         if file_row >= start_row && file_row <= end_row {
                             // 這一行有選擇
                             let chars: Vec<char> = displayed_line.chars().collect();
                             let mut col = 0;
-                            
+
+                            #[allow(clippy::explicit_counter_loop)]
                             for (idx, &ch) in chars.iter().enumerate() {
                                 if col >= available_width {
                                     break;
                                 }
-                                
+
                                 let is_selected = if file_row == start_row && file_row == end_row {
                                     idx >= start_col && idx < end_col
                                 } else if file_row == start_row {
@@ -115,9 +122,9 @@ impl View {
                                 } else {
                                     true
                                 };
-                                
-                                let is_in_comment = comment_start.map_or(false, |pos| idx >= pos);
-                                
+
+                                let is_in_comment = comment_start.is_some_and(|pos| idx >= pos);
+
                                 if is_selected {
                                     queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
                                 } else if is_in_comment {
@@ -136,13 +143,17 @@ impl View {
                             if let Some(comment_pos) = comment_start {
                                 let chars: Vec<char> = displayed_line.chars().collect();
                                 let mut col = 0;
+                                #[allow(clippy::explicit_counter_loop)]
                                 for (idx, &ch) in chars.iter().enumerate() {
                                     if col >= available_width {
                                         break;
                                     }
                                     if idx >= comment_pos {
                                         if idx == comment_pos {
-                                            queue!(stdout, style::SetForegroundColor(Color::DarkGreen))?;
+                                            queue!(
+                                                stdout,
+                                                style::SetForegroundColor(Color::DarkGreen)
+                                            )?;
                                         }
                                         queue!(stdout, style::Print(ch))?;
                                     } else {
@@ -152,7 +163,8 @@ impl View {
                                 }
                                 queue!(stdout, style::ResetColor)?;
                             } else {
-                                let truncated = self.truncate_line(&displayed_line, available_width);
+                                let truncated =
+                                    self.truncate_line(&displayed_line, available_width);
                                 queue!(stdout, style::Print(truncated))?;
                             }
                         }
@@ -161,13 +173,17 @@ impl View {
                         if let Some(comment_pos) = comment_start {
                             let chars: Vec<char> = displayed_line.chars().collect();
                             let mut col = 0;
+                            #[allow(clippy::explicit_counter_loop)]
                             for (idx, &ch) in chars.iter().enumerate() {
                                 if col >= available_width {
                                     break;
                                 }
                                 if idx >= comment_pos {
                                     if idx == comment_pos {
-                                        queue!(stdout, style::SetForegroundColor(Color::DarkGreen))?;
+                                        queue!(
+                                            stdout,
+                                            style::SetForegroundColor(Color::DarkGreen)
+                                        )?;
                                     }
                                     queue!(stdout, style::Print(ch))?;
                                 } else {
@@ -190,16 +206,22 @@ impl View {
             }
 
             // 清除行的剩餘部分
-            queue!(stdout, crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine))?;
+            queue!(
+                stdout,
+                crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine)
+            )?;
         }
 
         // 渲染狀態欄
         self.render_status_bar(buffer, message, cursor)?;
 
         // 計算光標的視覺列位置（考慮 Tab 展開）
-        let current_line = buffer.line(cursor.row).map(|s| s.to_string()).unwrap_or_default();
+        let current_line = buffer
+            .line(cursor.row)
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         let visual_col = Self::calculate_visual_column(&current_line, cursor.col);
-        
+
         let cursor_x = if self.show_line_numbers {
             (line_num_width + visual_col) as u16
         } else {
@@ -226,16 +248,25 @@ impl View {
         }
     }
 
-    fn render_status_bar(&self, buffer: &RopeBuffer, message: Option<&str>, cursor: &Cursor) -> Result<()> {
+    fn render_status_bar(
+        &self,
+        buffer: &RopeBuffer,
+        message: Option<&str>,
+        cursor: &Cursor,
+    ) -> Result<()> {
         let mut stdout = io::stdout();
         queue!(stdout, cursor::MoveTo(0, self.screen_rows as u16))?;
-        
+
         queue!(stdout, style::SetBackgroundColor(Color::DarkGrey))?;
         queue!(stdout, style::SetForegroundColor(Color::White))?;
 
-        let modified = if buffer.is_modified() { " [modified]" } else { "" };
+        let modified = if buffer.is_modified() {
+            " [modified]"
+        } else {
+            ""
+        };
         let filename = buffer.file_name();
-        
+
         let status = if let Some(msg) = message {
             // 如果有消息，優先顯示消息
             format!(" {}{} - {}", filename, modified, msg)

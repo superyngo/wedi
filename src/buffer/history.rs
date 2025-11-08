@@ -2,9 +2,19 @@
 
 #[derive(Debug, Clone)]
 pub enum Action {
-    Insert { pos: usize, text: String },
-    Delete { pos: usize, text: String },
-    DeleteRange { start: usize, end: usize, text: String },
+    Insert {
+        pos: usize,
+        text: String,
+    },
+    Delete {
+        pos: usize,
+        text: String,
+    },
+    DeleteRange {
+        start: usize,
+        end: usize,
+        text: String,
+    },
 }
 
 pub struct History {
@@ -48,14 +58,17 @@ impl History {
         }
     }
 
+    #[allow(dead_code)]
     pub fn can_undo(&self) -> bool {
         !self.undo_stack.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn can_redo(&self) -> bool {
         !self.redo_stack.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.undo_stack.clear();
         self.redo_stack.clear();
