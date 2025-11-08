@@ -100,15 +100,15 @@ impl View {
                     let mut comment_display_idx = None;
                     
                     for (char_idx, ch) in line_str.chars().enumerate() {
+                        // 如果這是註解開始的字符,記錄當前顯示字符串的長度(即將添加的字符位置)
+                        if comment_start_char_idx == Some(char_idx) {
+                            comment_display_idx = Some(displayed_line.chars().count());
+                        }
+                        
                         if ch == '\t' {
                             displayed_line.push_str("    ");
                         } else {
                             displayed_line.push(ch);
-                        }
-                        
-                        // 如果這是註解開始的字符,記錄它在顯示字符串中的位置
-                        if comment_start_char_idx == Some(char_idx) {
-                            comment_display_idx = Some(displayed_line.len() - if ch == '\t' { 4 } else { 1 });
                         }
                     }
 
