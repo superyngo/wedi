@@ -12,7 +12,9 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: false
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -27,11 +29,11 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact_name: wedi.exe
             asset_name: wedi-windows-x86_64.exe
-          - os: macos-latest
+          - os: macos-13
             target: x86_64-apple-darwin
             artifact_name: wedi
             asset_name: wedi-macos-x86_64
-          - os: macos-latest
+          - os: macos-14
             target: aarch64-apple-darwin
             artifact_name: wedi
             asset_name: wedi-macos-aarch64
@@ -74,14 +76,14 @@ jobs:
 
       - name: Upload artifacts (Linux and macOS)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.asset_name }}.tar.gz
 
       - name: Upload artifacts (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.asset_name }}.zip
@@ -92,23 +94,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
       - name: Display structure
-        run: ls -R
+        run: |
+          echo "Current directory structure:"
+          ls -la
+          echo "Artifacts directory:"
+          ls -la artifacts/
+          echo "Looking for artifacts:"
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \)
 
       - name: Prepare release files
         run: |
           mkdir -p release_files
-          find . -name "*.tar.gz" -o -name "*.zip" | while read file; do
-            cp "$file" release_files/
-          done
+          # Copy all tar.gz and zip files to release_files directory
+          find artifacts -type f -name "*.tar.gz" -exec cp {} release_files/ \;
+          find artifacts -type f -name "*.zip" -exec cp {} release_files/ \;
+          echo "Files in release_files:"
+          ls -la release_files/
 
       - name: Generate checksums
         run: |
           cd release_files
-          sha256sum * > SHA256SUMS
-          cat SHA256SUMS
+          if [ -n "$(ls -A)" ]; then
+            sha256sum * > SHA256SUMS
+            echo "Checksums generated:"
+            cat SHA256SUMS
+          else
+            echo "No files found in release_files directory!"
+            exit 1
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
