@@ -9,31 +9,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
   build:
-    name: Build ${{ matrix.os }}
-    needs: create-release
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -92,35 +69,26 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
-          mv ${{ matrix.asset_name }}.zip ../../../
+          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ../../../${{ matrix.asset_name }}.zip
         shell: pwsh
 
-      - name: Upload Release Asset (Linux and macOS)
+      - name: Upload artifacts (Linux and macOS)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}.tar.gz
-          asset_name: ${{ matrix.asset_name }}.tar.gz
-          asset_content_type: application/gzip
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.tar.gz
 
-      - name: Upload Release Asset (Windows)
+      - name: Upload artifacts (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}.zip
-          asset_name: ${{ matrix.asset_name }}.zip
-          asset_content_type: application/zip
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.zip
 
-  checksums:
-    name: Generate Checksums
-    needs: [create-release, build]
+  release:
+    name: Create Release
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -128,14 +96,26 @@ jobs:
 
       - name: Generate checksums
         run: |
-          sha256sum * > SHA256SUMS
+          for dir in */; do
+            cd "$dir"
+            for file in *; do
+              sha256sum "$file" >> ../SHA256SUMS
+            done
+            cd ..
+          done
 
-      - name: Upload checksums
-        uses: actions/upload-release-asset@v1
+      - name: Display structure
+        run: ls -R
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            */wedi-*.tar.gz
+            */wedi-*.zip
+            SHA256SUMS
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./SHA256SUMS
-          asset_name: SHA256SUMS
-          asset_content_type: text/plain
