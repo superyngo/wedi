@@ -1,0 +1,27 @@
+[package]
+name = "wedi"
+version = "0.1.4"
+edition = "2021"
+authors = ["wedi contributors"]
+description = "A cross-platform minimalist lightweight CLI text editor"
+license = "MIT"
+
+[dependencies]
+crossterm = "0.27"      # 終端操作
+clap = { version = "4.5", features = ["derive"] }  # CLI 參數解析
+ropey = "1.6"           # 文本緩衝區
+arboard = "3.3"         # 剪貼板
+unicode-width = "0.1"   # Unicode 字符寬度計算
+log = "0.4"             # 日誌
+env_logger = "0.11"     # 日誌實現
+anyhow = "1.0"          # 錯誤處理
+
+[dev-dependencies]
+assert_cmd = "2.0"      # CLI 測試
+predicates = "3.0"      # 測試斷言
+tempfile = "3.8"        # 臨時文件測試
+
+[profile.release]
+strip = true            # 移除符號以減小二進制文件大小
+lto = true              # 啟用鏈接時優化
+opt-level = "z"         # 優化文件大小
