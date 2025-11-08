@@ -19,7 +19,15 @@ A cross-platform minimalist lightweight CLI text editor written in Rust.
 - ✅ **Fast navigation (Ctrl+Arrows/Home/End)** 🎉
 - ✅ **Chinese character support** 🎉
 - ✅ **Comment highlighting** 🎉
+- ✅ **Internal clipboard fallback for headless systems** 🎉
 - 🚧 Syntax highlighting (coming soon)
+
+## Important Notes
+
+⚠️ **Terminal Compatibility:**
+- **Windows Terminal / PowerShell 7+**: Full feature support ✅
+- **Traditional Windows Console (cmd.exe)**: Some key combinations (Ctrl+Arrows, Shift+Arrows) may not work due to console limitations. Use alternative keys: Ctrl+Home/End, Home/End with Shift
+- **Linux/macOS terminals**: Full support in most modern terminals
 
 ## Installation
 

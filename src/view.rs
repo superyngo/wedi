@@ -92,11 +92,25 @@ impl View {
                     let line_str = line.to_string();
                     let line_str = line_str.trim_end_matches(['\n', '\r']);
 
-                    // 查找註解符號的起始位置
-                    let comment_start = comment_handler.find_comment_start(line_str);
+                    // 查找註解符號的起始位置(在原始字符串中的字符索引)
+                    let comment_start_char_idx = comment_handler.find_comment_start(line_str);
 
-                    // 處理Tab鍵顯示為空格
-                    let displayed_line = line_str.replace('\t', "    ");
+                    // 處理Tab鍵顯示為空格,並計算註解位置在顯示字符串中的索引
+                    let mut displayed_line = String::new();
+                    let mut comment_display_idx = None;
+                    
+                    for (char_idx, ch) in line_str.chars().enumerate() {
+                        if ch == '\t' {
+                            displayed_line.push_str("    ");
+                        } else {
+                            displayed_line.push(ch);
+                        }
+                        
+                        // 如果這是註解開始的字符,記錄它在顯示字符串中的位置
+                        if comment_start_char_idx == Some(char_idx) {
+                            comment_display_idx = Some(displayed_line.len() - if ch == '\t' { 4 } else { 1 });
+                        }
+                    }
 
                     // 截斷超出屏幕的部分，並處理選擇高亮
                     let available_width = self.screen_cols.saturating_sub(line_num_width);
@@ -123,7 +137,7 @@ impl View {
                                     true
                                 };
 
-                                let is_in_comment = comment_start.is_some_and(|pos| idx >= pos);
+                                let is_in_comment = comment_display_idx.is_some_and(|pos| idx >= pos);
 
                                 if is_selected {
                                     queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
@@ -140,7 +154,7 @@ impl View {
                             }
                         } else {
                             // 沒有選擇，如果有註解則部分變色
-                            if let Some(comment_pos) = comment_start {
+                            if let Some(comment_pos) = comment_display_idx {
                                 let chars: Vec<char> = displayed_line.chars().collect();
                                 let mut col = 0;
                                 #[allow(clippy::explicit_counter_loop)]
@@ -170,7 +184,7 @@ impl View {
                         }
                     } else {
                         // 沒有選擇，如果有註解則部分變色
-                        if let Some(comment_pos) = comment_start {
+                        if let Some(comment_pos) = comment_display_idx {
                             let chars: Vec<char> = displayed_line.chars().collect();
                             let mut col = 0;
                             #[allow(clippy::explicit_counter_loop)]
