@@ -32,6 +32,10 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact_name: wedi.exe
             asset_name: wedi-windows-x86_64.exe
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            artifact_name: wedi.exe
+            asset_name: wedi-windows-i686.exe
           - os: macos-13
             target: x86_64-apple-darwin
             artifact_name: wedi
