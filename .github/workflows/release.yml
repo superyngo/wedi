@@ -94,26 +94,26 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v3
 
-      - name: Generate checksums
-        run: |
-          for dir in */; do
-            cd "$dir"
-            for file in *; do
-              sha256sum "$file" >> ../SHA256SUMS
-            done
-            cd ..
-          done
-
       - name: Display structure
         run: ls -R
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          find . -name "*.tar.gz" -o -name "*.zip" | while read file; do
+            cp "$file" release_files/
+          done
+
+      - name: Generate checksums
+        run: |
+          cd release_files
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            */wedi-*.tar.gz
-            */wedi-*.zip
-            SHA256SUMS
+          files: release_files/*
           draft: false
           prerelease: false
           generate_release_notes: true
