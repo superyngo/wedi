@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*" # 當推送 v1.0.0 格式的 tag 時觸發
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
