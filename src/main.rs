@@ -80,7 +80,8 @@ SUPPORTED COMMENT STYLES:
   \"   - Vim
 ")]
 struct Args {
-    /// File to open or create
+    /// File to open or create (default: Untitled)
+    #[arg(default_value = "Untitled")]
     file: PathBuf,
 
     /// Enable debug mode
