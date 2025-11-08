@@ -15,6 +15,7 @@ pub struct Editor {
     view: View,
     terminal: Terminal,
     clipboard: ClipboardManager,
+    internal_clipboard: String, // 內部剪貼簿作為後備
     search: Search,
     comment_handler: CommentHandler,
     should_quit: bool,
@@ -46,6 +47,7 @@ impl Editor {
             view,
             terminal,
             clipboard,
+            internal_clipboard: String::new(), // 初始化內部剪貼簿
             search: Search::new(),
             comment_handler,
             should_quit: false,
@@ -275,49 +277,60 @@ impl Editor {
 
             // 剪貼板操作
             Command::Copy => {
-                if self.has_selection() {
-                    let text = self.get_selected_text();
-                    if let Err(e) = self.clipboard.set_text(&text) {
-                        self.message = Some(format!("Copy failed: {}", e));
-                    }
+                let text = if self.has_selection() {
+                    self.get_selected_text()
                 } else {
                     // 複製當前整行（完整內容，包括尾部空格和換行符）
                     let line_text = self.buffer.get_line_full(self.cursor.row);
-
                     // 確保以換行符結尾（用於識別整行貼上）
-                    let line_with_newline = if line_text.ends_with('\n') {
+                    if line_text.ends_with('\n') {
                         line_text
                     } else {
                         format!("{}\n", line_text)
-                    };
-
-                    if let Err(e) = self.clipboard.set_text(&line_with_newline) {
-                        self.message = Some(format!("Copy failed: {}", e));
                     }
+                };
+
+                // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
+                if let Err(_) = self.clipboard.set_text(&text) {
+                    self.internal_clipboard = text;
+                    if !self.clipboard.is_available() {
+                        self.message = Some("Copied (internal clipboard)".to_string());
+                    }
+                } else {
+                    self.internal_clipboard = text; // 同步到內部剪貼簿
                 }
             }
 
             Command::Cut => {
-                if self.has_selection() {
-                    let text = self.get_selected_text();
-                    if let Err(e) = self.clipboard.set_text(&text) {
-                        self.message = Some(format!("Cut failed: {}", e));
-                    } else {
-                        self.delete_selection();
-                    }
+                let text = if self.has_selection() {
+                    self.get_selected_text()
                 } else {
                     // 剪切當前整行（完整內容）
                     let line_text = self.buffer.get_line_full(self.cursor.row);
-
                     // 確保以換行符結尾
-                    let line_with_newline = if line_text.ends_with('\n') {
+                    if line_text.ends_with('\n') {
                         line_text
                     } else {
                         format!("{}\n", line_text)
-                    };
+                    }
+                };
 
-                    if let Err(e) = self.clipboard.set_text(&line_with_newline) {
-                        self.message = Some(format!("Cut failed: {}", e));
+                // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
+                let copy_success = if let Err(_) = self.clipboard.set_text(&text) {
+                    self.internal_clipboard = text;
+                    if !self.clipboard.is_available() {
+                        self.message = Some("Cut (internal clipboard)".to_string());
+                    }
+                    true
+                } else {
+                    self.internal_clipboard = text; // 同步到內部剪貼簿
+                    true
+                };
+
+                // 剪切成功後刪除內容
+                if copy_success {
+                    if self.has_selection() {
+                        self.delete_selection();
                     } else {
                         self.buffer.delete_line(self.cursor.row);
                         // 剪切後光標上移一行
@@ -337,7 +350,20 @@ impl Editor {
             }
 
             Command::Paste => {
-                if let Ok(text) = self.clipboard.get_text() {
+                // 嘗試從系統剪貼簿獲取,失敗則使用內部剪貼簿
+                let text = self.clipboard.get_text()
+                    .unwrap_or_else(|_| {
+                        if self.internal_clipboard.is_empty() {
+                            if !self.clipboard.is_available() {
+                                self.message = Some("Nothing to paste (internal clipboard)".to_string());
+                            }
+                            String::new()
+                        } else {
+                            self.internal_clipboard.clone()
+                        }
+                    });
+
+                if !text.is_empty() {
                     if self.has_selection() {
                         self.delete_selection();
                     }
