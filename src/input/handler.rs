@@ -39,6 +39,9 @@ pub enum Command {
     Cut,
     Paste,
 
+    // 視窗調整
+    Resize,
+
     // 文件操作
     Save,
     Quit,

@@ -63,6 +63,10 @@ impl Terminal {
                         return Ok(key_event);
                     }
                 }
+                Event::Resize(_cols, _rows) => {
+                    // 視窗大小改變,返回特殊標記
+                    return Ok(KeyEvent::new(KeyCode::F(21), KeyModifiers::NONE));
+                }
                 Event::Paste(_text) => {
                     // Windows Terminal 的 Ctrl+V 觸發 Paste 事件
                     // 返回一個特殊按鍵標記,攜帶文本長度信息

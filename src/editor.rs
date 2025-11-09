@@ -426,6 +426,11 @@ impl Editor {
                 }
             }
 
+            // 視窗調整
+            Command::Resize => {
+                self.view.update_size();
+            }
+
             // 撤銷/重做
             Command::Undo => {
                 if let Some(pos) = self.buffer.undo() {
