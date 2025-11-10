@@ -48,7 +48,10 @@ impl View {
         message: Option<&str>,
         comment_handler: &CommentHandler,
     ) -> Result<()> {
-        self.scroll_if_needed(cursor);
+        // 判斷是否有 debug 標尺
+        let has_debug_ruler = message.map_or(false, |m| m.starts_with("DEBUG"));
+
+        self.scroll_if_needed(cursor, buffer, has_debug_ruler);
 
         let mut stdout = io::stdout();
 
@@ -57,6 +60,14 @@ impl View {
 
         // 移動到左上角但不清空屏幕
         execute!(stdout, cursor::MoveTo(0, 0))?;
+
+        // 渲染列標尺（debug模式下才顯示）
+        let ruler_offset = if message.map_or(false, |m| m.starts_with("DEBUG")) {
+            self.render_column_ruler(&mut stdout)?;
+            1 // 佔用一行
+        } else {
+            0
+        };
 
         // 計算行號寬度
         let line_num_width = if self.show_line_numbers {
@@ -69,30 +80,36 @@ impl View {
         let sel_visual_range = selection.map(|sel| {
             let (start_row, start_col) = sel.start.min(sel.end);
             let (end_row, end_col) = sel.start.max(sel.end);
-            
+
             // 將start_col轉換為視覺列
             let start_visual_col = if start_row < buffer.line_count() {
-                let line = buffer.line(start_row).map(|s| s.to_string()).unwrap_or_default();
+                let line = buffer
+                    .line(start_row)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
                 Self::calculate_visual_column(&line, start_col)
             } else {
                 start_col
             };
-            
+
             // 將end_col轉換為視覺列
             let end_visual_col = if end_row < buffer.line_count() {
-                let line = buffer.line(end_row).map(|s| s.to_string()).unwrap_or_default();
+                let line = buffer
+                    .line(end_row)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
                 Self::calculate_visual_column(&line, end_col)
             } else {
                 end_col
             };
-            
+
             ((start_row, start_visual_col), (end_row, end_visual_col))
         });
 
         // 渲染文本行
-        let mut screen_row = 0;
+        let mut screen_row = ruler_offset; // 從標尺行之後開始
         let mut file_row = self.offset_row;
-        
+
         while screen_row < self.screen_rows && file_row < buffer.line_count() {
             queue!(stdout, cursor::MoveTo(0, screen_row as u16))?;
 
@@ -115,13 +132,13 @@ impl View {
                 // 處理Tab鍵顯示為空格,並計算註解位置在顯示字符串中的索引
                 let mut displayed_line = String::new();
                 let mut comment_display_idx = None;
-                
+
                 for (char_idx, ch) in line_str.chars().enumerate() {
                     // 如果這是註解開始的字符,記錄當前顯示字符串的長度(即將添加的字符位置)
                     if comment_start_char_idx == Some(char_idx) {
                         comment_display_idx = Some(displayed_line.chars().count());
                     }
-                    
+
                     if ch == '\t' {
                         displayed_line.push_str("    ");
                     } else {
@@ -130,17 +147,20 @@ impl View {
                 }
 
                 // 可用寬度（保留一個字符的邊距，避免自動換行）
-                let available_width = self.screen_cols.saturating_sub(line_num_width).saturating_sub(1);
-                
+                let available_width = self
+                    .screen_cols
+                    .saturating_sub(line_num_width)
+                    .saturating_sub(1);
+
                 // 將行內容按可用寬度切分成多個視覺行
                 let visual_lines = self.wrap_line(&displayed_line, available_width);
-                
+
                 // 渲染所有視覺行
                 for (visual_idx, visual_line) in visual_lines.iter().enumerate() {
                     if screen_row >= self.screen_rows {
                         break;
                     }
-                    
+
                     // 如果是後續視覺行，需要移到新行並空出行號位置
                     if visual_idx > 0 {
                         screen_row += 1;
@@ -148,7 +168,7 @@ impl View {
                             break;
                         }
                         queue!(stdout, cursor::MoveTo(0, screen_row as u16))?;
-                        
+
                         // 空出行號位置
                         if self.show_line_numbers {
                             for _ in 0..line_num_width {
@@ -156,16 +176,17 @@ impl View {
                             }
                         }
                     }
-                    
+
                     // 計算當前視覺行在整個displayed_line中的起始位置
                     let mut visual_line_start = 0;
                     for i in 0..visual_idx {
                         visual_line_start += visual_lines[i].chars().count();
                     }
                     let visual_line_end = visual_line_start + visual_line.chars().count();
-                    
+
                     // 如果註解在當前視覺行之前或之內，則整個視覺行需要部分或全部變色
-                    let is_comment_started = comment_display_idx.map_or(false, |pos| pos < visual_line_end);
+                    let is_comment_started =
+                        comment_display_idx.map_or(false, |pos| pos < visual_line_end);
                     let comment_pos_in_visual_line = if is_comment_started {
                         comment_display_idx.and_then(|pos| {
                             if pos >= visual_line_start {
@@ -177,7 +198,7 @@ impl View {
                     } else {
                         None
                     };
-                    
+
                     // 處理選擇高亮
                     if let Some(((start_row, start_col), (end_row, end_col))) = sel_visual_range {
                         if file_row >= start_row && file_row <= end_row {
@@ -187,7 +208,7 @@ impl View {
                             for (idx, &ch) in chars.iter().enumerate() {
                                 // 當前字符在displayed_line中的絕對位置
                                 let abs_pos = visual_line_start + idx;
-                                
+
                                 let is_selected = if file_row == start_row && file_row == end_row {
                                     abs_pos >= start_col && abs_pos < end_col
                                 } else if file_row == start_row {
@@ -198,7 +219,8 @@ impl View {
                                     true
                                 };
 
-                                let is_in_comment = comment_pos_in_visual_line.is_some_and(|pos| idx >= pos);
+                                let is_in_comment =
+                                    comment_pos_in_visual_line.is_some_and(|pos| idx >= pos);
 
                                 if is_selected {
                                     queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
@@ -256,7 +278,7 @@ impl View {
                             queue!(stdout, style::Print(visual_line))?;
                         }
                     }
-                    
+
                     // 清除行的剩餘部分
                     queue!(
                         stdout,
@@ -264,11 +286,11 @@ impl View {
                     )?;
                 }
             }
-            
+
             screen_row += 1;
             file_row += 1;
         }
-        
+
         // 填充剩餘的螢幕行
         while screen_row < self.screen_rows {
             queue!(stdout, cursor::MoveTo(0, screen_row as u16))?;
@@ -276,13 +298,13 @@ impl View {
             queue!(stdout, style::SetForegroundColor(Color::DarkGrey))?;
             queue!(stdout, style::Print("~"))?;
             queue!(stdout, style::ResetColor)?;
-            
+
             // 清除行的剩餘部分
             queue!(
                 stdout,
                 crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine)
             )?;
-            
+
             screen_row += 1;
         }
 
@@ -295,8 +317,11 @@ impl View {
         } else {
             0
         };
-        let available_width = self.screen_cols.saturating_sub(line_num_width);
-        
+        let available_width = self
+            .screen_cols
+            .saturating_sub(line_num_width)
+            .saturating_sub(1);
+
         // 計算光標Y位置：累計從offset_row到cursor.row之前所有行的視覺行數
         let mut cursor_screen_y = 0;
         for row in self.offset_row..cursor.row {
@@ -304,7 +329,7 @@ impl View {
                 if let Some(line) = buffer.line(row) {
                     let line_str = line.to_string();
                     let line_str = line_str.trim_end_matches(['\n', '\r']);
-                    
+
                     // 處理Tab展開
                     let mut displayed_line = String::new();
                     for ch in line_str.chars() {
@@ -314,19 +339,19 @@ impl View {
                             displayed_line.push(ch);
                         }
                     }
-                    
+
                     let visual_lines = self.wrap_line(&displayed_line, available_width);
                     cursor_screen_y += visual_lines.len();
                 }
             }
         }
-        
+
         // 計算光標在當前行的視覺列和視覺行索引
         let current_line = buffer
             .line(cursor.row)
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         // 處理Tab展開
         let mut displayed_line = String::new();
         for ch in current_line.trim_end_matches(['\n', '\r']).chars() {
@@ -336,15 +361,15 @@ impl View {
                 displayed_line.push(ch);
             }
         }
-        
+
         let visual_col = Self::calculate_visual_column(&current_line, cursor.col);
         let visual_lines = self.wrap_line(&displayed_line, available_width);
-        
+
         // 找出光標在哪個視覺行
         let mut accumulated_width = 0;
         let mut visual_line_idx = 0;
         let mut col_in_visual_line = visual_col;
-        
+
         for (idx, vline) in visual_lines.iter().enumerate() {
             let vline_width = vline.chars().count();
             if visual_col < accumulated_width + vline_width || idx == visual_lines.len() - 1 {
@@ -354,7 +379,7 @@ impl View {
             }
             accumulated_width += vline_width;
         }
-        
+
         cursor_screen_y += visual_line_idx;
 
         let cursor_x = if self.show_line_numbers {
@@ -362,7 +387,7 @@ impl View {
         } else {
             col_in_visual_line as u16
         };
-        let cursor_y = cursor_screen_y as u16;
+        let cursor_y = (cursor_screen_y + ruler_offset) as u16; // 加上標尺偏移
 
         // 設置普通光標位置
         execute!(stdout, cursor::MoveTo(cursor_x, cursor_y))?;
@@ -372,14 +397,33 @@ impl View {
         Ok(())
     }
 
-    pub fn scroll_if_needed(&mut self, cursor: &Cursor) {
+    pub fn scroll_if_needed(
+        &mut self,
+        cursor: &Cursor,
+        buffer: &RopeBuffer,
+        has_debug_ruler: bool,
+    ) {
         // 向上滾動
         if cursor.row < self.offset_row {
             self.offset_row = cursor.row;
+            return;
         }
-        // 向下滾動
-        if cursor.row >= self.offset_row + self.screen_rows {
-            self.offset_row = cursor.row - self.screen_rows + 1;
+
+        // 向下滾動：基於視覺行數判斷
+        let effective_rows = self.get_effective_screen_rows(has_debug_ruler);
+        let visual_offset =
+            self.count_visual_lines(buffer, self.offset_row, cursor.row) + cursor.visual_line_index;
+
+        // 如果光標視覺位置超出螢幕，向下調整 offset_row
+        if visual_offset >= effective_rows {
+            while self.offset_row < cursor.row {
+                self.offset_row += 1;
+                let new_offset = self.count_visual_lines(buffer, self.offset_row, cursor.row)
+                    + cursor.visual_line_index;
+                if new_offset < effective_rows {
+                    break;
+                }
+            }
         }
     }
 
@@ -416,10 +460,11 @@ impl View {
         };
 
         // 確保狀態欄填滿整行
-        let status = if status.len() < self.screen_cols {
+        let status = if status.chars().count() < self.screen_cols {
             format!("{:width$}", status, width = self.screen_cols)
         } else {
-            status[..self.screen_cols].to_string()
+            // 使用字符邊界安全截斷
+            status.chars().take(self.screen_cols).collect::<String>()
         };
 
         queue!(stdout, style::Print(status))?;
@@ -456,7 +501,7 @@ impl View {
 
         for ch in line.chars() {
             let char_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
-            
+
             // 如果加入這個字符會超過或等於寬度限制，且當前行不為空
             if current_width + char_width > max_width && !current_line.is_empty() {
                 // 保存當前行並開始新行
@@ -464,7 +509,7 @@ impl View {
                 current_line = String::new();
                 current_width = 0;
             }
-            
+
             // 將字符加入當前行
             current_line.push(ch);
             current_width += char_width;
@@ -474,7 +519,7 @@ impl View {
         if !current_line.is_empty() {
             result.push(current_line);
         }
-        
+
         // 確保至少有一個空行
         if result.is_empty() {
             result.push(String::new());
@@ -504,5 +549,152 @@ impl View {
 
     pub fn toggle_line_numbers(&mut self) {
         self.show_line_numbers = !self.show_line_numbers;
+    }
+
+    /// 獲取可用於顯示內容的寬度（扣除行號寬度）
+    pub fn get_available_width(&self, buffer: &RopeBuffer) -> usize {
+        let line_num_width = if self.show_line_numbers {
+            buffer.line_count().to_string().len() + 1
+        } else {
+            0
+        };
+        self.screen_cols
+            .saturating_sub(line_num_width)
+            .saturating_sub(1)
+    }
+
+    /// 計算指定邏輯行的視覺行分割
+    pub fn calculate_visual_lines_for_row(&self, buffer: &RopeBuffer, row: usize) -> Vec<String> {
+        let available_width = self.get_available_width(buffer);
+
+        if row >= buffer.line_count() {
+            return vec![String::new()];
+        }
+
+        let line = buffer.line(row).map(|s| s.to_string()).unwrap_or_default();
+        let line = line.trim_end_matches(['\n', '\r']);
+
+        // 處理 Tab 展開
+        let mut displayed_line = String::new();
+        for ch in line.chars() {
+            if ch == '\t' {
+                displayed_line.push_str("    ");
+            } else {
+                displayed_line.push(ch);
+            }
+        }
+
+        self.wrap_line(&displayed_line, available_width)
+    }
+
+    /// 將邏輯列轉換為視覺列（考慮 Tab 展開和字符寬度）
+    pub fn logical_col_to_visual_col(&self, line: &str, logical_col: usize) -> usize {
+        Self::calculate_visual_column(line, logical_col)
+    }
+
+    /// 從視覺行索引和視覺列轉換為邏輯列
+    pub fn visual_to_logical_col(
+        &self,
+        buffer: &RopeBuffer,
+        row: usize,
+        visual_line_index: usize,
+        visual_col: usize,
+    ) -> usize {
+        let visual_lines = self.calculate_visual_lines_for_row(buffer, row);
+
+        if visual_line_index >= visual_lines.len() {
+            return 0;
+        }
+
+        // 計算前面視覺行的總字符數
+        let mut accumulated_chars = 0;
+        for i in 0..visual_line_index {
+            accumulated_chars += visual_lines[i].chars().count();
+        }
+
+        // 加上當前視覺行內的列位置
+        let col_in_visual = visual_col.min(visual_lines[visual_line_index].chars().count());
+        let visual_col_total = accumulated_chars + col_in_visual;
+
+        // 轉換回邏輯列（反向處理 Tab）
+        if let Some(line) = buffer.line(row) {
+            let line_str = line.to_string();
+            let line_str = line_str.trim_end_matches(['\n', '\r']);
+
+            let mut logical_col = 0;
+            let mut current_visual = 0;
+
+            for ch in line_str.chars() {
+                if current_visual >= visual_col_total {
+                    break;
+                }
+
+                if ch == '\t' {
+                    current_visual += 4;
+                } else {
+                    current_visual += unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                }
+
+                logical_col += 1;
+            }
+
+            logical_col
+        } else {
+            0
+        }
+    }
+
+    /// 計算從 start_row 到 end_row（不含）之間的總視覺行數
+    pub fn count_visual_lines(
+        &self,
+        buffer: &RopeBuffer,
+        start_row: usize,
+        end_row: usize,
+    ) -> usize {
+        let mut total = 0;
+        for row in start_row..end_row.min(buffer.line_count()) {
+            let visual_lines = self.calculate_visual_lines_for_row(buffer, row);
+            total += visual_lines.len();
+        }
+        total
+    }
+
+    /// 獲取實際可用於顯示文本的螢幕行數（扣除 debug 標尺）
+    pub fn get_effective_screen_rows(&self, has_debug_ruler: bool) -> usize {
+        if has_debug_ruler {
+            self.screen_rows.saturating_sub(1)
+        } else {
+            self.screen_rows
+        }
+    }
+
+    /// 渲染列標尺（顯示列位置個位數字）
+    fn render_column_ruler(&self, stdout: &mut io::Stdout) -> Result<()> {
+        queue!(stdout, cursor::MoveTo(0, 0))?;
+        queue!(stdout, style::SetForegroundColor(Color::DarkGrey))?;
+
+        let line_num_width = if self.show_line_numbers {
+            2 // 假設最多6位數行號寬度
+        } else {
+            0
+        };
+
+        // 輸出行號區域的空白
+        for _ in 0..line_num_width {
+            queue!(stdout, style::Print(" "))?;
+        }
+
+        // 輸出列標尺數字（個位數）
+        let available_cols = self
+            .screen_cols
+            .saturating_sub(line_num_width)
+            .saturating_sub(1);
+        for col in 0..available_cols {
+            let digit = col % 10;
+            queue!(stdout, style::Print(digit))?;
+        }
+
+        queue!(stdout, style::ResetColor)?;
+        Ok(())
     }
 }

@@ -22,10 +22,11 @@ pub struct Editor {
     selection: Option<Selection>,
     message: Option<String>,
     quit_times: u8, // 追蹤連續按 Ctrl+Q 的次數
+    debug_mode: bool,
 }
 
 impl Editor {
-    pub fn new(file_path: Option<&Path>) -> Result<Self> {
+    pub fn new(file_path: Option<&Path>, debug_mode: bool) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
             RopeBuffer::from_file(path)?
         } else {
@@ -54,6 +55,7 @@ impl Editor {
             selection: None,
             message: None,
             quit_times: 0,
+            debug_mode,
         })
     }
 
@@ -62,11 +64,21 @@ impl Editor {
         Terminal::clear_screen()?;
 
         while !self.should_quit {
+            let debug_info = if self.debug_mode {
+                Some(self.get_debug_info())
+            } else {
+                None
+            };
+
             self.view.render(
                 &self.buffer,
                 &self.cursor,
                 self.selection.as_ref(),
-                self.message.as_deref(),
+                if self.debug_mode {
+                    debug_info.as_deref()
+                } else {
+                    self.message.as_deref()
+                },
                 &self.comment_handler,
             )?;
 
@@ -100,10 +112,10 @@ impl Editor {
                 if ch == '\n' {
                     self.cursor.row += 1;
                     self.cursor.col = 0;
-                    self.cursor.desired_col = 0;
+                    self.cursor.desired_visual_col = 0;
                 } else {
                     self.cursor.col += 1;
-                    self.cursor.desired_col = self.cursor.col;
+                    self.cursor.desired_visual_col = self.cursor.col;
                 }
 
                 self.selection = None;
@@ -117,7 +129,7 @@ impl Editor {
                     self.cursor.col -= 1;
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.delete_char(pos);
-                    self.cursor.desired_col = self.cursor.col;
+                    self.cursor.desired_visual_col = self.cursor.col;
                 } else if self.cursor.row > 0 {
                     // 刪除換行符，合併到上一行
                     self.cursor.row -= 1;
@@ -128,7 +140,7 @@ impl Editor {
                         .chars()
                         .count();
                     self.cursor.col = prev_line_len;
-                    self.cursor.desired_col = self.cursor.col;
+                    self.cursor.desired_visual_col = self.cursor.col;
 
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.delete_char(pos);
@@ -158,25 +170,25 @@ impl Editor {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
                     self.cursor.col = 0;
-                    self.cursor.desired_col = 0;
+                    self.cursor.desired_visual_col = 0;
                 }
             }
 
             // 光標移動
             Command::MoveUp => {
-                self.cursor.move_up(&self.buffer);
+                self.cursor.move_up(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::MoveDown => {
-                self.cursor.move_down(&self.buffer);
+                self.cursor.move_down(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::MoveLeft => {
-                self.cursor.move_left(&self.buffer);
+                self.cursor.move_left(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::MoveRight => {
-                self.cursor.move_right(&self.buffer);
+                self.cursor.move_right(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::MoveHome => {
@@ -184,30 +196,33 @@ impl Editor {
                 self.selection = None;
             }
             Command::MoveEnd => {
-                self.cursor.move_to_line_end(&self.buffer);
+                self.cursor.move_to_line_end(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::PageUp => {
+                let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
                 self.cursor
-                    .move_page_up(&self.buffer, self.view.screen_rows);
+                    .move_page_up(&self.buffer, &self.view, effective_rows);
                 self.selection = None;
             }
             Command::PageDown => {
+                let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
                 self.cursor
-                    .move_page_down(&self.buffer, self.view.screen_rows);
+                    .move_page_down(&self.buffer, &self.view, effective_rows);
                 self.selection = None;
             }
 
             Command::MoveToFileStart => {
                 self.cursor.row = 0;
                 self.cursor.col = 0;
-                self.cursor.desired_col = 0;
+                self.cursor.visual_line_index = 0;
+                self.cursor.desired_visual_col = 0;
                 self.selection = None;
             }
             Command::MoveToFileEnd => {
                 if self.buffer.line_count() > 0 {
                     self.cursor.row = self.buffer.line_count() - 1;
-                    self.cursor.move_to_line_end(&self.buffer);
+                    self.cursor.move_to_line_end(&self.buffer, &self.view);
                 }
                 self.selection = None;
             }
@@ -216,7 +231,7 @@ impl Editor {
                 self.selection = None;
             }
             Command::MoveToLineEnd => {
-                self.cursor.move_to_line_end(&self.buffer);
+                self.cursor.move_to_line_end(&self.buffer, &self.view);
                 self.selection = None;
             }
 
@@ -230,18 +245,22 @@ impl Editor {
                 }
 
                 match direction {
-                    Direction::Up => self.cursor.move_up(&self.buffer),
-                    Direction::Down => self.cursor.move_down(&self.buffer),
-                    Direction::Left => self.cursor.move_left(&self.buffer),
-                    Direction::Right => self.cursor.move_right(&self.buffer),
+                    Direction::Up => self.cursor.move_up(&self.buffer, &self.view),
+                    Direction::Down => self.cursor.move_down(&self.buffer, &self.view),
+                    Direction::Left => self.cursor.move_left(&self.buffer, &self.view),
+                    Direction::Right => self.cursor.move_right(&self.buffer, &self.view),
                     Direction::Home => self.cursor.move_to_line_start(),
-                    Direction::End => self.cursor.move_to_line_end(&self.buffer),
-                    Direction::PageUp => self
-                        .cursor
-                        .move_page_up(&self.buffer, self.view.screen_rows),
-                    Direction::PageDown => self
-                        .cursor
-                        .move_page_down(&self.buffer, self.view.screen_rows),
+                    Direction::End => self.cursor.move_to_line_end(&self.buffer, &self.view),
+                    Direction::PageUp => {
+                        let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                        self.cursor
+                            .move_page_up(&self.buffer, &self.view, effective_rows)
+                    }
+                    Direction::PageDown => {
+                        let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                        self.cursor
+                            .move_page_down(&self.buffer, &self.view, effective_rows)
+                    }
                 }
 
                 if let Some(sel) = &mut self.selection {
@@ -344,24 +363,24 @@ impl Editor {
                             self.cursor.row = self.buffer.line_count() - 1;
                         }
                         self.cursor.col = 0;
-                        self.cursor.desired_col = 0;
+                        self.cursor.desired_visual_col = 0;
                     }
                 }
             }
 
             Command::Paste => {
                 // 嘗試從系統剪貼簿獲取,失敗則使用內部剪貼簿
-                let text = self.clipboard.get_text()
-                    .unwrap_or_else(|_| {
-                        if self.internal_clipboard.is_empty() {
-                            if !self.clipboard.is_available() {
-                                self.message = Some("Nothing to paste (internal clipboard)".to_string());
-                            }
-                            String::new()
-                        } else {
-                            self.internal_clipboard.clone()
+                let text = self.clipboard.get_text().unwrap_or_else(|_| {
+                    if self.internal_clipboard.is_empty() {
+                        if !self.clipboard.is_available() {
+                            self.message =
+                                Some("Nothing to paste (internal clipboard)".to_string());
                         }
-                    });
+                        String::new()
+                    } else {
+                        self.internal_clipboard.clone()
+                    }
+                });
 
                 if !text.is_empty() {
                     if self.has_selection() {
@@ -379,7 +398,7 @@ impl Editor {
 
                         // 光標移動到新插入行的開始
                         self.cursor.col = 0;
-                        self.cursor.desired_col = 0;
+                        self.cursor.desired_visual_col = 0;
                     } else {
                         // 普通貼上：在光標位置插入
                         let pos = self.cursor.char_position(&self.buffer);
@@ -394,7 +413,7 @@ impl Editor {
                                 self.cursor.col += 1;
                             }
                         }
-                        self.cursor.desired_col = self.cursor.col;
+                        self.cursor.desired_visual_col = self.cursor.col;
                     }
                 }
             }
@@ -441,7 +460,7 @@ impl Editor {
 
                     self.cursor.row = row;
                     self.cursor.col = col;
-                    self.cursor.desired_col = col;
+                    self.cursor.desired_visual_col = col;
                     self.message = Some("Undo".to_string());
                 } else {
                     self.message = Some("Nothing to undo".to_string());
@@ -457,7 +476,7 @@ impl Editor {
 
                     self.cursor.row = row;
                     self.cursor.col = col;
-                    self.cursor.desired_col = col;
+                    self.cursor.desired_visual_col = col;
                     self.message = Some("Redo".to_string());
                 } else {
                     self.message = Some("Nothing to redo".to_string());
@@ -476,7 +495,7 @@ impl Editor {
                             if let Some((row, col)) = self.search.next_match() {
                                 self.cursor.row = row;
                                 self.cursor.col = col;
-                                self.cursor.desired_col = col;
+                                self.cursor.desired_visual_col = col;
                                 self.message = Some(format!(
                                     "Found {} matches (F3: next, Shift+F3: prev)",
                                     self.search.match_count()
@@ -494,7 +513,7 @@ impl Editor {
                     if let Some((row, col)) = self.search.next_match() {
                         self.cursor.row = row;
                         self.cursor.col = col;
-                        self.cursor.desired_col = col;
+                        self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
                             "Match {}/{}",
                             (self.search.match_count() + 1) % self.search.match_count() + 1,
@@ -511,7 +530,7 @@ impl Editor {
                     if let Some((row, col)) = self.search.prev_match() {
                         self.cursor.row = row;
                         self.cursor.col = col;
-                        self.cursor.desired_col = col;
+                        self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
                             "Match {}/{}",
                             (self.search.match_count() + 1) % self.search.match_count() + 1,
@@ -594,7 +613,7 @@ impl Editor {
                         // 保留選擇狀態（不清除選取）
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
-                        self.cursor.desired_col = 0;
+                        self.cursor.desired_visual_col = 0;
 
                         let action = if should_add_comment {
                             "Added"
@@ -650,14 +669,14 @@ impl Editor {
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
-                        self.cursor.desired_col = 0;
+                        self.cursor.desired_visual_col = 0;
                     }
                 } else {
                     // 單行：在光標位置插入 4 個空格
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.insert(pos, "    ");
                     self.cursor.col += 4;
-                    self.cursor.desired_col = self.cursor.col;
+                    self.cursor.desired_visual_col = self.cursor.col;
                 }
             }
 
@@ -688,7 +707,7 @@ impl Editor {
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
-                        self.cursor.desired_col = 0;
+                        self.cursor.desired_visual_col = 0;
                     }
                 } else {
                     // 單行：刪除光標前最多 4 個空格
@@ -708,7 +727,7 @@ impl Editor {
                         self.buffer
                             .delete_range(delete_start, delete_start + spaces_to_remove);
                         self.cursor.col -= spaces_to_remove;
-                        self.cursor.desired_col = self.cursor.col;
+                        self.cursor.desired_visual_col = self.cursor.col;
                     }
                 }
             }
@@ -722,7 +741,7 @@ impl Editor {
                         if line_num > 0 && line_num <= self.buffer.line_count() {
                             self.cursor.row = line_num - 1;
                             self.cursor.col = 0;
-                            self.cursor.desired_col = 0;
+                            self.cursor.desired_visual_col = 0;
                             self.message = Some(format!("Jumped to line {}", line_num));
                         } else {
                             self.message = Some(format!("Invalid line number: {}", line_num));
@@ -794,8 +813,55 @@ impl Editor {
 
             self.cursor.row = start_row;
             self.cursor.col = start_col;
-            self.cursor.desired_col = start_col;
+            self.cursor.desired_visual_col = start_col;
             self.selection = None;
         }
+    }
+
+    fn get_debug_info(&self) -> String {
+        let total_lines = self.buffer.line_count();
+        let screen_rows = self.view.screen_rows;
+        let logical_row = self.cursor.row;
+        let logical_col = self.cursor.col;
+        let visual_line_index = self.cursor.visual_line_index;
+
+        // 計算可用列寬度
+        let available_width = self.view.get_available_width(&self.buffer);
+
+        // 計算當前行的視覺列位置和總字符數
+        let (visual_col_in_line, line_char_count) =
+            if let Some(line) = self.buffer.line(logical_row) {
+                let line_str = line.to_string();
+                let line_str = line_str.trim_end_matches(['\n', '\r']);
+                let visual_col = self.view.logical_col_to_visual_col(&line_str, logical_col);
+                let char_count = line_str.chars().count();
+
+                // 計算在當前視覺行內的列位置
+                let visual_lines = self
+                    .view
+                    .calculate_visual_lines_for_row(&self.buffer, logical_row);
+                let mut accumulated = 0;
+                for i in 0..visual_line_index.min(visual_lines.len()) {
+                    accumulated += visual_lines[i].chars().count();
+                }
+                let col_in_visual_line = visual_col.saturating_sub(accumulated);
+
+                (col_in_visual_line, char_count)
+            } else {
+                (0, 0)
+            };
+
+        format!(
+            "DEBUG | LC:{} AA:{}x{} Logical:L{}:C{} WC:{} Visual:VL{}:VC{} Desired:{}",
+            total_lines,
+            screen_rows,
+            available_width,
+            logical_row + 1,
+            logical_col,
+            line_char_count,
+            visual_line_index,
+            visual_col_in_line,
+            self.cursor.desired_visual_col
+        )
     }
 }

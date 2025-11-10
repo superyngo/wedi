@@ -96,7 +96,7 @@ fn main() -> Result<()> {
     utils::init_logger(args.debug);
 
     // 創建並運行編輯器
-    let mut editor = Editor::new(Some(&args.file))?;
+    let mut editor = Editor::new(Some(&args.file), args.debug)?;
 
     // 設置 panic hook 以確保終端正常恢復
     let original_hook = std::panic::take_hook();
