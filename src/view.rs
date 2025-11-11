@@ -46,6 +46,7 @@ impl View {
         buffer: &RopeBuffer,
         cursor: &Cursor,
         selection: Option<&Selection>,
+        selection_mode: bool,
         message: Option<&str>,
         comment_handler: &CommentHandler,
     ) -> Result<()> {
@@ -306,7 +307,7 @@ impl View {
         }
 
         // 渲染狀態欄
-        self.render_status_bar(buffer, message, cursor)?;
+        self.render_status_bar(buffer, selection_mode, message, cursor)?;
 
         // 計算光標的螢幕位置（考慮換行）
         let line_num_width = self.calculate_line_number_width(buffer);
@@ -423,6 +424,7 @@ impl View {
     fn render_status_bar(
         &self,
         buffer: &RopeBuffer,
+        selection_mode: bool,
         message: Option<&str>,
         cursor: &Cursor,
     ) -> Result<()> {
@@ -439,14 +441,22 @@ impl View {
         };
         let filename = buffer.file_name();
 
+        // 選擇模式提示
+        let mode_indicator = if selection_mode {
+            " [Selection Mode]"
+        } else {
+            ""
+        };
+
         let status = if let Some(msg) = message {
             // 如果有消息，優先顯示消息
-            format!(" {}{} - {}", filename, modified, msg)
+            format!(" {}{}{}  - {}", filename, modified, mode_indicator, msg)
         } else {
             format!(
-                " {}{}  Line {}/{}  Ctrl+S:Save Ctrl+Q:Quit",
+                " {}{}{}  Line {}/{}  Ctrl+S:Save Ctrl+Q:Quit",
                 filename,
                 modified,
+                mode_indicator,
                 cursor.row + 1,
                 buffer.line_count()
             )

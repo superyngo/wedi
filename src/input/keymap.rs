@@ -2,7 +2,62 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::handler::{Command, Direction};
 
-pub fn handle_key_event(event: KeyEvent, _has_selection: bool) -> Option<Command> {
+pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
+    // F1 切換選擇模式（優先處理）
+    if matches!(event.code, KeyCode::F(1)) && event.modifiers == KeyModifiers::NONE {
+        return Some(Command::ToggleSelectionMode);
+    }
+
+    // 選擇模式下，將基本移動鍵轉換為 ExtendSelection
+    if selection_mode {
+        match (event.code, event.modifiers) {
+            (KeyCode::Up, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::Up))
+            }
+            (KeyCode::Down, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::Down))
+            }
+            (KeyCode::Left, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::Left))
+            }
+            (KeyCode::Right, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::Right))
+            }
+            (KeyCode::Home, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::Home))
+            }
+            (KeyCode::End, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::End))
+            }
+            (KeyCode::PageUp, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::PageUp))
+            }
+            (KeyCode::PageDown, KeyModifiers::NONE) => {
+                return Some(Command::ExtendSelection(Direction::PageDown))
+            }
+            // Ctrl 快速移動在選擇模式下也轉換為擴展選擇
+            (KeyCode::Up, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::FileStart))
+            }
+            (KeyCode::Down, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::FileEnd))
+            }
+            (KeyCode::Left, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::Home))
+            }
+            (KeyCode::Right, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::End))
+            }
+            (KeyCode::Home, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::FileStart))
+            }
+            (KeyCode::End, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::FileEnd))
+            }
+            _ => {} // 其他按鍵繼續正常處理
+        }
+    }
+
     match (event.code, event.modifiers) {
         // 基本移動
         (KeyCode::Up, KeyModifiers::NONE) => Some(Command::MoveUp),
@@ -45,6 +100,26 @@ pub fn handle_key_event(event: KeyEvent, _has_selection: bool) -> Option<Command
             if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
         {
             Some(Command::ExtendSelection(Direction::End))
+        }
+        (KeyCode::Up, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::FileStart))
+        }
+        (KeyCode::Down, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::FileEnd))
+        }
+        (KeyCode::Home, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::FileStart))
+        }
+        (KeyCode::End, m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::FileEnd))
         }
 
         // 字符輸入

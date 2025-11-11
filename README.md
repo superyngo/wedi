@@ -10,6 +10,7 @@ A cross-platform minimalist lightweight CLI text editor written in Rust.
 - ✅ Line numbers display (toggleable)
 - ✅ Clipboard support (copy, cut, paste)
 - ✅ Selection mode with Shift key
+- ✅ **F1 Selection Mode** (for terminals without Shift key support) 🎉
 - ✅ Smart line operations
 - ✅ **Undo/Redo (Ctrl+Z/Y)** 🎉
 - ✅ **Search functionality (Ctrl+F, F3)** 🎉
@@ -72,11 +73,15 @@ wedi --debug <filename>
 
 ### Selection
 
+- **F1**: Toggle selection mode (for terminals without Shift key support)
 - **Shift + Arrow Keys**: Select text
 - **Shift + Home / End**: Select to line start/end
 - **Shift + Page Up / Down**: Select page up/down
+- **Shift + Ctrl + Arrows**: Quick select to line/file start/end
 - **Ctrl+A**: Select all
 - **ESC**: Clear selection and messages
+
+> **Note**: In F1 selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press F1 again, ESC, or perform any editing operation to exit selection mode.
 
 ### Clipboard
 

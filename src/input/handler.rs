@@ -8,6 +8,8 @@ pub enum Direction {
     End,
     PageUp,
     PageDown,
+    FileStart,
+    FileEnd,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,4 +81,7 @@ pub enum Command {
 
     // 清除訊息
     ClearMessage,
+
+    // 選擇模式切換
+    ToggleSelectionMode,
 }

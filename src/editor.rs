@@ -21,6 +21,7 @@ pub struct Editor {
     comment_handler: CommentHandler,
     should_quit: bool,
     selection: Option<Selection>,
+    selection_mode: bool, // F1 選擇模式開關
     message: Option<String>,
     quit_times: u8, // 追蹤連續按 Ctrl+Q 的次數
     debug_mode: bool,
@@ -54,6 +55,7 @@ impl Editor {
             comment_handler,
             should_quit: false,
             selection: None,
+            selection_mode: false, // 預設關閉選擇模式
             message: None,
             quit_times: 0,
             debug_mode,
@@ -75,6 +77,7 @@ impl Editor {
                 &self.buffer,
                 &self.cursor,
                 self.selection.as_ref(),
+                self.selection_mode,
                 if self.debug_mode {
                     debug_info.as_deref()
                 } else {
@@ -85,7 +88,7 @@ impl Editor {
 
             let key_event = Terminal::read_key()?;
 
-            if let Some(command) = handle_key_event(key_event, self.has_selection()) {
+            if let Some(command) = handle_key_event(key_event, self.selection_mode) {
                 self.handle_command(command)?;
             }
         }
@@ -123,6 +126,7 @@ impl Editor {
                 }
 
                 self.selection = None;
+                self.selection_mode = false; // 輸入後關閉選擇模式
             }
 
             // 刪除操作
@@ -151,6 +155,7 @@ impl Editor {
                     self.cursor
                         .set_position(&self.buffer, &self.view, new_row, prev_line_len);
                 }
+                self.selection_mode = false; // 刪除後關閉選擇模式
             }
 
             Command::Delete => {
@@ -160,6 +165,7 @@ impl Editor {
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.delete_char(pos);
                 }
+                self.selection_mode = false; // 刪除後關閉選擇模式
             }
 
             Command::DeleteLine => {
@@ -173,6 +179,7 @@ impl Editor {
                     }
                     self.cursor.reset_to_line_start();
                 }
+                self.selection_mode = false; // 刪除後關閉選擇模式
             }
 
             // 光標移動
@@ -214,17 +221,11 @@ impl Editor {
             }
 
             Command::MoveToFileStart => {
-                self.cursor.row = 0;
-                self.cursor.col = 0;
-                self.cursor.visual_line_index = 0;
-                self.cursor.desired_visual_col = 0;
+                self.cursor.move_to_file_start(&self.view);
                 self.selection = None;
             }
             Command::MoveToFileEnd => {
-                if self.buffer.line_count() > 0 {
-                    self.cursor.row = self.buffer.line_count() - 1;
-                    self.cursor.move_to_line_end(&self.buffer, &self.view);
-                }
+                self.cursor.move_to_file_end(&self.buffer, &self.view);
                 self.selection = None;
             }
             Command::MoveToLineStart => {
@@ -252,6 +253,12 @@ impl Editor {
                     Direction::Right => self.cursor.move_right(&self.buffer, &self.view),
                     Direction::Home => self.cursor.move_to_line_start(),
                     Direction::End => self.cursor.move_to_line_end(&self.buffer, &self.view),
+                    Direction::FileStart => {
+                        self.cursor.move_to_file_start(&self.view);
+                    }
+                    Direction::FileEnd => {
+                        self.cursor.move_to_file_end(&self.buffer, &self.view);
+                    }
                     Direction::PageUp => {
                         let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
                         self.cursor
@@ -292,7 +299,26 @@ impl Editor {
 
             Command::ClearMessage => {
                 self.selection = None;
+                self.selection_mode = false; // ESC 關閉選擇模式但保留選擇範圍
                 self.message = None;
+            }
+
+            // 選擇模式切換
+            Command::ToggleSelectionMode => {
+                self.selection_mode = !self.selection_mode;
+
+                // 開啟選擇模式時，如果沒有選擇範圍，初始化選擇
+                if self.selection_mode && self.selection.is_none() {
+                    self.selection = Some(Selection {
+                        start: (self.cursor.row, self.cursor.col),
+                        end: (self.cursor.row, self.cursor.col),
+                    });
+                }
+
+                self.message = Some(format!(
+                    "Selection Mode: {}",
+                    if self.selection_mode { "ON" } else { "OFF" }
+                ));
             }
 
             // 剪貼板操作
@@ -319,6 +345,9 @@ impl Editor {
                 } else {
                     self.internal_clipboard = text; // 同步到內部剪貼簿
                 }
+
+                // 複製後關閉選擇模式但保留選擇範圍
+                self.selection_mode = false;
 
                 // 直接使用內部剪貼簿
                 // self.internal_clipboard = text;
@@ -374,6 +403,9 @@ impl Editor {
                         self.cursor.desired_visual_col = 0;
                     }
                 }
+
+                // 剪切後關閉選擇模式並清除選擇
+                self.selection_mode = false;
             }
 
             Command::Paste => {
@@ -427,6 +459,7 @@ impl Editor {
                         self.cursor.desired_visual_col = self.cursor.col;
                     }
                 }
+                self.selection_mode = false; // 貼上後關閉選擇模式
             }
 
             // 內部剪貼板操作（僅使用內部剪貼簿）
@@ -447,6 +480,7 @@ impl Editor {
                 // 直接使用內部剪貼簿
                 self.internal_clipboard = text;
                 self.message = Some("Copied (internal clipboard)".to_string());
+                self.selection_mode = false; // 複製後關閉選擇模式
             }
 
             Command::CutInternal => {
@@ -479,6 +513,7 @@ impl Editor {
                     self.cursor.col = 0;
                     self.cursor.desired_visual_col = 0;
                 }
+                self.selection_mode = false; // 剪切後關閉選擇模式
             }
 
             Command::PasteInternal => {
@@ -521,6 +556,7 @@ impl Editor {
                         self.cursor.desired_visual_col = self.cursor.col;
                     }
                 }
+                self.selection_mode = false; // 貼上後關閉選擇模式
             }
 
             // 文件操作

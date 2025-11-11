@@ -94,6 +94,24 @@ impl Cursor {
         self.sync_desired_visual_col(buffer, view);
     }
 
+    /// 移動到文件開頭
+    pub fn move_to_file_start(&mut self, _view: &View) {
+        // 設置到第一行行首，視覺狀態使用預設值
+        self.row = 0;
+        self.col = 0;
+        self.visual_line_index = 0;
+        self.desired_visual_col = 0;
+    }
+
+    /// 移動到文件末尾
+    pub fn move_to_file_end(&mut self, buffer: &RopeBuffer, view: &View) {
+        if buffer.line_count() > 0 {
+            self.row = buffer.line_count() - 1;
+            // 移動到最後一行行尾，並同步視覺狀態
+            self.move_to_line_end(buffer, view);
+        }
+    }
+
     pub fn move_page_up(&mut self, buffer: &RopeBuffer, view: &View, effective_rows: usize) {
         let mut target_row = self.row;
         let mut visual_count = 0;
