@@ -36,6 +36,14 @@ jobs:
             target: i686-unknown-linux-musl
             artifact_name: wedi
             asset_name: wedi-linux-i686-musl
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            artifact_name: wedi
+            asset_name: wedi-linux-armv7
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: wedi
+            asset_name: wedi-linux-aarch64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: wedi.exe
@@ -74,6 +82,30 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
+
+      - name: Install ARM cross-compilation tools (ARM targets only)
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+
+      - name: Install ARM64 cross-compilation tools (ARM64 targets only)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Configure cargo for ARM cross-compilation
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf' || matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          mkdir -p ~/.cargo
+          if [ "${{ matrix.target }}" = "armv7-unknown-linux-gnueabihf" ]; then
+            echo '[target.armv7-unknown-linux-gnueabihf]' >> ~/.cargo/config.toml
+            echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config.toml
+          elif [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
+            echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
+          fi
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}

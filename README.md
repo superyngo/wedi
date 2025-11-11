@@ -19,7 +19,6 @@ A cross-platform minimalist lightweight CLI text editor written in Rust.
 - ✅ **Fast navigation (Ctrl+Arrows/Home/End)** 🎉
 - ✅ **Chinese character support** 🎉
 - ✅ **Comment highlighting** 🎉
-- 🚧 Syntax highlighting (coming soon)
 
 ## Installation
 
