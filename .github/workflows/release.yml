@@ -56,10 +56,12 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact_name: wedi.exe
             asset_name: wedi-windows-x86_64.exe
+            rustflags: "-C target-feature=+crt-static"
           - os: windows-latest
             target: i686-pc-windows-msvc
             artifact_name: wedi.exe
             asset_name: wedi-windows-i686.exe
+            rustflags: "-C target-feature=+crt-static"
           - os: macos-13
             target: x86_64-apple-darwin
             artifact_name: wedi
@@ -129,6 +131,8 @@ jobs:
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
 
       - name: Strip binary (Linux and macOS - x86)
         if: matrix.os != 'windows-latest' && matrix.target != 'armv7-unknown-linux-gnueabihf' && matrix.target != 'armv7-unknown-linux-musleabihf' && matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-musl'

@@ -20,7 +20,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(name = "wedi")]
 #[command(author = "wen")]
-#[command(version = "0.1.9")]
+#[command(version = "0.1.10")]
 #[command(about = "A cross-platform minimalist lightweight CLI text editor")]
 #[command(long_about = "
 wedi - A minimalist text editor
@@ -63,7 +63,9 @@ KEYBOARD SHORTCUTS:
     Ctrl+C          Copy (selection or current line)
     Ctrl+X          Cut (selection or current line)
     Ctrl+V          Paste
-    Alt+V           Paste bypassing terminal formatting
+    Alt+C           Internal Copy (selection or current line)
+    Alt+X           Internal Cut (selection or current line)
+    Alt+V           Internal Paste 
     
   Search:
     Ctrl+F          Find text

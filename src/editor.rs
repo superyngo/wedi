@@ -429,6 +429,102 @@ impl Editor {
                 }
             }
 
+            // 內部剪貼板操作（僅使用內部剪貼簿）
+            Command::CopyInternal => {
+                let text = if self.has_selection() {
+                    self.get_selected_text()
+                } else {
+                    // 複製當前整行（完整內容，包括尾部空格和換行符）
+                    let line_text = self.buffer.get_line_full(self.cursor.row);
+                    // 確保以換行符結尾（用於識別整行貼上）
+                    if line_text.ends_with('\n') {
+                        line_text
+                    } else {
+                        format!("{}\n", line_text)
+                    }
+                };
+
+                // 直接使用內部剪貼簿
+                self.internal_clipboard = text;
+                self.message = Some("Copied (internal clipboard)".to_string());
+            }
+
+            Command::CutInternal => {
+                let text = if self.has_selection() {
+                    self.get_selected_text()
+                } else {
+                    // 剪切當前整行（完整內容）
+                    let line_text = self.buffer.get_line_full(self.cursor.row);
+                    // 確保以換行符結尾
+                    if line_text.ends_with('\n') {
+                        line_text
+                    } else {
+                        format!("{}\n", line_text)
+                    }
+                };
+
+                // 直接使用內部剪貼簿
+                self.internal_clipboard = text;
+                self.message = Some("Cut (internal clipboard)".to_string());
+
+                // 剪切後刪除內容
+                if self.has_selection() {
+                    self.delete_selection();
+                } else {
+                    self.buffer.delete_line(self.cursor.row);
+                    // 如果刪除後超出範圍,調整到最後一行
+                    if self.cursor.row >= self.buffer.line_count()
+                        && self.buffer.line_count() > 0
+                    {
+                        self.cursor.row = self.buffer.line_count() - 1;
+                    }
+                    self.cursor.col = 0;
+                    self.cursor.desired_visual_col = 0;
+                }
+            }
+
+            Command::PasteInternal => {
+                // 直接使用內部剪貼簿
+                let text = self.internal_clipboard.clone();
+
+                if text.is_empty() {
+                    self.message = Some("Nothing to paste (internal clipboard)".to_string());
+                } else {
+                    if self.has_selection() {
+                        self.delete_selection();
+                    }
+
+                    // 檢查是否為整行貼上（文字以換行結尾）
+                    let is_whole_line = text.ends_with('\n');
+
+                    if is_whole_line {
+                        // 整行貼上：在光標所在行的開始處插入
+                        // 這樣會將原行內容推到下一行
+                        let line_start = self.buffer.line_to_char(self.cursor.row);
+                        self.buffer.insert(line_start, &text);
+
+                        // 光標移動到新插入行的開始
+                        self.cursor.col = 0;
+                        self.cursor.desired_visual_col = 0;
+                    } else {
+                        // 普通貼上：在光標位置插入
+                        let pos = self.cursor.char_position(&self.buffer);
+                        self.buffer.insert(pos, &text);
+
+                        // 移動到貼上內容末尾
+                        for ch in text.chars() {
+                            if ch == '\n' {
+                                self.cursor.row += 1;
+                                self.cursor.col = 0;
+                            } else {
+                                self.cursor.col += 1;
+                            }
+                        }
+                        self.cursor.desired_visual_col = self.cursor.col;
+                    }
+                }
+            }
+
             // 文件操作
             Command::Save => {
                 if let Err(e) = self.buffer.save() {

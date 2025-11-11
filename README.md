@@ -83,7 +83,9 @@ wedi --debug <filename>
 - **Ctrl+C**: Copy (selection or current line)
 - **Ctrl+X**: Cut (selection or current line)
 - **Ctrl+V**: Paste
-- **Alt+V**: Paste bypassing terminal formatting
+- **Alt+C**: Internal Copy (selection or current line)
+- **Alt+X**: Internal Cut (selection or current line)
+- **Alt+V**: Internal Paste
 
 ### Search
 

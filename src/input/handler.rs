@@ -38,6 +38,9 @@ pub enum Command {
     Copy,
     Cut,
     Paste,
+    CopyInternal,  // 使用內部剪貼簿複製
+    CutInternal,   // 使用內部剪貼簿剪切
+    PasteInternal, // 使用內部剪貼簿貼上
 
     // 視窗調整
     Resize,
