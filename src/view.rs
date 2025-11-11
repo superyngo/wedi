@@ -2,6 +2,7 @@ use crate::buffer::RopeBuffer;
 use crate::comment::CommentHandler;
 use crate::cursor::Cursor;
 use crate::terminal::Terminal;
+use crate::utils::visual_width;
 use anyhow::Result;
 use crossterm::{
     cursor, execute, queue,
@@ -49,7 +50,7 @@ impl View {
         comment_handler: &CommentHandler,
     ) -> Result<()> {
         // 判斷是否有 debug 標尺
-        let has_debug_ruler = message.map_or(false, |m| m.starts_with("DEBUG"));
+        let has_debug_ruler = message.is_some_and(|m| m.starts_with("DEBUG"));
 
         self.scroll_if_needed(cursor, buffer, has_debug_ruler);
 
@@ -62,7 +63,7 @@ impl View {
         execute!(stdout, cursor::MoveTo(0, 0))?;
 
         // 渲染列標尺（debug模式下才顯示）
-        let ruler_offset = if message.map_or(false, |m| m.starts_with("DEBUG")) {
+        let ruler_offset = if message.is_some_and(|m| m.starts_with("DEBUG")) {
             self.render_column_ruler(&mut stdout)?;
             1 // 佔用一行
         } else {
@@ -136,7 +137,7 @@ impl View {
                 for (char_idx, ch) in line_str.chars().enumerate() {
                     // 如果這是註解開始的字符,記錄當前顯示字符串的長度(即將添加的字符位置)
                     if comment_start_char_idx == Some(char_idx) {
-                        comment_display_idx = Some(displayed_line.chars().count());
+                        comment_display_idx = Some(visual_width(&displayed_line));
                     }
 
                     if ch == '\t' {
@@ -179,22 +180,16 @@ impl View {
 
                     // 計算當前視覺行在整個displayed_line中的起始位置
                     let mut visual_line_start = 0;
-                    for i in 0..visual_idx {
-                        visual_line_start += visual_lines[i].chars().count();
+                    for line in visual_lines.iter().take(visual_idx) {
+                        visual_line_start += visual_width(line);
                     }
-                    let visual_line_end = visual_line_start + visual_line.chars().count();
+                    let visual_line_end = visual_line_start + visual_width(visual_line);
 
                     // 如果註解在當前視覺行之前或之內，則整個視覺行需要部分或全部變色
                     let is_comment_started =
-                        comment_display_idx.map_or(false, |pos| pos < visual_line_end);
+                        comment_display_idx.is_some_and(|pos| pos < visual_line_end);
                     let comment_pos_in_visual_line = if is_comment_started {
-                        comment_display_idx.and_then(|pos| {
-                            if pos >= visual_line_start {
-                                Some(pos - visual_line_start)
-                            } else {
-                                Some(0) // 註解已經在前面的視覺行開始，整行都是註解
-                            }
-                        })
+                        comment_display_idx.map(|pos| pos.saturating_sub(visual_line_start))
                     } else {
                         None
                     };
@@ -204,23 +199,26 @@ impl View {
                         if file_row >= start_row && file_row <= end_row {
                             // 這一行有選擇
                             let chars: Vec<char> = visual_line.chars().collect();
+                            let mut current_visual_pos = visual_line_start;
 
-                            for (idx, &ch) in chars.iter().enumerate() {
-                                // 當前字符在displayed_line中的絕對位置
-                                let abs_pos = visual_line_start + idx;
+                            for &ch in chars.iter() {
+                                // 計算當前字符的視覺寬度
+                                let ch_width =
+                                    unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
 
                                 let is_selected = if file_row == start_row && file_row == end_row {
-                                    abs_pos >= start_col && abs_pos < end_col
+                                    current_visual_pos >= start_col && current_visual_pos < end_col
                                 } else if file_row == start_row {
-                                    abs_pos >= start_col
+                                    current_visual_pos >= start_col
                                 } else if file_row == end_row {
-                                    abs_pos < end_col
+                                    current_visual_pos < end_col
                                 } else {
                                     true
                                 };
 
-                                let is_in_comment =
-                                    comment_pos_in_visual_line.is_some_and(|pos| idx >= pos);
+                                let is_in_comment = comment_pos_in_visual_line.is_some_and(|pos| {
+                                    current_visual_pos >= visual_line_start + pos
+                                });
 
                                 if is_selected {
                                     queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
@@ -233,6 +231,9 @@ impl View {
                                 } else if is_in_comment {
                                     queue!(stdout, style::ResetColor)?;
                                 }
+
+                                // 移動視覺位置
+                                current_visual_pos += ch_width;
                             }
                         } else {
                             // 沒有選擇，如果有註解則部分變色
@@ -371,7 +372,7 @@ impl View {
         let mut col_in_visual_line = visual_col;
 
         for (idx, vline) in visual_lines.iter().enumerate() {
-            let vline_width = vline.chars().count();
+            let vline_width = visual_width(vline);
             if visual_col < accumulated_width + vline_width || idx == visual_lines.len() - 1 {
                 visual_line_idx = idx;
                 col_in_visual_line = visual_col - accumulated_width;
@@ -460,33 +461,27 @@ impl View {
         };
 
         // 確保狀態欄填滿整行
-        let status = if status.chars().count() < self.screen_cols {
+        let status = if visual_width(&status) < self.screen_cols {
             format!("{:width$}", status, width = self.screen_cols)
         } else {
-            // 使用字符邊界安全截斷
-            status.chars().take(self.screen_cols).collect::<String>()
+            // 使用視覺寬度安全截斷
+            let mut result = String::new();
+            let mut current_width = 0;
+            for ch in status.chars() {
+                let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                if current_width + ch_width > self.screen_cols {
+                    break;
+                }
+                result.push(ch);
+                current_width += ch_width;
+            }
+            result
         };
 
         queue!(stdout, style::Print(status))?;
         queue!(stdout, style::ResetColor)?;
 
         Ok(())
-    }
-
-    fn truncate_line(&self, line: &str, max_width: usize) -> String {
-        let mut width = 0;
-        let mut result = String::new();
-
-        for ch in line.chars() {
-            let char_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
-            if width + char_width > max_width {
-                break;
-            }
-            result.push(ch);
-            width += char_width;
-        }
-
-        result
     }
 
     /// 將行按可用寬度切分成多個視覺行
@@ -606,15 +601,15 @@ impl View {
             return 0;
         }
 
-        // 計算前面視覺行的總字符數
-        let mut accumulated_chars = 0;
-        for i in 0..visual_line_index {
-            accumulated_chars += visual_lines[i].chars().count();
+        // 計算前面視覺行的總視覺寬度
+        let mut accumulated_width = 0;
+        for line in visual_lines.iter().take(visual_line_index) {
+            accumulated_width += visual_width(line);
         }
 
         // 加上當前視覺行內的列位置
-        let col_in_visual = visual_col.min(visual_lines[visual_line_index].chars().count());
-        let visual_col_total = accumulated_chars + col_in_visual;
+        let col_in_visual = visual_col.min(visual_width(&visual_lines[visual_line_index]));
+        let visual_col_total = accumulated_width + col_in_visual;
 
         // 轉換回邏輯列（反向處理 Tab）
         if let Some(line) = buffer.line(row) {

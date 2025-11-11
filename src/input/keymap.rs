@@ -77,11 +77,11 @@ pub fn handle_key_event(event: KeyEvent, _has_selection: bool) -> Option<Command
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),
         (KeyCode::Char('x'), KeyModifiers::CONTROL) => Some(Command::Cut),
         (KeyCode::Char('v'), KeyModifiers::CONTROL) => Some(Command::Paste),
+        (KeyCode::Char('v'), KeyModifiers::ALT) => Some(Command::Paste),
         // F20 是 Paste 事件的標記（Windows Terminal 的 Ctrl+V）
-                    (KeyCode::F(20), KeyModifiers::NONE) => Some(Command::Paste),
-            // F21 用於視窗大小調整事件
-            (KeyCode::F(21), KeyModifiers::NONE) => Some(Command::Resize),
-            _ => None,
+        // (KeyCode::F(20), KeyModifiers::NONE) => Some(Command::SelectAll),
+        // F21 用於視窗大小調整事件
+        (KeyCode::F(21), KeyModifiers::NONE) => Some(Command::Resize),
 
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),

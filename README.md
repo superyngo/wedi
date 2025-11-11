@@ -49,58 +49,53 @@ wedi --debug <filename>
 
 ## Keyboard Shortcuts
 
-### Basic Operations
+### Basic Editing
 
-- **Arrow Keys**: Move cursor
-- **Home / End**: Move to line start/end
-- **Page Up / Page Down**: Scroll page
 - **Ctrl+S**: Save file
-- **Ctrl+Q**: Quit editor (press twice if modified)
-- **Ctrl+L**: Toggle line numbers
-- **Ctrl+G**: Go to line
+- **Ctrl+Q**: Quit (press twice if modified)
+- **Ctrl+Z**: Undo
+- **Ctrl+Y**: Redo
+- **Backspace**: Delete character before cursor or selected text
+- **Delete**: Delete character under cursor or selected text
+- **Ctrl+D**: Delete current line or selected lines
 - **Tab**: Insert 4 spaces
 - **Shift+Tab**: Remove up to 4 leading spaces
 
-### Fast Navigation
+### Navigation
 
-- **Ctrl+Up** / **Ctrl+Home**: Jump to first line
-- **Ctrl+Down** / **Ctrl+End**: Jump to last line
-- **Ctrl+Left**: Jump to line start
-- **Ctrl+Right**: Jump to line end
+- **Arrow Keys**: Move cursor
+- **Ctrl+Up** / **Ctrl+Home**: Move to first line
+- **Ctrl+Down** / **Ctrl+End**: Move to last line
+- **Home** / **Ctrl+Left**: Move to line start
+- **End** / **Ctrl+Right**: Move to line end
+- **Page Up / Page Down**: Scroll page up/down
+- **Ctrl+G**: Go to line number
 
-### Selection Mode
+### Selection
 
 - **Shift + Arrow Keys**: Select text
 - **Shift + Home / End**: Select to line start/end
-- **Shift + Page Up / Down**: Select page
-- **Ctrl+Shift+Left**: Select to line start
-- **Ctrl+Shift+Right**: Select to line end
+- **Shift + Page Up / Down**: Select page up/down
 - **Ctrl+A**: Select all
-- **ESC**: Clear selection
+- **ESC**: Clear selection and messages
 
-### Editing Operations
+### Clipboard
 
-| Shortcut             | With Selection            | Without Selection     |
-| -------------------- | ------------------------- | --------------------- |
-| **Ctrl+C**           | Copy selected text        | Copy current line     |
-| **Ctrl+X**           | Cut selected text         | Cut current line\*    |
-| **Ctrl+V**           | Paste (replace selection) | Paste at cursor\*\*   |
-| **Ctrl+D**           | Delete selected text      | Delete current line\* |
-| **Backspace/Delete** | Delete selection          | Delete character      |
-| **Any character**    | Replace selection         | Insert character      |
+- **Ctrl+C**: Copy (selection or current line)
+- **Ctrl+X**: Cut (selection or current line)
+- **Ctrl+V**: Paste
+- **Alt+V**: Paste bypassing terminal formatting
 
-\* After cutting/deleting a line, cursor moves up one line  
-\*\* Whole-line paste inserts at line start, pushing original line down
+### Search
 
-### Advanced Operations 🎉
-
-- **Ctrl+Z**: Undo
-- **Ctrl+Y**: Redo
-- **Ctrl+F**: Find text (search with navigation)
+- **Ctrl+F**: Find text
 - **F3**: Find next match
 - **Shift+F3**: Find previous match
-- **Ctrl+G**: Go to line
-- **Ctrl+U** / **Ctrl+\\** / **Ctrl+/**: Toggle comment (supports multiple languages)
+
+### Code
+
+- **Ctrl+/** / **Ctrl+\\** / **Ctrl+U**: Toggle line comment
+- **Ctrl+L**: Toggle line numbers
 
 ## Supported Comment Styles
 

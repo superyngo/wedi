@@ -1,8 +1,8 @@
 [package]
 name = "wedi"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
-authors = ["wedi contributors"]
+authors = ["wen"]
 description = "A cross-platform minimalist lightweight CLI text editor"
 license = "MIT"
 

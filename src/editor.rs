@@ -5,6 +5,7 @@ use crate::cursor::Cursor;
 use crate::input::{handle_key_event, Command, Direction};
 use crate::search::Search;
 use crate::terminal::Terminal;
+use crate::utils::visual_width;
 use crate::view::{Selection, View};
 use anyhow::Result;
 use std::path::Path;
@@ -111,11 +112,14 @@ impl Editor {
 
                 if ch == '\n' {
                     self.cursor.row += 1;
-                    self.cursor.col = 0;
-                    self.cursor.desired_visual_col = 0;
+                    self.cursor.reset_to_line_start();
                 } else {
-                    self.cursor.col += 1;
-                    self.cursor.desired_visual_col = self.cursor.col;
+                    self.cursor.set_position(
+                        &self.buffer,
+                        &self.view,
+                        self.cursor.row,
+                        self.cursor.col + 1,
+                    );
                 }
 
                 self.selection = None;
@@ -126,24 +130,26 @@ impl Editor {
                 if self.has_selection() {
                     self.delete_selection();
                 } else if self.cursor.col > 0 {
-                    self.cursor.col -= 1;
-                    let pos = self.cursor.char_position(&self.buffer);
+                    let new_col = self.cursor.col - 1;
+                    let pos = self.buffer.line_to_char(self.cursor.row) + new_col;
                     self.buffer.delete_char(pos);
-                    self.cursor.desired_visual_col = self.cursor.col;
+                    self.cursor
+                        .set_position(&self.buffer, &self.view, self.cursor.row, new_col);
                 } else if self.cursor.row > 0 {
                     // 刪除換行符，合併到上一行
-                    self.cursor.row -= 1;
+                    let new_row = self.cursor.row - 1;
                     let prev_line_len = self
                         .buffer
-                        .get_line_content(self.cursor.row)
+                        .get_line_content(new_row)
                         .trim_end_matches(['\n', '\r'])
                         .chars()
                         .count();
-                    self.cursor.col = prev_line_len;
-                    self.cursor.desired_visual_col = self.cursor.col;
 
-                    let pos = self.cursor.char_position(&self.buffer);
+                    let pos = self.buffer.line_to_char(new_row) + prev_line_len;
                     self.buffer.delete_char(pos);
+
+                    self.cursor
+                        .set_position(&self.buffer, &self.view, new_row, prev_line_len);
                 }
             }
 
@@ -161,16 +167,11 @@ impl Editor {
                     self.delete_selection();
                 } else {
                     self.buffer.delete_line(self.cursor.row);
-                    // 刪除後光標上移一行
-                    if self.cursor.row > 0 {
-                        self.cursor.row -= 1;
-                    }
                     // 如果刪除後超出範圍,調整到最後一行
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
-                    self.cursor.col = 0;
-                    self.cursor.desired_visual_col = 0;
+                    self.cursor.reset_to_line_start();
                 }
             }
 
@@ -310,7 +311,7 @@ impl Editor {
                 };
 
                 // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
-                if let Err(_) = self.clipboard.set_text(&text) {
+                if self.clipboard.set_text(&text).is_err() {
                     self.internal_clipboard = text;
                     if !self.clipboard.is_available() {
                         self.message = Some("Copied (internal clipboard)".to_string());
@@ -318,6 +319,9 @@ impl Editor {
                 } else {
                     self.internal_clipboard = text; // 同步到內部剪貼簿
                 }
+
+                // 直接使用內部剪貼簿
+                // self.internal_clipboard = text;
             }
 
             Command::Cut => {
@@ -335,7 +339,7 @@ impl Editor {
                 };
 
                 // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
-                let copy_success = if let Err(_) = self.clipboard.set_text(&text) {
+                let copy_success = if self.clipboard.set_text(&text).is_err() {
                     self.internal_clipboard = text;
                     if !self.clipboard.is_available() {
                         self.message = Some("Cut (internal clipboard)".to_string());
@@ -346,6 +350,10 @@ impl Editor {
                     true
                 };
 
+                // 直接使用內部剪貼簿
+                // self.internal_clipboard = text;
+                // let copy_success = true;
+
                 // 剪切成功後刪除內容
                 if copy_success {
                     if self.has_selection() {
@@ -353,9 +361,9 @@ impl Editor {
                     } else {
                         self.buffer.delete_line(self.cursor.row);
                         // 剪切後光標上移一行
-                        if self.cursor.row > 0 {
-                            self.cursor.row -= 1;
-                        }
+                        // if self.cursor.row > 0 {
+                        //     self.cursor.row -= 1;
+                        // }
                         // 如果刪除後超出範圍,調整到最後一行
                         if self.cursor.row >= self.buffer.line_count()
                             && self.buffer.line_count() > 0
@@ -381,6 +389,9 @@ impl Editor {
                         self.internal_clipboard.clone()
                     }
                 });
+
+                // 使用內部剪貼簿
+                // let text = self.internal_clipboard.clone();
 
                 if !text.is_empty() {
                     if self.has_selection() {
@@ -811,9 +822,8 @@ impl Editor {
 
             self.buffer.delete_range(start_pos, end_pos);
 
-            self.cursor.row = start_row;
-            self.cursor.col = start_col;
-            self.cursor.desired_visual_col = start_col;
+            self.cursor
+                .set_position(&self.buffer, &self.view, start_row, start_col);
             self.selection = None;
         }
     }
@@ -829,39 +839,78 @@ impl Editor {
         let available_width = self.view.get_available_width(&self.buffer);
 
         // 計算當前行的視覺列位置和總字符數
-        let (visual_col_in_line, line_char_count) =
-            if let Some(line) = self.buffer.line(logical_row) {
-                let line_str = line.to_string();
-                let line_str = line_str.trim_end_matches(['\n', '\r']);
-                let visual_col = self.view.logical_col_to_visual_col(&line_str, logical_col);
-                let char_count = line_str.chars().count();
+        let (
+            visual_col_in_line,
+            line_char_count,
+            line_visual_width,
+            total_visual_lines,
+            current_visual_line_width,
+        ) = if let Some(line) = self.buffer.line(logical_row) {
+            let line_str = line.to_string();
+            let line_str = line_str.trim_end_matches(['\n', '\r']);
+            let visual_col = self.view.logical_col_to_visual_col(line_str, logical_col);
+            let char_count = line_str.chars().count();
 
-                // 計算在當前視覺行內的列位置
-                let visual_lines = self
-                    .view
-                    .calculate_visual_lines_for_row(&self.buffer, logical_row);
-                let mut accumulated = 0;
-                for i in 0..visual_line_index.min(visual_lines.len()) {
-                    accumulated += visual_lines[i].chars().count();
-                }
-                let col_in_visual_line = visual_col.saturating_sub(accumulated);
+            // 計算在當前視覺行內的列位置
+            let visual_lines = self
+                .view
+                .calculate_visual_lines_for_row(&self.buffer, logical_row);
+            let total_visual_lines = visual_lines.len();
+            let mut accumulated = 0;
+            for line in visual_lines
+                .iter()
+                .take(visual_line_index.min(visual_lines.len()))
+            {
+                accumulated += visual_width(line);
+            }
+            let col_in_visual_line = visual_col.saturating_sub(accumulated);
 
-                (col_in_visual_line, char_count)
+            // 計算整行的視覺寬度
+            let line_visual_width = visual_width(line_str);
+
+            // 計算當前視覺行的寬度
+            let current_visual_line_width = if visual_line_index < visual_lines.len() {
+                visual_width(&visual_lines[visual_line_index])
             } else {
-                (0, 0)
+                0
             };
 
+            (
+                col_in_visual_line,
+                char_count,
+                line_visual_width,
+                total_visual_lines,
+                current_visual_line_width,
+            )
+        } else {
+            (0, 0, 0, 0, 0)
+        };
+
+        // 計算選取的邏輯字數和顯示寬度
+        let (selection_char_count, selection_visual_width) = if self.selection.is_some() {
+            let selected_text = self.get_selected_text();
+            let char_count = selected_text.chars().count();
+            let visual_width = visual_width(&selected_text);
+            (char_count, visual_width)
+        } else {
+            (0, 0)
+        };
+
         format!(
-            "DEBUG | LC:{} AA:{}x{} Logical:L{}:C{} WC:{} Visual:VL{}:VC{} Desired:{}",
-            total_lines,
+            "DEBUG | AA:{}x{} LL:L{}/{}:C{}/{}:{} VL:L{}/{}:C{}/{} SC:{}:{}",
             screen_rows,
             available_width,
             logical_row + 1,
+            total_lines,
             logical_col,
             line_char_count,
-            visual_line_index,
+            line_visual_width,
+            visual_line_index + 1,
+            total_visual_lines,
             visual_col_in_line,
-            self.cursor.desired_visual_col
+            current_visual_line_width,
+            selection_char_count,
+            selection_visual_width
         )
     }
 }

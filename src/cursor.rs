@@ -1,4 +1,5 @@
 use crate::buffer::RopeBuffer;
+use crate::utils::visual_width;
 use crate::view::View;
 
 #[derive(Debug, Clone, Copy)]
@@ -138,6 +139,22 @@ impl Cursor {
         buffer.line_to_char(self.row) + self.col
     }
 
+    /// 設置光標位置並同步視覺狀態
+    /// 這是統一的光標位置設置方法，確保邏輯和視覺狀態一致
+    pub fn set_position(&mut self, buffer: &RopeBuffer, view: &View, row: usize, col: usize) {
+        self.row = row;
+        self.col = col;
+        self.update_visual_from_logical(buffer, view);
+        self.sync_desired_visual_col(buffer, view);
+    }
+
+    /// 重置到行首（用於換行等操作）
+    pub fn reset_to_line_start(&mut self) {
+        self.col = 0;
+        self.visual_line_index = 0;
+        self.desired_visual_col = 0;
+    }
+
     /// 從視覺座標更新邏輯列位置
     fn update_logical_col_from_visual(&mut self, buffer: &RopeBuffer, view: &View) {
         let visual_col = self.desired_visual_col;
@@ -159,7 +176,7 @@ impl Cursor {
             // 找出光標在哪個視覺行
             let mut accumulated = 0;
             for (idx, vline) in visual_lines.iter().enumerate() {
-                let vline_len = vline.chars().count();
+                let vline_len = visual_width(vline);
                 if visual_col < accumulated + vline_len || idx == visual_lines.len() - 1 {
                     self.visual_line_index = idx;
                     break;
@@ -182,7 +199,7 @@ impl Cursor {
             let mut accumulated = 0;
             for i in 0..self.visual_line_index {
                 if i < visual_lines.len() {
-                    accumulated += visual_lines[i].chars().count();
+                    accumulated += visual_width(&visual_lines[i]);
                 }
             }
 

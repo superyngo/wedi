@@ -162,9 +162,8 @@ impl CommentHandler {
         match &self.style {
             Some(CommentStyle::Line(prefix)) => {
                 // 返回字符索引而非字節索引
-                line.find(prefix).map(|byte_idx| {
-                    line[..byte_idx].chars().count()
-                })
+                line.find(prefix)
+                    .map(|byte_idx| line[..byte_idx].chars().count())
             }
             _ => None,
         }
