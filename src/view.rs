@@ -64,18 +64,14 @@ impl View {
 
         // 渲染列標尺（debug模式下才顯示）
         let ruler_offset = if message.is_some_and(|m| m.starts_with("DEBUG")) {
-            self.render_column_ruler(&mut stdout)?;
+            self.render_column_ruler(&mut stdout, buffer)?;
             1 // 佔用一行
         } else {
             0
         };
 
         // 計算行號寬度
-        let line_num_width = if self.show_line_numbers {
-            buffer.line_count().to_string().len() + 1
-        } else {
-            0
-        };
+        let line_num_width = self.calculate_line_number_width(buffer);
 
         // 計算選擇範圍（轉換為視覺列）
         let sel_visual_range = selection.map(|sel| {
@@ -313,11 +309,7 @@ impl View {
         self.render_status_bar(buffer, message, cursor)?;
 
         // 計算光標的螢幕位置（考慮換行）
-        let line_num_width = if self.show_line_numbers {
-            buffer.line_count().to_string().len() + 1
-        } else {
-            0
-        };
+        let line_num_width = self.calculate_line_number_width(buffer);
         let available_width = self
             .screen_cols
             .saturating_sub(line_num_width)
@@ -546,13 +538,18 @@ impl View {
         self.show_line_numbers = !self.show_line_numbers;
     }
 
-    /// 獲取可用於顯示內容的寬度（扣除行號寬度）
-    pub fn get_available_width(&self, buffer: &RopeBuffer) -> usize {
-        let line_num_width = if self.show_line_numbers {
+    /// 計算行號寬度（包含右側空格）
+    fn calculate_line_number_width(&self, buffer: &RopeBuffer) -> usize {
+        if self.show_line_numbers {
             buffer.line_count().to_string().len() + 1
         } else {
             0
-        };
+        }
+    }
+
+    /// 獲取可用於顯示內容的寬度（扣除行號寬度）
+    pub fn get_available_width(&self, buffer: &RopeBuffer) -> usize {
+        let line_num_width = self.calculate_line_number_width(buffer);
         self.screen_cols
             .saturating_sub(line_num_width)
             .saturating_sub(1)
@@ -664,15 +661,11 @@ impl View {
     }
 
     /// 渲染列標尺（顯示列位置個位數字）
-    fn render_column_ruler(&self, stdout: &mut io::Stdout) -> Result<()> {
+    fn render_column_ruler(&self, stdout: &mut io::Stdout, buffer: &RopeBuffer) -> Result<()> {
         queue!(stdout, cursor::MoveTo(0, 0))?;
         queue!(stdout, style::SetForegroundColor(Color::DarkGrey))?;
 
-        let line_num_width = if self.show_line_numbers {
-            2 // 假設最多6位數行號寬度
-        } else {
-            0
-        };
+        let line_num_width = self.calculate_line_number_width(buffer);
 
         // 輸出行號區域的空白
         for _ in 0..line_num_width {

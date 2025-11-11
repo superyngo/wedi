@@ -473,9 +473,7 @@ impl Editor {
                 } else {
                     self.buffer.delete_line(self.cursor.row);
                     // 如果刪除後超出範圍,調整到最後一行
-                    if self.cursor.row >= self.buffer.line_count()
-                        && self.buffer.line_count() > 0
-                    {
+                    if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
                     self.cursor.col = 0;
