@@ -48,7 +48,7 @@ KEYBOARD SHORTCUTS:
     Ctrl+G              Go to line number
     
   Selection:
-    F1                  Toggle selection mode (for terminals without Shift support)
+    Ctrl+P              Toggle selection mode (for terminals without Shift support)
     Shift+Arrows        Select text
     Shift+Ctrl+Arrows   Quick select to line/file boundaries
     Shift+Home/End      Select to line boundaries

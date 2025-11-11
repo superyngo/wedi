@@ -3,8 +3,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use super::handler::{Command, Direction};
 
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
-    // F1 切換選擇模式（優先處理）
-    if matches!(event.code, KeyCode::F(1)) && event.modifiers == KeyModifiers::NONE {
+    // Ctrl+P 切換選擇模式（優先處理）
+    if matches!(event.code, KeyCode::Char('p')) && event.modifiers == KeyModifiers::CONTROL {
         return Some(Command::ToggleSelectionMode);
     }
 
