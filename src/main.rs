@@ -20,7 +20,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(name = "wedi")]
 #[command(author = "wen")]
-#[command(version = "0.1.11")]
+#[command(version = "0.1.12")]
 #[command(about = "A cross-platform minimalist lightweight CLI text editor")]
 #[command(long_about = "
 wedi - A minimalist text editor
@@ -28,31 +28,32 @@ wedi - A minimalist text editor
 KEYBOARD SHORTCUTS:
   
   Basic Editing:
-    Ctrl+S              Save file
+    Ctrl+W              Save file
     Ctrl+Q              Quit (press twice if modified)
     Ctrl+Z              Undo
     Ctrl+Y              Redo
     Backspace           Delete character before cursor or selected text
     Delete              Delete character under cursor or selected text
     Ctrl+D              Delete current line or selected lines
-    Tab                 Insert 4 spaces
-    Shift+Tab           Remove up to 4 leading spaces
+    Tab                 Indent (insert 4 spaces or indent selected lines)
+    Shift+Tab           Unindent (remove up to 4 leading spaces)
 
   Navigation:
-    Arrow Keys          Move cursor
-    Ctrl+Left/Home      Move to line start
-    Ctrl+Right/End      Move to line end
-    Ctrl+Up/Ctrl+Home   Move to first line
-    Ctrl+Down/Ctrl+End  Move to last line
-    Page Up/Down        Scroll page up/down
-    Ctrl+G              Go to line number
+    Arrow Keys            Move cursor
+    Ctrl+Left/Ctrl+H/Home Move to line start
+    Ctrl+Right/Ctrl+E/End Move to line end
+    Ctrl+Up/Ctrl+Home     Move to first line
+    Ctrl+Down/Ctrl+End    Move to last line
+    Page Up/Down          Scroll page up/down
+    Ctrl+G                Go to line number
     
   Selection:
-    Ctrl+T              Toggle selection mode (for terminals without Shift support)
+    Ctrl+S              Toggle selection mode (for terminals without Shift support)
     Shift+Arrows        Select text
     Shift+Ctrl+Arrows   Quick select to line/file boundaries
     Shift+Home/End      Select to line boundaries
     Shift+Ctrl+Home/End Quick select to file boundaries
+    Shift+Ctrl+H/E      Quick select to line boundaries
     Shift+PgUp/Dn       Select page up/down
     Ctrl+A              Select all
     ESC                 Clear selection and messages
@@ -71,7 +72,7 @@ KEYBOARD SHORTCUTS:
     Shift+F3            Find previous match
     
   Code:
-    Ctrl+/ \\ U          Toggle line comment
+    Ctrl+/ \\ K         Toggle line comment
     Ctrl+L              Toggle line numbers
 
 SUPPORTED COMMENT STYLES:

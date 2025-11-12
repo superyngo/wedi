@@ -228,14 +228,14 @@ impl Editor {
                 self.cursor.move_to_file_end(&self.buffer, &self.view);
                 self.selection = None;
             }
-            Command::MoveToLineStart => {
-                self.cursor.move_to_line_start();
-                self.selection = None;
-            }
-            Command::MoveToLineEnd => {
-                self.cursor.move_to_line_end(&self.buffer, &self.view);
-                self.selection = None;
-            }
+            // Command::MoveToLineStart => {
+            //     self.cursor.move_to_line_start();
+            //     self.selection = None;
+            // }
+            // Command::MoveToLineEnd => {
+            //     self.cursor.move_to_line_end(&self.buffer, &self.view);
+            //     self.selection = None;
+            // }
 
             // 選擇操作
             Command::ExtendSelection(direction) => {

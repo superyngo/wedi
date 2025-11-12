@@ -10,14 +10,14 @@ A cross-platform minimalist lightweight CLI text editor written in Rust.
 - ✅ Line numbers display (toggleable)
 - ✅ Clipboard support (copy, cut, paste)
 - ✅ Selection mode with Shift key
-- ✅ **Ctrl+T Selection Mode** (for terminals without Shift key support) 🎉
+- ✅ **Ctrl+S Selection Mode** (for terminals without Shift key support) 🎉
 - ✅ Smart line operations
 - ✅ **Undo/Redo (Ctrl+Z/Y)** 🎉
 - ✅ **Search functionality (Ctrl+F, F3)** 🎉
-- ✅ **Comment toggling (Ctrl+U/\\/)** 🎉
+- ✅ **Comment toggling (Ctrl+K/\\//)** 🎉
 - ✅ **Go to line (Ctrl+G)** 🎉
 - ✅ **Tab/Shift+Tab indentation** 🎉
-- ✅ **Fast navigation (Ctrl+Arrows/Home/End)** 🎉
+- ✅ **Fast navigation (Ctrl+H/E, Ctrl+Arrows/Home/End)** 🎉
 - ✅ **Chinese character support** 🎉
 - ✅ **Comment highlighting** 🎉
 
@@ -51,37 +51,38 @@ wedi --debug <filename>
 
 ### Basic Editing
 
-- **Ctrl+S**: Save file
+- **Ctrl+W**: Save file
 - **Ctrl+Q**: Quit (press twice if modified)
 - **Ctrl+Z**: Undo
 - **Ctrl+Y**: Redo
 - **Backspace**: Delete character before cursor or selected text
 - **Delete**: Delete character under cursor or selected text
 - **Ctrl+D**: Delete current line or selected lines
-- **Tab**: Insert 4 spaces
-- **Shift+Tab**: Remove up to 4 leading spaces
+- **Tab**: Indent (insert 4 spaces or indent selected lines)
+- **Shift+Tab**: Unindent (remove up to 4 leading spaces)
 
 ### Navigation
 
 - **Arrow Keys**: Move cursor
 - **Ctrl+Up** / **Ctrl+Home**: Move to first line
 - **Ctrl+Down** / **Ctrl+End**: Move to last line
-- **Home** / **Ctrl+Left**: Move to line start
-- **End** / **Ctrl+Right**: Move to line end
+- **Home** / **Ctrl+H**: Move to line start
+- **End** / **Ctrl+E**: Move to line end
 - **Page Up / Page Down**: Scroll page up/down
 - **Ctrl+G**: Go to line number
 
 ### Selection
 
-- **Ctrl+T**: Toggle selection mode (for terminals without Shift key support)
+- **Ctrl+S**: Toggle selection mode (for terminals without Shift key support)
 - **Shift + Arrow Keys**: Select text
 - **Shift + Home / End**: Select to line start/end
 - **Shift + Page Up / Down**: Select page up/down
 - **Shift + Ctrl + Arrows**: Quick select to line/file start/end
+- **Shift + Ctrl + H / E**: Quick select to line start/end
 - **Ctrl+A**: Select all
 - **ESC**: Clear selection and messages
 
-> **Note**: In Ctrl+T selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press Ctrl+T again, ESC, or perform any editing operation to exit selection mode.
+> **Note**: In Ctrl+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows, Ctrl+H/E) will extend selection. Press Ctrl+S again, ESC, or perform any editing operation to exit selection mode.
 
 ### Clipboard
 
@@ -100,7 +101,7 @@ wedi --debug <filename>
 
 ### Code
 
-- **Ctrl+/** / **Ctrl+\\** / **Ctrl+U**: Toggle line comment
+- **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers
 
 ## Supported Comment Styles

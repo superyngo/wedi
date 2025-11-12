@@ -27,14 +27,14 @@ pub enum Command {
     MoveDown,
     MoveLeft,
     MoveRight,
-    MoveHome,
-    MoveEnd,
+    MoveHome, // Home： 跳到行首
+    MoveEnd,  // End： 跳到行尾
     PageUp,
     PageDown,
     MoveToFileStart, // Ctrl+Up: 跳到第一行
     MoveToFileEnd,   // Ctrl+Down: 跳到最後一行
-    MoveToLineStart, // Ctrl+Left: 跳到行首
-    MoveToLineEnd,   // Ctrl+Right: 跳到行尾
+    // MoveToLineStart, // Ctrl+Left: 跳到行首
+    // MoveToLineEnd,   // Ctrl+Right: 跳到行尾
 
     // 剪貼板操作
     Copy,

@@ -3,8 +3,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use super::handler::{Command, Direction};
 
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
-    // Ctrl+T 切換選擇模式（優先處理）
-    if matches!(event.code, KeyCode::Char('t')) && event.modifiers == KeyModifiers::CONTROL {
+    // Ctrl+S 切換選擇模式（優先處理）
+    if matches!(event.code, KeyCode::Char('s')) && event.modifiers == KeyModifiers::CONTROL {
         return Some(Command::ToggleSelectionMode);
     }
 
@@ -35,6 +35,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
             (KeyCode::PageDown, KeyModifiers::NONE) => {
                 return Some(Command::ExtendSelection(Direction::PageDown))
             }
+
             // Ctrl 快速移動在選擇模式下也轉換為擴展選擇
             (KeyCode::Up, KeyModifiers::CONTROL) => {
                 return Some(Command::ExtendSelection(Direction::FileStart))
@@ -54,6 +55,12 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
             (KeyCode::End, KeyModifiers::CONTROL) => {
                 return Some(Command::ExtendSelection(Direction::FileEnd))
             }
+            (KeyCode::Char('h'), KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::Home))
+            }
+            (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::End))
+            }
             _ => {} // 其他按鍵繼續正常處理
         }
     }
@@ -72,11 +79,13 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // Ctrl 快速移動
         (KeyCode::Up, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),
         (KeyCode::Down, KeyModifiers::CONTROL) => Some(Command::MoveToFileEnd),
-        (KeyCode::Left, KeyModifiers::CONTROL) => Some(Command::MoveToLineStart),
-        (KeyCode::Right, KeyModifiers::CONTROL) => Some(Command::MoveToLineEnd),
+        (KeyCode::Left, KeyModifiers::CONTROL) => Some(Command::MoveHome),
+        (KeyCode::Right, KeyModifiers::CONTROL) => Some(Command::MoveEnd),
         // 替代按鍵:Ctrl+Home/End
         (KeyCode::Home, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),
         (KeyCode::End, KeyModifiers::CONTROL) => Some(Command::MoveToFileEnd),
+        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::MoveHome),
+        (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::MoveEnd),
 
         // 選擇模式移動
         (KeyCode::Up, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::Up)),
@@ -121,6 +130,16 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         {
             Some(Command::ExtendSelection(Direction::FileEnd))
         }
+        (KeyCode::Char('h'), m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::Home))
+        }
+        (KeyCode::Char('e'), m)
+            if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Command::ExtendSelection(Direction::End))
+        }
 
         // 字符輸入
         (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
@@ -135,7 +154,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Delete, _) => Some(Command::Delete),
 
         // Ctrl 組合鍵
-        (KeyCode::Char('s'), KeyModifiers::CONTROL) => Some(Command::Save),
+        (KeyCode::Char('w'), KeyModifiers::CONTROL) => Some(Command::Save),
         (KeyCode::Char('q'), KeyModifiers::CONTROL) => Some(Command::Quit),
         (KeyCode::Char('z'), KeyModifiers::CONTROL) => Some(Command::Undo),
         (KeyCode::Char('y'), KeyModifiers::CONTROL) => Some(Command::Redo),
@@ -146,7 +165,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('d'), KeyModifiers::CONTROL) => Some(Command::DeleteLine),
         (KeyCode::Char('\\'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('/'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
-        (KeyCode::Char('u'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
+        (KeyCode::Char('k'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
 
         // 剪貼板操作
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),
