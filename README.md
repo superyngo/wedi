@@ -47,6 +47,45 @@ wedi -v
 wedi --debug <filename>
 ```
 
+### Encoding Options
+
+wedi supports specifying different encodings for reading and saving files:
+
+```bash
+# Specify decoding (reading) encoding
+wedi <filename> --dec <encoding>
+
+# Specify encoding (saving) encoding
+wedi <filename> --en <encoding>
+
+# Specify both decoding and encoding
+wedi <filename> --dec <encoding> --en <encoding>
+```
+
+**Supported Encodings:**
+- `utf-8` / `utf8` (default)
+- `utf-16le` / `utf-16be`
+- `gbk` (Chinese GBK)
+- `shift-jis` (Japanese Shift-JIS)
+- `big5` (Traditional Chinese Big5)
+- `cp1252` (Western European Windows-1252)
+- And many more...
+
+**Encoding Priority for Saving:**
+When saving files, the encoding priority is: `--en` > `--dec` > detected encoding from file.
+
+**Examples:**
+```bash
+# Read UTF-8, save as GBK
+wedi file.txt --dec utf-8 --en gbk
+
+# Read with auto-detection, save as UTF-16LE
+wedi file.txt --en utf-16le
+
+# Read GBK, save as GBK
+wedi file.txt --dec gbk
+```
+
 ## Keyboard Shortcuts
 
 ### Basic Editing

@@ -4,198 +4,220 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::history::{Action, History};
+use super::EncodingConfig;
 
 pub struct RopeBuffer {
     rope: Rope,
     file_path: Option<PathBuf>,
     modified: bool,
     history: History,
-    in_undo_redo: bool,                       // 防止在撤銷/重做時記錄歷史
-    encoding: &'static encoding_rs::Encoding, // 文件編碼
+    in_undo_redo: bool,                            // 防止在撤銷/重做時記錄歷史
+    read_encoding: &'static encoding_rs::Encoding, // 讀取編碼
+    save_encoding: &'static encoding_rs::Encoding, // 存檔編碼
 }
 
 impl RopeBuffer {
-    /// 特殊的 ANSI 編碼標記
-    const ANSI_ENCODING_MARKER: &'static encoding_rs::Encoding = &encoding_rs::UTF_8; // 臨時使用 UTF-8 作為標記
-
     pub fn new() -> Self {
+        let system_enc = Self::get_system_ansi_encoding();
         Self {
             rope: Rope::new(),
             file_path: None,
             modified: false,
             history: History::default(),
             in_undo_redo: false,
-            encoding: encoding_rs::UTF_8,
+            read_encoding: system_enc,
+            save_encoding: system_enc,
         }
     }
 
     /// 根據系統區域設置獲取 ANSI 編碼
-    fn get_system_ansi_encoding() -> &'static encoding_rs::Encoding {
-        // 在 Windows 中，ANSI 編碼取決於系統代碼頁
-        // 這裡簡化處理：檢查環境變數或使用平台特定的邏輯
+    pub fn get_system_ansi_encoding() -> &'static encoding_rs::Encoding {
+        // 跨平台編碼檢測策略
+        // Windows: 使用 WinAPI 讀取 CodePage
+        // Linux/macOS: 讀取 locale，解析 charset（大多是 UTF-8）
+        // 若無法判斷 → fallback = UTF-8
 
         #[cfg(target_os = "windows")]
         {
-            use std::env;
-            use std::process::Command;
+            use windows::Win32::Globalization::GetACP;
+            use windows::Win32::System::Console::{GetConsoleCP, GetConsoleOutputCP};
 
-            // 檢查 LANG 或 LC_ALL 環境變數
-            if let Ok(lang) = env::var("LANG") {
-                if lang.to_lowercase().contains("zh_tw") || lang.to_lowercase().contains("zh-hk") {
-                    // 繁體中文 - Big5
+            // 優先使用 console 輸入代碼頁（用戶輸入），其次輸出代碼頁，最後系統 ANSI 代碼頁
+            let cp = unsafe {
+                let input_cp = GetConsoleCP();
+                let output_cp = GetConsoleOutputCP();
+                let ansi_cp = GetACP();
+
+                if input_cp != 0 {
+                    input_cp
+                } else if output_cp != 0 {
+                    output_cp
+                } else {
+                    ansi_cp
+                }
+            };
+            match cp {
+                65001 => encoding_rs::UTF_8, // UTF-8
+                936 => encoding_rs::GBK,     // 中文(簡體)
+                950 => {
+                    // 中文(繁體) - Big5
                     if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                        return enc;
-                    }
-                } else if lang.to_lowercase().contains("zh_cn") {
-                    // 簡體中文 - GBK
-                    return encoding_rs::GBK;
-                } else if lang.to_lowercase().contains("ja") {
-                    // 日文 - Shift-JIS
-                    return encoding_rs::SHIFT_JIS;
-                }
-            }
-
-            // 檢查系統代碼頁 (如果可用)
-            if let Ok(codepage) = env::var("ACP") {
-                match codepage.as_str() {
-                    "936" => return encoding_rs::GBK, // 中文(簡體)
-                    "950" => {
-                        // 中文(繁體)
-                        if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                            return enc;
-                        }
-                    }
-                    "932" => return encoding_rs::SHIFT_JIS, // 日文
-                    "949" => {
-                        // 韓文
-                        if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
-                            return enc;
-                        }
-                    }
-                    "1252" => return encoding_rs::WINDOWS_1252, // 西歐
-                    _ => {}
-                }
-            }
-
-            // 嘗試使用 chcp 命令獲取當前代碼頁
-            if let Ok(output) = Command::new("chcp").output() {
-                if let Ok(output_str) = String::from_utf8(output.stdout) {
-                    // chcp 輸出格式如: "Active code page: 936"
-                    if let Some(cp_start) = output_str.find(": ") {
-                        let cp_str = &output_str[cp_start + 2..].trim();
-                        if let Ok(cp) = cp_str.parse::<u32>() {
-                            match cp {
-                                936 => return encoding_rs::GBK, // 中文(簡體)
-                                950 => {
-                                    // 中文(繁體)
-                                    if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                                        return enc;
-                                    }
-                                }
-                                932 => return encoding_rs::SHIFT_JIS, // 日文
-                                949 => {
-                                    // 韓文
-                                    if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
-                                        return enc;
-                                    }
-                                }
-                                1252 => return encoding_rs::WINDOWS_1252, // 西歐
-                                _ => {}
-                            }
-                        }
+                        enc
+                    } else {
+                        encoding_rs::UTF_8
                     }
                 }
+                932 => encoding_rs::SHIFT_JIS, // 日文
+                949 => {
+                    // 韓文 - EUC-KR
+                    if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
+                        enc
+                    } else {
+                        encoding_rs::UTF_8
+                    }
+                }
+                1252 => encoding_rs::WINDOWS_1252, // 西歐
+                _ => encoding_rs::UTF_8,           // 其他情況 fallback 到 UTF-8
             }
-
-            // 預設使用 GBK (因為用戶環境可能是中文)
-            encoding_rs::GBK
         }
 
         #[cfg(not(target_os = "windows"))]
         {
-            // 在非 Windows 系統上，ANSI 通常是 Latin-1
-            encoding_rs::WINDOWS_1252
+            use std::env;
+
+            // 在 Unix-like 系統上，讀取 locale 設置
+            // 優先級: LC_ALL > LC_CTYPE > LANG
+            let locale_vars = ["LC_ALL", "LC_CTYPE", "LANG"];
+
+            for var in &locale_vars {
+                if let Ok(locale) = env::var(var) {
+                    // 解析 locale 字符串，提取 charset 部分
+                    // 格式如: zh_CN.UTF-8, en_US.UTF-8, zh_TW.Big5 等
+                    if let Some(charset_start) = locale.find('.') {
+                        let charset = &locale[charset_start + 1..];
+                        match charset.to_uppercase().as_str() {
+                            "UTF-8" => return encoding_rs::UTF_8,
+                            "GBK" | "GB2312" | "GB18030" => return encoding_rs::GBK,
+                            "BIG5" => {
+                                if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
+                                    return enc;
+                                }
+                            }
+                            "SHIFT_JIS" | "SJIS" => return encoding_rs::SHIFT_JIS,
+                            "EUC-KR" => {
+                                if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
+                                    return enc;
+                                }
+                            }
+                            _ => {} // 繼續檢查其他變數
+                        }
+                    }
+                }
+            }
+
+            // 若無法從 locale 判斷，預設使用 UTF-8
+            encoding_rs::UTF_8
         }
     }
 
-    /// 檢測文件編碼，基於 BOM
-    fn detect_encoding(bytes: &[u8]) -> (&'static encoding_rs::Encoding, usize) {
+    /// 檢測 Unicode BOM 或 UTF-8 編碼，返回編碼和 BOM 長度，如果都不是則返回 None
+    fn detect_unicode(bytes: &[u8]) -> Option<(&'static encoding_rs::Encoding, usize)> {
         if bytes.len() >= 3 && bytes[0..3] == [0xEF, 0xBB, 0xBF] {
             // UTF-8 BOM
-            (encoding_rs::UTF_8, 3)
+            Some((encoding_rs::UTF_8, 3))
         } else if bytes.len() >= 2 && bytes[0..2] == [0xFF, 0xFE] {
             // UTF-16LE BOM
-            (encoding_rs::UTF_16LE, 2)
+            Some((encoding_rs::UTF_16LE, 2))
         } else if bytes.len() >= 2 && bytes[0..2] == [0xFE, 0xFF] {
             // UTF-16BE BOM
-            (encoding_rs::UTF_16BE, 2)
+            Some((encoding_rs::UTF_16BE, 2))
         } else {
-            // 無 BOM，預設 UTF-8
-            (encoding_rs::UTF_8, 0)
+            // 沒有 BOM，檢查是否為有效的 UTF-8
+            let (_, _, had_errors) = encoding_rs::UTF_8.decode(bytes);
+            if !had_errors {
+                // 如果是有效的 UTF-8，使用 UTF-8
+                Some((encoding_rs::UTF_8, 0))
+            } else {
+                None
+            }
         }
     }
 
     pub fn from_file(path: &Path) -> Result<Self> {
-        Self::from_file_with_encoding(path, None)
+        let encoding_config = EncodingConfig {
+            read_encoding: None,
+            save_encoding: None,
+        };
+        Self::from_file_with_encoding(path, &encoding_config)
     }
 
-    pub fn from_file_with_encoding(
-        path: &Path,
-        encoding: Option<&'static encoding_rs::Encoding>,
-    ) -> Result<Self> {
+    pub fn from_file_with_encoding(path: &Path, encoding_config: &EncodingConfig) -> Result<Self> {
         // 如果文件存在，讀取內容；否則創建空緩衝區
         let (rope, detected_encoding, modified) = if path.exists() {
             let bytes = fs::read(path)
                 .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
-            // 編碼處理邏輯
-            let (encoding_to_use, bom_length) = if let Some(specified_enc) = encoding {
-                // 檢查是否是 ANSI 標記
-                if std::ptr::eq(specified_enc, Self::ANSI_ENCODING_MARKER) {
-                    // ANSI：先檢查 BOM，如果沒有 BOM 再使用系統 ANSI
-                    let (bom_encoding, bom_len) = Self::detect_encoding(&bytes);
-                    if bom_len > 0 {
-                        // 有 BOM，使用 BOM 檢測到的編碼
-                        (bom_encoding, bom_len)
+            // 編碼處理邏輯 - 簡化版本
+            // 優先級：BOM > 用戶指定 > 系統預設
+            let (read_encoding, bom_length, detected_encoding_info) =
+                if let Some((bom_encoding, bom_len)) = Self::detect_unicode(&bytes) {
+                    // 檢測到 BOM 或 UTF-8，使用檢測到的編碼
+                    let detected_info = if bom_len > 0 {
+                        format!("BOM detected: {}", bom_encoding.name())
                     } else {
-                        // 無 BOM，使用系統 ANSI 編碼
-                        (Self::get_system_ansi_encoding(), 0)
-                    }
-                } else if specified_enc.name() == "Big5"
-                    || specified_enc.name() == "GBK"
-                    || specified_enc.name() == "Windows-1252"
-                    || specified_enc.name() == "Shift_JIS"
-                {
-                    // 對於系統 ANSI 編碼，先檢查 BOM
-                    let (bom_encoding, bom_len) = Self::detect_encoding(&bytes);
-                    if bom_len > 0 {
-                        // 有 BOM，使用 BOM 檢測到的編碼
-                        (bom_encoding, bom_len)
-                    } else {
-                        // 無 BOM，使用指定的編碼
-                        (specified_enc, 0)
-                    }
+                        format!("UTF-8 detected (no BOM)")
+                    };
+                    (bom_encoding, bom_len, Some((detected_info, bom_encoding)))
+                } else if let Some(specified_enc) = encoding_config.read_encoding {
+                    // 沒有檢測到，使用用戶指定的編碼
+                    (specified_enc, 0, None)
                 } else {
-                    // 非 ANSI 編碼，直接使用指定編碼
-                    (specified_enc, 0)
+                    // 沒有檢測到也沒有用戶指定，使用系統編碼
+                    let system_enc = Self::get_system_ansi_encoding();
+                    (system_enc, 0, None)
+                };
+
+            // Debug 模式：顯示編碼選擇信息
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!("  File: {}", path.display());
+                if let Some((detected_info, detected_enc)) = &detected_encoding_info {
+                    log::debug!("  Detected: {}", detected_info);
+                    if let Some(specified_enc) = encoding_config.read_encoding {
+                        if detected_enc.name() != specified_enc.name() {
+                            log::debug!("  User specified: {} (bypassed)", specified_enc.name());
+                        }
+                    }
+                } else if let Some(specified_enc) = encoding_config.read_encoding {
+                    log::debug!("  User specified: {}", specified_enc.name());
+                } else {
+                    log::debug!("  System default: {}", read_encoding.name());
                 }
-            } else {
-                // 沒有指定編碼，檢測 BOM
-                Self::detect_encoding(&bytes)
-            };
+                log::debug!("  Using decoding: {}", read_encoding.name());
+            }
 
             // 解碼為 UTF-8
-            let (decoded, _, had_errors) = encoding_to_use.decode(&bytes[bom_length..]);
+            let (decoded, _, had_errors) = read_encoding.decode(&bytes[bom_length..]);
             if had_errors {
                 log::warn!("Encoding errors detected in file: {}", path.display());
             }
 
-            (Rope::from_str(&decoded), encoding_to_use, false)
+            (Rope::from_str(&decoded), read_encoding, false)
         } else {
             // 文件不存在，創建空緩衝區
-            let encoding_to_use = encoding.unwrap_or(encoding_rs::UTF_8);
+            let encoding_to_use = encoding_config.read_encoding.unwrap_or(encoding_rs::UTF_8);
             (Rope::new(), encoding_to_use, true)
         };
+
+        // 確定存檔編碼：優先級 --en > --dec > 實際讀取編碼
+        let save_encoding = encoding_config
+            .save_encoding
+            .or(encoding_config.read_encoding)
+            .unwrap_or(detected_encoding);
+
+        // Debug 模式：顯示存檔編碼選擇信息
+        if log::log_enabled!(log::Level::Debug) {
+            log::debug!("  Using encoding: {}", save_encoding.name());
+        }
 
         Ok(Self {
             rope,
@@ -203,7 +225,8 @@ impl RopeBuffer {
             modified,
             history: History::default(),
             in_undo_redo: false,
-            encoding: detected_encoding,
+            read_encoding: detected_encoding,
+            save_encoding,
         })
     }
 
@@ -326,7 +349,7 @@ impl RopeBuffer {
         if let Some(path) = &self.file_path.clone() {
             let contents = self.rope.to_string();
             // 使用指定編碼編碼內容
-            let (encoded, _, had_errors) = self.encoding.encode(&contents);
+            let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
             if had_errors {
                 log::warn!(
                     "Encoding errors occurred while saving file: {}",
@@ -345,7 +368,7 @@ impl RopeBuffer {
     pub fn save_to(&mut self, path: &Path) -> Result<()> {
         let contents = self.rope.to_string();
         // 使用指定編碼編碼內容
-        let (encoded, _, had_errors) = self.encoding.encode(&contents);
+        let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
         if had_errors {
             log::warn!(
                 "Encoding errors occurred while saving file: {}",
@@ -362,7 +385,7 @@ impl RopeBuffer {
     pub fn save_as(&mut self, path: &Path) -> Result<()> {
         let contents = self.rope.to_string();
         // 使用指定編碼編碼內容
-        let (encoded, _, had_errors) = self.encoding.encode(&contents);
+        let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
         if had_errors {
             log::warn!(
                 "Encoding errors occurred while saving file: {}",
@@ -494,14 +517,36 @@ impl RopeBuffer {
 
     /// 設置文件編碼
     pub fn set_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
-        self.encoding = encoding;
+        self.save_encoding = encoding;
         // 設置編碼後標記為已修改，因為編碼改變了
         self.modified = true;
     }
 
     /// 獲取當前編碼
     pub fn encoding(&self) -> &'static encoding_rs::Encoding {
-        self.encoding
+        self.save_encoding
+    }
+
+    /// 設置讀取編碼
+    pub fn set_read_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+        self.read_encoding = encoding;
+    }
+
+    /// 獲取讀取編碼
+    pub fn read_encoding(&self) -> &'static encoding_rs::Encoding {
+        self.read_encoding
+    }
+
+    /// 設置存檔編碼
+    pub fn set_save_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+        self.save_encoding = encoding;
+        // 設置編碼後標記為已修改，因為編碼改變了
+        self.modified = true;
+    }
+
+    /// 獲取存檔編碼
+    pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
+        self.save_encoding
     }
 }
 

@@ -13,137 +13,69 @@ mod utils;
 mod view;
 
 use anyhow::Result;
+use buffer::EncodingConfig;
 use clap::Parser;
 use editor::Editor;
 use std::path::PathBuf;
 
-/// 特殊的 ANSI 編碼標記
-static ANSI_ENCODING_MARKER: &encoding_rs::Encoding = &encoding_rs::UTF_8; // 臨時使用 UTF-8 作為標記
+fn parse_encoding(dec: Option<&str>, en: Option<&str>) -> Result<EncodingConfig> {
+    // 解析讀取編碼
+    let read_encoding = if let Some(enc_str) = dec {
+        Some(parse_single_encoding(enc_str)?)
+    } else {
+        // 沒有指定讀取編碼自動檢測
+        None
+    };
 
-fn parse_encoding(encoding_str: &str) -> Result<Option<&'static encoding_rs::Encoding>> {
-    match encoding_str.to_lowercase().as_str() {
-        "utf-8" | "utf8" => Ok(Some(encoding_rs::UTF_8)),
-        "utf-16le" | "utf16le" => Ok(Some(encoding_rs::UTF_16LE)),
-        "utf-16be" | "utf16be" => Ok(Some(encoding_rs::UTF_16BE)),
-        "gbk" | "cp936" => Ok(Some(encoding_rs::GBK)),
-        "shift-jis" | "shift_jis" | "sjis" => Ok(Some(encoding_rs::SHIFT_JIS)),
+    // 解析存檔編碼
+    let save_encoding = if let Some(enc_str) = en {
+        // 用戶指定了存檔編碼
+        Some(parse_single_encoding(enc_str)?)
+    } else if let Some(enc_str) = dec {
+        // 沒有指定存檔編碼，但有讀取編碼，使用讀取編碼
+        Some(parse_single_encoding(enc_str)?)
+    } else {
+        // 都沒有指定，存檔編碼將在讀取後動態決定
+        None
+    };
+
+    Ok(EncodingConfig {
+        read_encoding,
+        save_encoding,
+    })
+}
+
+fn parse_single_encoding(enc_str: &str) -> Result<&'static encoding_rs::Encoding> {
+    match enc_str.to_lowercase().as_str() {
+        "utf-8" | "utf8" => Ok(encoding_rs::UTF_8),
+        "utf-16le" | "utf16le" => Ok(encoding_rs::UTF_16LE),
+        "utf-16be" | "utf16be" => Ok(encoding_rs::UTF_16BE),
+        "gbk" | "cp936" => Ok(encoding_rs::GBK),
+        "shift-jis" | "shift_jis" | "sjis" => Ok(encoding_rs::SHIFT_JIS),
         "big5" | "cp950" => {
             // Big5 編碼用於繁體中文
             if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                Ok(Some(enc))
+                Ok(enc)
             } else {
                 anyhow::bail!("Big5 encoding not supported");
             }
         }
-        "ansi" => {
-            // 返回特殊的 ANSI 標記
-            Ok(Some(ANSI_ENCODING_MARKER))
-        }
-        "cp1252" | "windows-1252" => Ok(Some(encoding_rs::WINDOWS_1252)),
+        "cp1252" | "windows-1252" => Ok(encoding_rs::WINDOWS_1252),
         _ => {
             // 嘗試查找其他編碼
-            if let Some(enc) = encoding_rs::Encoding::for_label(encoding_str.as_bytes()) {
-                Ok(Some(enc))
+            if let Some(enc) = encoding_rs::Encoding::for_label(enc_str.as_bytes()) {
+                Ok(enc)
             } else {
-                anyhow::bail!("Unsupported encoding: {}", encoding_str);
+                anyhow::bail!("Unsupported encoding: {}", enc_str);
             }
         }
-    }
-}
-
-/// 根據系統區域設置獲取 ANSI 編碼
-fn get_system_ansi_encoding() -> &'static encoding_rs::Encoding {
-    // 在 Windows 中，ANSI 編碼取決於系統代碼頁
-    // 這裡簡化處理：檢查環境變數或使用平台特定的邏輯
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::env;
-        use std::process::Command;
-
-        // 檢查 LANG 或 LC_ALL 環境變數
-        if let Ok(lang) = env::var("LANG") {
-            if lang.to_lowercase().contains("zh_tw") || lang.to_lowercase().contains("zh-hk") {
-                // 繁體中文 - Big5
-                if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                    return enc;
-                }
-            } else if lang.to_lowercase().contains("zh_cn") {
-                // 簡體中文 - GBK
-                return encoding_rs::GBK;
-            } else if lang.to_lowercase().contains("ja") {
-                // 日文 - Shift-JIS
-                return encoding_rs::SHIFT_JIS;
-            }
-        }
-
-        // 檢查系統代碼頁 (如果可用)
-        if let Ok(codepage) = env::var("ACP") {
-            match codepage.as_str() {
-                "936" => return encoding_rs::GBK, // 中文(簡體)
-                "950" => {
-                    // 中文(繁體)
-                    if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                        return enc;
-                    }
-                }
-                "932" => return encoding_rs::SHIFT_JIS, // 日文
-                "949" => {
-                    // 韓文
-                    if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
-                        return enc;
-                    }
-                }
-                "1252" => return encoding_rs::WINDOWS_1252, // 西歐
-                _ => {}
-            }
-        }
-
-        // 嘗試使用 chcp 命令獲取當前代碼頁
-        if let Ok(output) = Command::new("chcp").output() {
-            if let Ok(output_str) = String::from_utf8(output.stdout) {
-                // chcp 輸出格式如: "Active code page: 936"
-                if let Some(cp_start) = output_str.find(": ") {
-                    let cp_str = &output_str[cp_start + 2..].trim();
-                    if let Ok(cp) = cp_str.parse::<u32>() {
-                        match cp {
-                            936 => return encoding_rs::GBK, // 中文(簡體)
-                            950 => {
-                                // 中文(繁體)
-                                if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                                    return enc;
-                                }
-                            }
-                            932 => return encoding_rs::SHIFT_JIS, // 日文
-                            949 => {
-                                // 韓文
-                                if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
-                                    return enc;
-                                }
-                            }
-                            1252 => return encoding_rs::WINDOWS_1252, // 西歐
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-
-        // 預設使用 GBK (因為用戶環境可能是中文)
-        encoding_rs::GBK
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        // 在非 Windows 系統上，ANSI 通常是 Latin-1
-        encoding_rs::WINDOWS_1252
     }
 }
 
 #[derive(Parser, Debug)]
 #[command(name = "wedi")]
 #[command(author = "wen")]
-#[command(version = "0.1.12")]
+#[command(version = "0.1.13")]
 #[command(about = "A lightweight, easy-to-use console text editor.")]
 #[command(long_about = "
 wedi - A easy-to-use text editor
@@ -214,9 +146,15 @@ struct Args {
     #[arg(long)]
     debug: bool,
 
-    /// File encoding (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, ansi, cp1252, etc.)
-    #[arg(long, default_value = "utf-8")]
-    encoding: String,
+    /// Decode encoding for reading files (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)
+    /// If not specified, uses automatic detection or system default
+    #[arg(long)]
+    dec: Option<String>,
+
+    /// Encode encoding for saving files (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)
+    /// If not specified, uses --dec encoding or the encoding used for reading
+    #[arg(long)]
+    en: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -226,19 +164,10 @@ fn main() -> Result<()> {
     utils::init_logger(args.debug);
 
     // 解析編碼
-    let encoding = parse_encoding(&args.encoding)?;
-
-    // 如果啟用了調試模式，打印編碼信息
-    if args.debug {
-        if let Some(enc) = encoding {
-            eprintln!("Using encoding: {}", enc.name());
-        } else {
-            eprintln!("Using default encoding: UTF-8");
-        }
-    }
+    let encoding_config = parse_encoding(args.dec.as_deref(), args.en.as_deref())?;
 
     // 創建並運行編輯器
-    let mut editor = Editor::new(Some(&args.file), args.debug, encoding)?;
+    let mut editor = Editor::new(Some(&args.file), args.debug, &encoding_config)?;
 
     // 設置 panic hook 以確保終端正常恢復
     let original_hook = std::panic::take_hook();

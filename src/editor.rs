@@ -1,4 +1,4 @@
-use crate::buffer::RopeBuffer;
+use crate::buffer::{EncodingConfig, RopeBuffer};
 use crate::clipboard::ClipboardManager;
 use crate::comment::CommentHandler;
 use crate::cursor::Cursor;
@@ -31,16 +31,20 @@ impl Editor {
     pub fn new(
         file_path: Option<&Path>,
         debug_mode: bool,
-        encoding: Option<&'static encoding_rs::Encoding>,
+        encoding_config: &EncodingConfig,
     ) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
             // 使用新的方法，支持指定編碼
-            RopeBuffer::from_file_with_encoding(path, encoding)?
+            RopeBuffer::from_file_with_encoding(path, encoding_config)?
         } else {
             let mut buffer = RopeBuffer::new();
-            // 如果指定了編碼，設置編碼
-            if let Some(enc) = encoding {
-                buffer.set_encoding(enc);
+            // 如果指定了讀取編碼，設置編碼
+            if let Some(enc) = encoding_config.read_encoding {
+                buffer.set_read_encoding(enc);
+            }
+            // 如果指定了存檔編碼，設置存檔編碼
+            if let Some(enc) = encoding_config.save_encoding {
+                buffer.set_save_encoding(enc);
             }
             buffer
         };
