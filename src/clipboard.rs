@@ -10,7 +10,7 @@ impl ClipboardManager {
         // 嘗試初始化剪貼簿,如果失敗(如無圖形界面)則設為 None
         let clipboard = Clipboard::new().ok();
         if clipboard.is_none() {
-            eprintln!("Warning: Clipboard not available (no GUI detected). Copy/Paste disabled.");
+            eprintln!("Warning: No GUI detected. System/terminal Copy/Paste not synced.");
         }
         Ok(Self { clipboard })
     }

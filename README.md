@@ -1,6 +1,6 @@
 # wedi
 
-A cross-platform minimalist lightweight CLI text editor written in Rust.
+A lightweight, easy-to-use console text editor written in Rust.
 
 ## Features
 

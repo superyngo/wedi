@@ -21,9 +21,9 @@ use std::path::PathBuf;
 #[command(name = "wedi")]
 #[command(author = "wen")]
 #[command(version = "0.1.12")]
-#[command(about = "A cross-platform minimalist lightweight CLI text editor")]
+#[command(about = "A lightweight, easy-to-use console text editor.")]
 #[command(long_about = "
-wedi - A minimalist text editor
+wedi - A easy-to-use text editor
 
 KEYBOARD SHORTCUTS:
   
