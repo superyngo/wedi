@@ -28,11 +28,21 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(file_path: Option<&Path>, debug_mode: bool) -> Result<Self> {
+    pub fn new(
+        file_path: Option<&Path>,
+        debug_mode: bool,
+        encoding: Option<&'static encoding_rs::Encoding>,
+    ) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
-            RopeBuffer::from_file(path)?
+            // 使用新的方法，支持指定編碼
+            RopeBuffer::from_file_with_encoding(path, encoding)?
         } else {
-            RopeBuffer::new()
+            let mut buffer = RopeBuffer::new();
+            // 如果指定了編碼，設置編碼
+            if let Some(enc) = encoding {
+                buffer.set_encoding(enc);
+            }
+            buffer
         };
 
         let terminal = Terminal::new()?;

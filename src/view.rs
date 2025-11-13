@@ -453,7 +453,7 @@ impl View {
             format!(" {}{}{}  - {}", filename, modified, mode_indicator, msg)
         } else {
             format!(
-                " {}{}{}  Line {}/{}  Ctrl+S:Save Ctrl+Q:Quit",
+                " {}{}{}  Line {}/{}  Ctrl+W:Save Ctrl+Q:Quit",
                 filename,
                 modified,
                 mode_indicator,
