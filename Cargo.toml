@@ -16,7 +16,10 @@ log = "0.4"             # 日誌
 env_logger = "0.11"     # 日誌實現
 anyhow = "1.0"          # 錯誤處理
 encoding_rs = "0.8"     # 編碼處理
-windows = { version = "0.58", features = ["Win32_Globalization", "Win32_System_Console", "Win32_System_SystemServices"] }  # Windows API
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_Globalization", "Win32_System_Console", "Win32_System_SystemServices"] }
+
 
 [dev-dependencies]
 assert_cmd = "2.0"      # CLI 測試

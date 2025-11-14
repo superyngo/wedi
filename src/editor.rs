@@ -591,7 +591,7 @@ impl Editor {
                         // 第一次按 Ctrl+Q，顯示警告
                         self.quit_times = 1;
                         self.message = Some(
-                            "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+S to save"
+                            "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+W to save"
                                 .to_string(),
                         );
                     }
