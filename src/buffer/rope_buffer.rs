@@ -441,7 +441,8 @@ impl RopeBuffer {
             let result_pos = match action {
                 Action::Insert { pos, text } => {
                     // 撤銷插入 = 刪除
-                    self.rope.remove(pos..pos + text.len());
+                    let char_count = text.chars().count();
+                    self.rope.remove(pos..pos + char_count);
                     self.modified = true;
                     Some(pos)
                 }
@@ -475,11 +476,12 @@ impl RopeBuffer {
                     // 重做插入
                     self.rope.insert(pos, &text);
                     self.modified = true;
-                    Some(pos + text.len())
+                    Some(pos + text.chars().count())
                 }
                 Action::Delete { pos, text } => {
                     // 重做刪除
-                    self.rope.remove(pos..pos + text.len());
+                    let char_count = text.chars().count();
+                    self.rope.remove(pos..pos + char_count);
                     self.modified = true;
                     Some(pos)
                 }
