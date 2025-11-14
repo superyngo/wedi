@@ -9,8 +9,8 @@ pub struct EncodingConfig {
     pub save_encoding: Option<&'static encoding_rs::Encoding>,
 }
 
-#[derive(Debug, Clone)]
-pub struct EncodingSpec {
-    pub encoding: Option<&'static encoding_rs::Encoding>,
-    pub is_user_specified: bool,
-}
+// #[derive(Debug, Clone)]
+// pub struct EncodingSpec {
+//     pub encoding: Option<&'static encoding_rs::Encoding>,
+//     pub is_user_specified: bool,
+// }

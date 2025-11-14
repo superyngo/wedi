@@ -143,13 +143,13 @@ impl RopeBuffer {
         }
     }
 
-    pub fn from_file(path: &Path) -> Result<Self> {
-        let encoding_config = EncodingConfig {
-            read_encoding: None,
-            save_encoding: None,
-        };
-        Self::from_file_with_encoding(path, &encoding_config)
-    }
+    // pub fn from_file(path: &Path) -> Result<Self> {
+    //     let encoding_config = EncodingConfig {
+    //         read_encoding: None,
+    //         save_encoding: None,
+    //     };
+    //     Self::from_file_with_encoding(path, &encoding_config)
+    // }
 
     pub fn from_file_with_encoding(path: &Path, encoding_config: &EncodingConfig) -> Result<Self> {
         // 如果文件存在，讀取內容；否則創建空緩衝區
@@ -165,7 +165,7 @@ impl RopeBuffer {
                     let detected_info = if bom_len > 0 {
                         format!("BOM detected: {}", bom_encoding.name())
                     } else {
-                        format!("UTF-8 detected (no BOM)")
+                        "UTF-8 detected (no BOM)".to_string()
                     };
                     (bom_encoding, bom_len, Some((detected_info, bom_encoding)))
                 } else if let Some(specified_enc) = encoding_config.read_encoding {
@@ -515,28 +515,27 @@ impl RopeBuffer {
         self.history.can_redo()
     }
 
-    /// 設置文件編碼
-    pub fn set_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
-        self.save_encoding = encoding;
-        // 設置編碼後標記為已修改，因為編碼改變了
-        self.modified = true;
-    }
+    // 設置文件編碼
+    // pub fn set_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+    //     self.save_encoding = encoding;
+    //     // 設置編碼後標記為已修改，因為編碼改變了
+    //     self.modified = true;
+    // }
 
-    /// 獲取當前編碼
-    pub fn encoding(&self) -> &'static encoding_rs::Encoding {
-        self.save_encoding
-    }
+    // 獲取當前編碼
+    // pub fn encoding(&self) -> &'static encoding_rs::Encoding {
+    //     self.save_encoding
+    // }
 
-    /// 設置讀取編碼
+    // 設置讀取編碼
     pub fn set_read_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
         self.read_encoding = encoding;
     }
 
     /// 獲取讀取編碼
-    pub fn read_encoding(&self) -> &'static encoding_rs::Encoding {
-        self.read_encoding
-    }
-
+    // pub fn read_encoding(&self) -> &'static encoding_rs::Encoding {
+    //     self.read_encoding
+    // }
     /// 設置存檔編碼
     pub fn set_save_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
         self.save_encoding = encoding;
@@ -544,10 +543,10 @@ impl RopeBuffer {
         self.modified = true;
     }
 
-    /// 獲取存檔編碼
-    pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
-        self.save_encoding
-    }
+    // 獲取存檔編碼
+    // pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
+    //     self.save_encoding
+    // }
 }
 
 #[cfg(test)]
