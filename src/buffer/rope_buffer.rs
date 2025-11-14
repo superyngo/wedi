@@ -39,23 +39,10 @@ impl RopeBuffer {
 
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::Globalization::GetACP;
-            use windows::Win32::System::Console::{GetConsoleCP, GetConsoleOutputCP};
+            use winapi::um::winnls::GetACP;
 
-            // 優先使用 console 輸入代碼頁（用戶輸入），其次輸出代碼頁，最後系統 ANSI 代碼頁
-            let cp = unsafe {
-                let input_cp = GetConsoleCP();
-                let output_cp = GetConsoleOutputCP();
-                let ansi_cp = GetACP();
-
-                if input_cp != 0 {
-                    input_cp
-                } else if output_cp != 0 {
-                    output_cp
-                } else {
-                    ansi_cp
-                }
-            };
+            // 使用系統 ANSI 代碼頁
+            let cp = unsafe { GetACP() };
             match cp {
                 65001 => encoding_rs::UTF_8, // UTF-8
                 936 => encoding_rs::GBK,     // 中文(簡體)
@@ -178,27 +165,33 @@ impl RopeBuffer {
                 };
 
             // Debug 模式：顯示編碼選擇信息
-            if log::log_enabled!(log::Level::Debug) {
-                log::debug!("  File: {}", path.display());
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG]   File: {}", path.display());
                 if let Some((detected_info, detected_enc)) = &detected_encoding_info {
-                    log::debug!("  Detected: {}", detected_info);
+                    eprintln!("[DEBUG]   Detected: {}", detected_info);
                     if let Some(specified_enc) = encoding_config.read_encoding {
                         if detected_enc.name() != specified_enc.name() {
-                            log::debug!("  User specified: {} (bypassed)", specified_enc.name());
+                            eprintln!(
+                                "[DEBUG]   User specified: {} (bypassed)",
+                                specified_enc.name()
+                            );
                         }
                     }
                 } else if let Some(specified_enc) = encoding_config.read_encoding {
-                    log::debug!("  User specified: {}", specified_enc.name());
+                    eprintln!("[DEBUG]   User specified: {}", specified_enc.name());
                 } else {
-                    log::debug!("  System default: {}", read_encoding.name());
+                    eprintln!("[DEBUG]   System default: {}", read_encoding.name());
                 }
-                log::debug!("  Using decoding: {}", read_encoding.name());
+                eprintln!("[DEBUG]   Using decoding: {}", read_encoding.name());
             }
 
             // 解碼為 UTF-8
             let (decoded, _, had_errors) = read_encoding.decode(&bytes[bom_length..]);
             if had_errors {
-                log::warn!("Encoding errors detected in file: {}", path.display());
+                eprintln!(
+                    "[WARN] Encoding errors detected in file: {}",
+                    path.display()
+                );
             }
 
             (Rope::from_str(&decoded), read_encoding, false)
@@ -215,8 +208,8 @@ impl RopeBuffer {
             .unwrap_or(detected_encoding);
 
         // Debug 模式：顯示存檔編碼選擇信息
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!("  Using encoding: {}", save_encoding.name());
+        if cfg!(debug_assertions) {
+            eprintln!("[DEBUG]   Using encoding: {}", save_encoding.name());
         }
 
         Ok(Self {
@@ -351,8 +344,8 @@ impl RopeBuffer {
             // 使用指定編碼編碼內容
             let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
             if had_errors {
-                log::warn!(
-                    "Encoding errors occurred while saving file: {}",
+                eprintln!(
+                    "[WARN] Encoding errors occurred while saving file: {}",
                     path.display()
                 );
             }
@@ -370,8 +363,8 @@ impl RopeBuffer {
         // 使用指定編碼編碼內容
         let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
         if had_errors {
-            log::warn!(
-                "Encoding errors occurred while saving file: {}",
+            eprintln!(
+                "[WARN] Encoding errors occurred while saving file: {}",
                 path.display()
             );
         }
@@ -387,8 +380,8 @@ impl RopeBuffer {
         // 使用指定編碼編碼內容
         let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
         if had_errors {
-            log::warn!(
-                "Encoding errors occurred while saving file: {}",
+            eprintln!(
+                "[WARN] Encoding errors occurred while saving file: {}",
                 path.display()
             );
         }

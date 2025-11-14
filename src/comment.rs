@@ -155,19 +155,6 @@ impl CommentHandler {
     pub fn has_comment_style(&self) -> bool {
         self.style.is_some()
     }
-
-    /// 查找行中註解符號的起始位置（如果有的話）
-    /// 返回 Some(index) 表示從該位置開始是註解
-    pub fn find_comment_start(&self, line: &str) -> Option<usize> {
-        match &self.style {
-            Some(CommentStyle::Line(prefix)) => {
-                // 返回字符索引而非字節索引
-                line.find(prefix)
-                    .map(|byte_idx| line[..byte_idx].chars().count())
-            }
-            _ => None,
-        }
-    }
 }
 
 impl Default for CommentHandler {

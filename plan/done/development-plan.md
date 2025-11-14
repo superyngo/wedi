@@ -1221,9 +1221,3 @@ git add .
 git commit -m "feat: implement cursor movement"
 git push
 ```
-
----
-
-**文檔版本**: v1.0
-**最後更新**: 2025-11-08
-**維護者**: [Your Name]

@@ -90,14 +90,12 @@ impl Editor {
             self.view.render(
                 &self.buffer,
                 &self.cursor,
-                self.selection.as_ref(),
-                self.selection_mode,
+                self.has_selection(),
                 if self.debug_mode {
                     debug_info.as_deref()
                 } else {
                     self.message.as_deref()
                 },
-                &self.comment_handler,
             )?;
 
             let key_event = Terminal::read_key()?;
@@ -126,6 +124,7 @@ impl Editor {
 
                 let pos = self.cursor.char_position(&self.buffer);
                 self.buffer.insert_char(pos, ch);
+                self.view.invalidate_cache();
 
                 if ch == '\n' {
                     self.cursor.row += 1;
@@ -151,6 +150,7 @@ impl Editor {
                     let new_col = self.cursor.col - 1;
                     let pos = self.buffer.line_to_char(self.cursor.row) + new_col;
                     self.buffer.delete_char(pos);
+                    self.view.invalidate_cache();
                     self.cursor
                         .set_position(&self.buffer, &self.view, self.cursor.row, new_col);
                 } else if self.cursor.row > 0 {
@@ -165,6 +165,7 @@ impl Editor {
 
                     let pos = self.buffer.line_to_char(new_row) + prev_line_len;
                     self.buffer.delete_char(pos);
+                    self.view.invalidate_cache();
 
                     self.cursor
                         .set_position(&self.buffer, &self.view, new_row, prev_line_len);
@@ -178,6 +179,7 @@ impl Editor {
                 } else {
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.delete_char(pos);
+                    self.view.invalidate_cache();
                 }
                 self.selection_mode = false; // 刪除後關閉選擇模式
             }
@@ -187,6 +189,7 @@ impl Editor {
                     self.delete_selection();
                 } else {
                     self.buffer.delete_line(self.cursor.row);
+                    self.view.invalidate_cache();
                     // 如果刪除後超出範圍,調整到最後一行
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
@@ -403,6 +406,7 @@ impl Editor {
                         self.delete_selection();
                     } else {
                         self.buffer.delete_line(self.cursor.row);
+                        self.view.invalidate_cache();
                         // 剪切後光標上移一行
                         // if self.cursor.row > 0 {
                         //     self.cursor.row -= 1;
@@ -452,6 +456,7 @@ impl Editor {
                         // 這樣會將原行內容推到下一行
                         let line_start = self.buffer.line_to_char(self.cursor.row);
                         self.buffer.insert(line_start, &text);
+                        self.view.invalidate_cache();
 
                         // 光標移動到新插入行的開始
                         self.cursor.col = 0;
@@ -460,6 +465,7 @@ impl Editor {
                         // 普通貼上：在光標位置插入
                         let pos = self.cursor.char_position(&self.buffer);
                         self.buffer.insert(pos, &text);
+                        self.view.invalidate_cache();
 
                         // 移動到貼上內容末尾
                         for ch in text.chars() {
@@ -520,6 +526,7 @@ impl Editor {
                     self.delete_selection();
                 } else {
                     self.buffer.delete_line(self.cursor.row);
+                    self.view.invalidate_cache();
                     // 如果刪除後超出範圍,調整到最後一行
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
@@ -549,6 +556,7 @@ impl Editor {
                         // 這樣會將原行內容推到下一行
                         let line_start = self.buffer.line_to_char(self.cursor.row);
                         self.buffer.insert(line_start, &text);
+                        self.view.invalidate_cache();
 
                         // 光標移動到新插入行的開始
                         self.cursor.col = 0;
@@ -557,6 +565,7 @@ impl Editor {
                         // 普通貼上：在光標位置插入
                         let pos = self.cursor.char_position(&self.buffer);
                         self.buffer.insert(pos, &text);
+                        self.view.invalidate_cache();
 
                         // 移動到貼上內容末尾
                         for ch in text.chars() {
@@ -608,6 +617,7 @@ impl Editor {
             // 撤銷/重做
             Command::Undo => {
                 if let Some(pos) = self.buffer.undo() {
+                    self.view.invalidate_cache();
                     // 將光標移動到撤銷操作的位置
                     let row = self.buffer.char_to_line(pos);
                     let line_start = self.buffer.line_to_char(row);
@@ -624,6 +634,7 @@ impl Editor {
 
             Command::Redo => {
                 if let Some(pos) = self.buffer.redo() {
+                    self.view.invalidate_cache();
                     // 將光標移動到重做操作的位置
                     let row = self.buffer.char_to_line(pos);
                     let line_start = self.buffer.line_to_char(row);
@@ -765,6 +776,8 @@ impl Editor {
                             }
                         }
 
+                        self.view.invalidate_cache();
+
                         // 保留選擇狀態（不清除選取）
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
@@ -802,6 +815,8 @@ impl Editor {
                             };
                         self.buffer.insert(line_start, &new_line_with_newline);
 
+                        self.view.invalidate_cache();
+
                         self.message = Some("Toggled comment".to_string());
                     }
                 }
@@ -821,6 +836,8 @@ impl Editor {
                             self.buffer.insert(line_start, "    ");
                         }
 
+                        self.view.invalidate_cache();
+
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
@@ -830,6 +847,7 @@ impl Editor {
                     // 單行：在光標位置插入 4 個空格
                     let pos = self.cursor.char_position(&self.buffer);
                     self.buffer.insert(pos, "    ");
+                    self.view.invalidate_cache();
                     self.cursor.col += 4;
                     self.cursor.desired_visual_col = self.cursor.col;
                 }
@@ -859,6 +877,8 @@ impl Editor {
                             }
                         }
 
+                        self.view.invalidate_cache();
+
                         // 保留選擇狀態
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
@@ -881,6 +901,7 @@ impl Editor {
                         let delete_start = line_start + self.cursor.col - spaces_to_remove;
                         self.buffer
                             .delete_range(delete_start, delete_start + spaces_to_remove);
+                        self.view.invalidate_cache();
                         self.cursor.col -= spaces_to_remove;
                         self.cursor.desired_visual_col = self.cursor.col;
                     }
@@ -965,6 +986,7 @@ impl Editor {
             let end_pos = self.buffer.line_to_char(end_row) + end_col;
 
             self.buffer.delete_range(start_pos, end_pos);
+            self.view.invalidate_cache();
 
             self.cursor
                 .set_position(&self.buffer, &self.view, start_row, start_col);
