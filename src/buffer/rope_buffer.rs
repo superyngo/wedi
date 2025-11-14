@@ -544,9 +544,10 @@ impl RopeBuffer {
     }
 
     // 獲取存檔編碼
-    // pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
-    //     self.save_encoding
-    // }
+    #[allow(dead_code)]
+    pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
+        self.save_encoding
+    }
 }
 
 #[cfg(test)]
@@ -563,8 +564,15 @@ mod tests {
         // 創建 UTF-8 文件（無 BOM）
         fs::write(&file_path, "Hello, 世界!").unwrap();
 
-        let buffer = RopeBuffer::from_file(&file_path).unwrap();
-        assert_eq!(buffer.encoding().name(), "UTF-8");
+        let buffer = RopeBuffer::from_file_with_encoding(
+            &file_path,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(buffer.save_encoding().name(), "UTF-8");
     }
 
     #[test]
@@ -577,8 +585,15 @@ mod tests {
         content.extend_from_slice("Hello, 世界!".as_bytes());
         fs::write(&file_path, content).unwrap();
 
-        let buffer = RopeBuffer::from_file(&file_path).unwrap();
-        assert_eq!(buffer.encoding().name(), "UTF-8");
+        let buffer = RopeBuffer::from_file_with_encoding(
+            &file_path,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(buffer.save_encoding().name(), "UTF-8");
     }
 
     #[test]
@@ -595,8 +610,15 @@ mod tests {
         content.extend_from_slice(&utf16_bytes);
         fs::write(&file_path, content).unwrap();
 
-        let buffer = RopeBuffer::from_file(&file_path).unwrap();
-        assert_eq!(buffer.encoding().name(), "UTF-16LE");
+        let buffer = RopeBuffer::from_file_with_encoding(
+            &file_path,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(buffer.save_encoding().name(), "UTF-16LE");
     }
 
     #[test]
@@ -606,7 +628,7 @@ mod tests {
 
         // 創建 buffer 並設置 GBK 編碼
         let mut buffer = RopeBuffer::new();
-        buffer.set_encoding(encoding_rs::GBK);
+        buffer.set_save_encoding(encoding_rs::GBK);
         buffer.insert(0, "Hello, 世界!");
 
         // 保存文件
@@ -627,8 +649,15 @@ mod tests {
         fs::write(&file_path, "Hello, 世界!").unwrap();
 
         // 讀取時指定 GBK 編碼
-        let mut buffer = RopeBuffer::from_file(&file_path).unwrap();
-        buffer.set_encoding(encoding_rs::GBK);
+        let mut buffer = RopeBuffer::from_file_with_encoding(
+            &file_path,
+            &EncodingConfig {
+                read_encoding: Some(encoding_rs::GBK),
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        buffer.set_save_encoding(encoding_rs::GBK);
 
         // 保存時應該使用 GBK
         buffer.save_to(&file_path).unwrap();
@@ -645,7 +674,7 @@ mod tests {
 
         // 創建 buffer 並設置 ANSI (Windows-1252) 編碼
         let mut buffer = RopeBuffer::new();
-        buffer.set_encoding(encoding_rs::WINDOWS_1252);
+        buffer.set_save_encoding(encoding_rs::WINDOWS_1252);
         buffer.insert(0, "Hello, world! ©");
 
         // 保存文件
@@ -667,7 +696,7 @@ mod tests {
 
         // 創建 buffer 並設置 Big5 編碼
         let mut buffer = RopeBuffer::new();
-        buffer.set_encoding(big5_encoding);
+        buffer.set_save_encoding(big5_encoding);
         buffer.insert(0, "Hello, 世界!"); // 這裡會有一些字符無法用 Big5 表示
 
         // 保存文件
