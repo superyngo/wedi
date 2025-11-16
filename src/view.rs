@@ -5,7 +5,7 @@ use crate::utils::visual_width;
 use anyhow::Result;
 use crossterm::{
     cursor, execute, queue,
-    style::{self, Color},
+    style::{self, Attribute, Color},
 };
 use std::io::{self, Write};
 use unicode_width::UnicodeWidthChar;
@@ -133,7 +133,7 @@ impl View {
         &mut self,
         buffer: &RopeBuffer,
         cursor: &Cursor,
-        selection_mode: bool,
+        selection: Option<&Selection>,
         message: Option<&str>,
     ) -> Result<()> {
         let has_debug_ruler = message.is_some_and(|m| m.starts_with("DEBUG"));
@@ -154,6 +154,38 @@ impl View {
 
         let line_num_width = self.calculate_line_number_width(buffer);
         let available_width = self.get_available_width(buffer);
+
+        // 計算選擇範圍（轉換為視覺列）
+        let sel_visual_range = selection.map(|sel| {
+            let (start_row, start_col) = sel.start.min(sel.end);
+            let (end_row, end_col) = sel.start.max(sel.end);
+
+            // 將start_col轉換為視覺列
+            let start_visual_col = if start_row < buffer.line_count() {
+                let line = buffer
+                    .line(start_row)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let line = line.trim_end_matches(['\n', '\r']);
+                self.logical_col_to_visual_col(line, start_col)
+            } else {
+                start_col
+            };
+
+            // 將end_col轉換為視覺列
+            let end_visual_col = if end_row < buffer.line_count() {
+                let line = buffer
+                    .line(end_row)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let line = line.trim_end_matches(['\n', '\r']);
+                self.logical_col_to_visual_col(line, end_col)
+            } else {
+                end_col
+            };
+
+            ((start_row, start_visual_col), (end_row, end_visual_col))
+        });
 
         let mut screen_row = ruler_offset;
         let mut file_row = self.offset_row;
@@ -210,7 +242,58 @@ impl View {
                     }
                 }
 
-                queue!(stdout, style::Print(visual_line))?;
+                // 渲染視覺行，支持selection高亮
+                if let Some(((start_row, start_col), (end_row, end_col))) = sel_visual_range {
+                    if file_row >= start_row && file_row <= end_row {
+                        // 這一行有選擇，需要逐字符渲染
+                        // 計算這個visual_line在整個邏輯行中的視覺起始位置
+                        let visual_line_start: usize = layout
+                            .visual_lines
+                            .iter()
+                            .take(visual_idx)
+                            .map(|line| visual_width(line))
+                            .sum();
+
+                        let chars: Vec<char> = visual_line.chars().collect();
+                        let mut current_visual_pos = visual_line_start;
+
+                        for &ch in chars.iter() {
+                            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+
+                            // 判斷這個字符是否在選擇範圍內
+                            let is_selected = if file_row == start_row && file_row == end_row {
+                                // 選擇在同一行
+                                current_visual_pos >= start_col && current_visual_pos < end_col
+                            } else if file_row == start_row {
+                                // 選擇起始行
+                                current_visual_pos >= start_col
+                            } else if file_row == end_row {
+                                // 選擇結束行
+                                current_visual_pos < end_col
+                            } else {
+                                // 選擇中間的行，全選
+                                true
+                            };
+
+                            if is_selected {
+                                queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
+                            }
+                            queue!(stdout, style::Print(ch))?;
+                            if is_selected {
+                                queue!(stdout, style::SetAttribute(Attribute::NoReverse))?;
+                            }
+
+                            current_visual_pos += ch_width;
+                        }
+                    } else {
+                        // 這一行沒有選擇，直接打印
+                        queue!(stdout, style::Print(visual_line))?;
+                    }
+                } else {
+                    // 沒有選擇，直接打印
+                    queue!(stdout, style::Print(visual_line))?;
+                }
+
                 queue!(
                     stdout,
                     crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine)
@@ -234,7 +317,7 @@ impl View {
             screen_row += 1;
         }
 
-        self.render_status_bar(buffer, selection_mode, message, cursor)?;
+        self.render_status_bar(buffer, selection.is_some(), message, cursor)?;
 
         // 移動終端光標到當前cursor位置
         let ruler_offset = if has_debug_ruler { 1 } else { 0 };

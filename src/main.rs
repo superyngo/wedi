@@ -18,9 +18,9 @@ use editor::Editor;
 use pico_args::Arguments;
 use std::path::PathBuf;
 
-fn parse_encoding(dec: Option<&str>, en: Option<&str>) -> Result<EncodingConfig> {
+fn parse_encoding(from_encoding: Option<&str>, to_encoding: Option<&str>) -> Result<EncodingConfig> {
     // 解析讀取編碼
-    let read_encoding = if let Some(enc_str) = dec {
+    let read_encoding = if let Some(enc_str) = from_encoding {
         Some(parse_single_encoding(enc_str)?)
     } else {
         // 沒有指定讀取編碼自動檢測
@@ -28,10 +28,10 @@ fn parse_encoding(dec: Option<&str>, en: Option<&str>) -> Result<EncodingConfig>
     };
 
     // 解析存檔編碼
-    let save_encoding = if let Some(enc_str) = en {
+    let save_encoding = if let Some(enc_str) = to_encoding {
         // 用戶指定了存檔編碼
         Some(parse_single_encoding(enc_str)?)
-    } else if let Some(enc_str) = dec {
+    } else if let Some(enc_str) = from_encoding {
         // 沒有指定存檔編碼，但有讀取編碼，使用讀取編碼
         Some(parse_single_encoding(enc_str)?)
     } else {
@@ -76,8 +76,8 @@ fn parse_single_encoding(enc_str: &str) -> Result<&'static encoding_rs::Encoding
 struct Args {
     file: PathBuf,
     debug: bool,
-    dec: Option<String>,
-    en: Option<String>,
+    from_encoding: Option<String>,
+    to_encoding: Option<String>,
 }
 
 impl Args {
@@ -90,9 +90,15 @@ impl Args {
             std::process::exit(0);
         }
 
+        // 檢查是否有 --version
+        if pargs.contains(["-v", "--version"]) {
+            Self::print_version();
+            std::process::exit(0);
+        }
+
         let debug = pargs.contains("--debug");
-        let dec = pargs.opt_value_from_str("--dec")?;
-        let en = pargs.opt_value_from_str("--en")?;
+        let from_encoding = pargs.opt_value_from_str(["-f", "--from-encoding"])?;
+        let to_encoding = pargs.opt_value_from_str(["-t", "--to-encoding"])?;
 
         let file = pargs
             .free_from_str()
@@ -107,9 +113,13 @@ impl Args {
         Ok(Self {
             file,
             debug,
-            dec,
-            en,
+            from_encoding,
+            to_encoding,
         })
+    }
+
+    fn print_version() {
+        println!("wedi {}", env!("CARGO_PKG_VERSION"));
     }
 
     fn print_help() {
@@ -119,12 +129,13 @@ impl Args {
         println!("    wedi [OPTIONS] [FILE]");
         println!();
         println!("OPTIONS:");
-        println!("    -h, --help                    Show this help message");
-        println!("    --debug                       Enable debug mode");
-        println!("    --dec <ENCODING>              Decode encoding for reading files");
-        println!("                                  (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
-        println!("    --en <ENCODING>               Encode encoding for saving files");
-        println!("                                  (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
+        println!("    -h, --help                         Show this help message");
+        println!("    -v, --version                      Show version information");
+        println!("    --debug                            Enable debug mode");
+        println!("    -f, --from-encoding <ENCODING>     Encoding for reading files");
+        println!("                                       (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
+        println!("    -t, --to-encoding <ENCODING>       Encoding for saving files");
+        println!("                                       (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
         println!();
         println!("KEYBOARD SHORTCUTS:");
         println!();
@@ -203,7 +214,7 @@ fn main() -> Result<()> {
     debug_log!("Starting wedi with file: {:?}", args.file);
     debug_log!("Debug mode enabled");
 
-    let encoding_config = parse_encoding(args.dec.as_deref(), args.en.as_deref())?;
+    let encoding_config = parse_encoding(args.from_encoding.as_deref(), args.to_encoding.as_deref())?;
 
     debug_log!(
         "Read encoding: {:?}",

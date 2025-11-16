@@ -39,9 +39,13 @@ wedi <filename>
 
 # Show help
 wedi -h
+# or
+wedi --help
 
 # Show version
 wedi -v
+# or
+wedi --version
 
 # Enable debug mode
 wedi --debug <filename>
@@ -52,14 +56,18 @@ wedi --debug <filename>
 wedi supports specifying different encodings for reading and saving files:
 
 ```bash
-# Specify decoding (reading) encoding
-wedi <filename> --dec <encoding>
+# Specify source encoding (reading)
+wedi <filename> --from-encoding <encoding>
+# or use shorthand
+wedi <filename> -f <encoding>
 
-# Specify encoding (saving) encoding
-wedi <filename> --en <encoding>
+# Specify target encoding (saving)
+wedi <filename> --to-encoding <encoding>
+# or use shorthand
+wedi <filename> -t <encoding>
 
-# Specify both decoding and encoding
-wedi <filename> --dec <encoding> --en <encoding>
+# Specify both source and target encoding
+wedi <filename> -f <encoding> -t <encoding>
 ```
 
 **Supported Encodings:**
@@ -72,18 +80,18 @@ wedi <filename> --dec <encoding> --en <encoding>
 - And many more...
 
 **Encoding Priority for Saving:**
-When saving files, the encoding priority is: `--en` > `--dec` > detected encoding from file.
+When saving files, the encoding priority is: `--to-encoding` > `--from-encoding` > detected encoding from file.
 
 **Examples:**
 ```bash
 # Read UTF-8, save as GBK
-wedi file.txt --dec utf-8 --en gbk
+wedi file.txt -f utf-8 -t gbk
 
 # Read with auto-detection, save as UTF-16LE
-wedi file.txt --en utf-16le
+wedi file.txt -t utf-16le
 
 # Read GBK, save as GBK
-wedi file.txt --dec gbk
+wedi file.txt -f gbk
 ```
 
 ## Keyboard Shortcuts

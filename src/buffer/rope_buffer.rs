@@ -18,7 +18,16 @@ pub struct RopeBuffer {
 
 impl RopeBuffer {
     pub fn new() -> Self {
+        // 新建文件默认使用系统 ANSI 编码
+        // 可通过 --dec 或 --en 参数覆盖
         let system_enc = Self::get_system_ansi_encoding();
+
+        // Debug 模式：显示新建文件的默认编码
+        if cfg!(debug_assertions) {
+            eprintln!("[DEBUG] RopeBuffer::new()");
+            eprintln!("[DEBUG]   System default encoding: {}", system_enc.name());
+        }
+
         Self {
             rope: Rope::new(),
             file_path: None,
@@ -39,33 +48,90 @@ impl RopeBuffer {
 
         #[cfg(target_os = "windows")]
         {
+            use winapi::um::consoleapi::{GetConsoleCP, GetConsoleOutputCP};
             use winapi::um::winnls::GetACP;
 
-            // 使用系統 ANSI 代碼頁
-            let cp = unsafe { GetACP() };
-            match cp {
-                65001 => encoding_rs::UTF_8, // UTF-8
-                936 => encoding_rs::GBK,     // 中文(簡體)
+            // 檢查多個代碼頁來源
+            let console_input_cp = unsafe { GetConsoleCP() };
+            let console_output_cp = unsafe { GetConsoleOutputCP() };
+            let system_acp = unsafe { GetACP() };
+
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG] Detecting system encoding on Windows:");
+                eprintln!("[DEBUG]   Console Input CP (GetConsoleCP): {}", console_input_cp);
+                eprintln!("[DEBUG]   Console Output CP (GetConsoleOutputCP): {}", console_output_cp);
+                eprintln!("[DEBUG]   System ANSI CP (GetACP): {}", system_acp);
+            }
+
+            // 優先使用控制台輸出代碼頁，如果是 0 則回退到系統 ANSI 代碼頁
+            let cp = if console_output_cp != 0 {
+                if cfg!(debug_assertions) {
+                    eprintln!("[DEBUG]   Using Console Output CP: {}", console_output_cp);
+                }
+                console_output_cp
+            } else {
+                if cfg!(debug_assertions) {
+                    eprintln!("[DEBUG]   Console CP is 0, using System ANSI CP: {}", system_acp);
+                }
+                system_acp
+            };
+
+            let encoding = match cp {
+                65001 => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using UTF-8 (CP 65001)");
+                    }
+                    encoding_rs::UTF_8
+                }
+                936 => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using GBK (CP 936)");
+                    }
+                    encoding_rs::GBK
+                }
                 950 => {
                     // 中文(繁體) - Big5
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using Big5 (CP 950)");
+                    }
                     if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
                         enc
                     } else {
                         encoding_rs::UTF_8
                     }
                 }
-                932 => encoding_rs::SHIFT_JIS, // 日文
+                932 => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using Shift_JIS (CP 932)");
+                    }
+                    encoding_rs::SHIFT_JIS
+                }
                 949 => {
                     // 韓文 - EUC-KR
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using EUC-KR (CP 949)");
+                    }
                     if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
                         enc
                     } else {
                         encoding_rs::UTF_8
                     }
                 }
-                1252 => encoding_rs::WINDOWS_1252, // 西歐
-                _ => encoding_rs::UTF_8,           // 其他情況 fallback 到 UTF-8
-            }
+                1252 => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Using Windows-1252 (CP 1252)");
+                    }
+                    encoding_rs::WINDOWS_1252
+                }
+                _ => {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   Unknown code page, using UTF-8 as fallback");
+                    }
+                    encoding_rs::UTF_8
+                }
+            };
+
+            encoding
         }
 
         #[cfg(not(target_os = "windows"))]
@@ -76,33 +142,74 @@ impl RopeBuffer {
             // 優先級: LC_ALL > LC_CTYPE > LANG
             let locale_vars = ["LC_ALL", "LC_CTYPE", "LANG"];
 
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG] Detecting system encoding on Unix-like system:");
+            }
+
             for var in &locale_vars {
                 if let Ok(locale) = env::var(var) {
+                    if cfg!(debug_assertions) {
+                        eprintln!("[DEBUG]   {} = {}", var, locale);
+                    }
+
                     // 解析 locale 字符串，提取 charset 部分
                     // 格式如: zh_CN.UTF-8, en_US.UTF-8, zh_TW.Big5 等
                     if let Some(charset_start) = locale.find('.') {
                         let charset = &locale[charset_start + 1..];
+
+                        if cfg!(debug_assertions) {
+                            eprintln!("[DEBUG]   Detected charset: {}", charset);
+                        }
+
                         match charset.to_uppercase().as_str() {
-                            "UTF-8" => return encoding_rs::UTF_8,
-                            "GBK" | "GB2312" | "GB18030" => return encoding_rs::GBK,
+                            "UTF-8" => {
+                                if cfg!(debug_assertions) {
+                                    eprintln!("[DEBUG]   Using UTF-8");
+                                }
+                                return encoding_rs::UTF_8;
+                            }
+                            "GBK" | "GB2312" | "GB18030" => {
+                                if cfg!(debug_assertions) {
+                                    eprintln!("[DEBUG]   Using GBK");
+                                }
+                                return encoding_rs::GBK;
+                            }
                             "BIG5" => {
                                 if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
+                                    if cfg!(debug_assertions) {
+                                        eprintln!("[DEBUG]   Using Big5");
+                                    }
                                     return enc;
                                 }
                             }
-                            "SHIFT_JIS" | "SJIS" => return encoding_rs::SHIFT_JIS,
+                            "SHIFT_JIS" | "SJIS" => {
+                                if cfg!(debug_assertions) {
+                                    eprintln!("[DEBUG]   Using Shift_JIS");
+                                }
+                                return encoding_rs::SHIFT_JIS;
+                            }
                             "EUC-KR" => {
                                 if let Some(enc) = encoding_rs::Encoding::for_label(b"euc-kr") {
+                                    if cfg!(debug_assertions) {
+                                        eprintln!("[DEBUG]   Using EUC-KR");
+                                    }
                                     return enc;
                                 }
                             }
-                            _ => {} // 繼續檢查其他變數
+                            _ => {
+                                if cfg!(debug_assertions) {
+                                    eprintln!("[DEBUG]   Unknown charset, continuing...");
+                                }
+                            } // 繼續檢查其他變數
                         }
                     }
                 }
             }
 
             // 若無法從 locale 判斷，預設使用 UTF-8
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG]   No valid locale found, using UTF-8 as fallback");
+            }
             encoding_rs::UTF_8
         }
     }
@@ -197,7 +304,20 @@ impl RopeBuffer {
             (Rope::from_str(&decoded), read_encoding, false)
         } else {
             // 文件不存在，創建空緩衝區
-            let encoding_to_use = encoding_config.read_encoding.unwrap_or(encoding_rs::UTF_8);
+            // 使用用戶指定編碼，否則使用系統默認編碼
+            let encoding_to_use = encoding_config
+                .read_encoding
+                .unwrap_or_else(|| Self::get_system_ansi_encoding());
+
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG]   File does not exist, creating new buffer");
+                if encoding_config.read_encoding.is_some() {
+                    eprintln!("[DEBUG]   Using user-specified encoding: {}", encoding_to_use.name());
+                } else {
+                    eprintln!("[DEBUG]   Using system default encoding: {}", encoding_to_use.name());
+                }
+            }
+
             (Rope::new(), encoding_to_use, true)
         };
 
@@ -340,6 +460,11 @@ impl RopeBuffer {
 
     pub fn save(&mut self) -> Result<()> {
         if let Some(path) = &self.file_path.clone() {
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG] Saving file: {}", path.display());
+                eprintln!("[DEBUG]   save_encoding: {}", self.save_encoding.name());
+            }
+
             let contents = self.rope.to_string();
             // 使用指定編碼編碼內容
             let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
@@ -351,6 +476,11 @@ impl RopeBuffer {
             }
             std::fs::write(path, encoded)?;
             self.modified = false;
+
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG]   File saved successfully with {} encoding", self.save_encoding.name());
+            }
+
             Ok(())
         } else {
             anyhow::bail!("No file path set")
@@ -510,27 +640,11 @@ impl RopeBuffer {
         self.history.can_redo()
     }
 
-    // 設置文件編碼
-    // pub fn set_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
-    //     self.save_encoding = encoding;
-    //     // 設置編碼後標記為已修改，因為編碼改變了
-    //     self.modified = true;
-    // }
-
-    // 獲取當前編碼
-    // pub fn encoding(&self) -> &'static encoding_rs::Encoding {
-    //     self.save_encoding
-    // }
-
     // 設置讀取編碼
     pub fn set_read_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
         self.read_encoding = encoding;
     }
 
-    /// 獲取讀取編碼
-    // pub fn read_encoding(&self) -> &'static encoding_rs::Encoding {
-    //     self.read_encoding
-    // }
     /// 設置存檔編碼
     pub fn set_save_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
         self.save_encoding = encoding;

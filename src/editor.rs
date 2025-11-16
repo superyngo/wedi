@@ -40,12 +40,31 @@ impl Editor {
             let mut buffer = RopeBuffer::new();
             // 如果指定了讀取編碼，設置編碼
             if let Some(enc) = encoding_config.read_encoding {
+                if cfg!(debug_assertions) {
+                    eprintln!("[DEBUG] Editor::new() - Setting read_encoding from config: {}", enc.name());
+                }
                 buffer.set_read_encoding(enc);
             }
             // 如果指定了存檔編碼，設置存檔編碼
             if let Some(enc) = encoding_config.save_encoding {
+                if cfg!(debug_assertions) {
+                    eprintln!("[DEBUG] Editor::new() - Setting save_encoding from config: {}", enc.name());
+                }
                 buffer.set_save_encoding(enc);
             }
+
+            if cfg!(debug_assertions) {
+                eprintln!("[DEBUG] Editor::new() - Final buffer save_encoding: {}",
+                    if let Some(enc) = encoding_config.save_encoding {
+                        enc.name()
+                    } else if let Some(enc) = encoding_config.read_encoding {
+                        enc.name()
+                    } else {
+                        "system default"
+                    }
+                );
+            }
+
             buffer
         };
 
@@ -90,7 +109,7 @@ impl Editor {
             self.view.render(
                 &self.buffer,
                 &self.cursor,
-                self.has_selection(),
+                self.selection.as_ref(),
                 if self.debug_mode {
                     debug_info.as_deref()
                 } else {

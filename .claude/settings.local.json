@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(cargo build:*)",
+      "Bash(chcp)",
+      "Bash(xxd:*)",
+      "Bash(iconv:*)",
+      "Bash(test_utf8.txt)",
+      "Bash(cargo test:*)",
+      "Bash(echo:*)",
+      "Bash(rustc:*)",
+      "Bash(rustup show:*)",
+      "Bash(nul)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo run:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
