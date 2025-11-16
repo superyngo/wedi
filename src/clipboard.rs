@@ -22,26 +22,30 @@ impl ClipboardManager {
                 OpenClipboard(ptr::null_mut());
                 EmptyClipboard();
 
-                let size = text.len() + 1;
+                // Convert UTF-8 string to UTF-16LE for Windows clipboard
+                let utf16: Vec<u16> = text.encode_utf16().collect();
+                let size = (utf16.len() + 1) * 2; // +1 for null terminator, *2 for u16 size
+
                 let h_mem = GlobalAlloc(GMEM_MOVEABLE, size);
                 if h_mem.is_null() {
                     CloseClipboard();
                     return Err(anyhow!("GlobalAlloc failed"));
                 }
 
-                let ptr = GlobalLock(h_mem) as *mut u8;
+                let ptr = GlobalLock(h_mem) as *mut u16;
                 if ptr.is_null() {
                     GlobalFree(h_mem);
                     CloseClipboard();
                     return Err(anyhow!("GlobalLock failed"));
                 }
 
-                std::ptr::copy_nonoverlapping(text.as_ptr(), ptr, size - 1);
-                *ptr.add(size - 1) = 0;
+                // Copy UTF-16 data and add null terminator
+                std::ptr::copy_nonoverlapping(utf16.as_ptr(), ptr, utf16.len());
+                *ptr.add(utf16.len()) = 0;
 
                 GlobalUnlock(h_mem);
 
-                SetClipboardData(CF_TEXT, h_mem);
+                SetClipboardData(CF_UNICODETEXT, h_mem);
                 CloseClipboard();
             }
             Ok(())
@@ -100,33 +104,36 @@ impl ClipboardManager {
 
             unsafe {
                 OpenClipboard(ptr::null_mut());
-                let handle = GetClipboardData(CF_TEXT);
+                let handle = GetClipboardData(CF_UNICODETEXT);
 
                 if handle.is_null() {
                     CloseClipboard();
                     return Ok("".into());
                 }
 
-                let ptr = GlobalLock(handle) as *const u8;
+                let ptr = GlobalLock(handle) as *const u16;
                 if ptr.is_null() {
                     CloseClipboard();
                     return Err(anyhow!("GlobalLock failed"));
                 }
 
+                // Read UTF-16 data until null terminator
                 let mut out = Vec::new();
                 let mut i = 0;
                 loop {
-                    let b = *ptr.add(i);
-                    if b == 0 {
+                    let ch = *ptr.add(i);
+                    if ch == 0 {
                         break;
                     }
-                    out.push(b);
+                    out.push(ch);
                     i += 1;
                 }
 
                 GlobalUnlock(handle);
                 CloseClipboard();
-                Ok(String::from_utf8_lossy(&out).to_string())
+
+                // Convert UTF-16LE to UTF-8 string
+                Ok(String::from_utf16_lossy(&out))
             }
         }
 

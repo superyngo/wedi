@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::history::{Action, History};
 use super::EncodingConfig;
+use crate::debug_log;
 
 pub struct RopeBuffer {
     rope: Rope,
@@ -272,25 +273,22 @@ impl RopeBuffer {
                 };
 
             // Debug 模式：顯示編碼選擇信息
-            if cfg!(debug_assertions) {
-                eprintln!("[DEBUG]   File: {}", path.display());
-                if let Some((detected_info, detected_enc)) = &detected_encoding_info {
-                    eprintln!("[DEBUG]   Detected: {}", detected_info);
-                    if let Some(specified_enc) = encoding_config.read_encoding {
-                        if detected_enc.name() != specified_enc.name() {
-                            eprintln!(
-                                "[DEBUG]   User specified: {} (bypassed)",
-                                specified_enc.name()
-                            );
-                        }
+            // if cfg!(debug_assertions) {
+            debug_log!("  File: {}", path.display());
+            if let Some((detected_info, detected_enc)) = &detected_encoding_info {
+                debug_log!("  Detected: {}", detected_info);
+                if let Some(specified_enc) = encoding_config.read_encoding {
+                    if detected_enc.name() != specified_enc.name() {
+                        debug_log!("  User specified: {} (bypassed)", specified_enc.name());
                     }
-                } else if let Some(specified_enc) = encoding_config.read_encoding {
-                    eprintln!("[DEBUG]   User specified: {}", specified_enc.name());
-                } else {
-                    eprintln!("[DEBUG]   System default: {}", read_encoding.name());
                 }
-                eprintln!("[DEBUG]   Using decoding: {}", read_encoding.name());
+            } else if let Some(specified_enc) = encoding_config.read_encoding {
+                debug_log!("  User specified: {}", specified_enc.name());
+            } else {
+                debug_log!("  System default: {}", read_encoding.name());
             }
+            debug_log!("  Using decoding: {}", read_encoding.name());
+            // }
 
             // 解碼為 UTF-8
             let (decoded, _, had_errors) = read_encoding.decode(&bytes[bom_length..]);
@@ -328,9 +326,9 @@ impl RopeBuffer {
             .unwrap_or(detected_encoding);
 
         // Debug 模式：顯示存檔編碼選擇信息
-        if cfg!(debug_assertions) {
-            eprintln!("[DEBUG]   Using encoding: {}", save_encoding.name());
-        }
+        // if cfg!(debug_assertions) {
+        debug_log!("  Using encoding: {}", save_encoding.name());
+        // }
 
         Ok(Self {
             rope,

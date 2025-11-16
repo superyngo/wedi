@@ -201,16 +201,10 @@ impl Args {
 fn main() -> Result<()> {
     let args = Args::parse()?;
 
-    // 替換為直接條件輸出，使用 cfg!(debug_assertions) 或 --debug 自動禁用
-    macro_rules! debug_log {
-        ($($arg:tt)*) => {{
-            if cfg!(debug_assertions) || args.debug {
-                eprintln!("[DEBUG] {}", format_args!($($arg)*));
-            }
-        }};
-    }
+    // 設置全局調試模式（支持 release 版本通過 --debug 參數啟用）
+    utils::set_debug_mode(args.debug);
 
-    // 在需要的地方使用
+    // 使用 debug_log! 宏輸出調試信息
     debug_log!("Starting wedi with file: {:?}", args.file);
     debug_log!("Debug mode enabled");
 
