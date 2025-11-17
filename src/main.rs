@@ -18,7 +18,10 @@ use editor::Editor;
 use pico_args::Arguments;
 use std::path::PathBuf;
 
-fn parse_encoding(from_encoding: Option<&str>, to_encoding: Option<&str>) -> Result<EncodingConfig> {
+fn parse_encoding(
+    from_encoding: Option<&str>,
+    to_encoding: Option<&str>,
+) -> Result<EncodingConfig> {
     // 解析讀取編碼
     let read_encoding = if let Some(enc_str) = from_encoding {
         Some(parse_single_encoding(enc_str)?)
@@ -151,13 +154,14 @@ impl Args {
         println!("    Shift+Tab           Unindent (remove up to 4 leading spaces)");
         println!();
         println!("  Navigation:");
-        println!("    Arrow Keys            Move cursor");
-        println!("    Ctrl+Left/Ctrl+H/Home Move to line start");
-        println!("    Ctrl+Right/Ctrl+E/End Move to line end");
-        println!("    Ctrl+Up/Ctrl+Home     Move to first line");
-        println!("    Ctrl+Down/Ctrl+End    Move to last line");
-        println!("    Page Up/Down          Scroll page up/down");
-        println!("    Ctrl+G                Go to line number");
+        println!("    Arrow Keys          Move cursor");
+        println!("    Ctrl+Left/Home      Move to line start");
+        println!("    Ctrl+Right/End      Move to line end");
+        println!("    Ctrl+Up/Ctrl+Home   Move to first line");
+        println!("    Ctrl+Down/Ctrl+End  Move to last line");
+        println!("    Page Up/Down        Scroll page up/down");
+        println!("    Ctrl+PageUp/Down    Jump 1/10 of file");
+        println!("    Ctrl+G              Go to line number");
         println!();
         println!("  Selection:");
         println!(
@@ -167,7 +171,6 @@ impl Args {
         println!("    Shift+Ctrl+Arrows   Quick select to line/file boundaries");
         println!("    Shift+Home/End      Select to line boundaries");
         println!("    Shift+Ctrl+Home/End Quick select to file boundaries");
-        println!("    Shift+Ctrl+H/E      Quick select to line boundaries");
         println!("    Shift+PgUp/Dn       Select page up/down");
         println!("    Ctrl+A              Select all");
         println!("    ESC                 Clear selection and messages");
@@ -189,6 +192,11 @@ impl Args {
         println!("    Ctrl+/ \\ K         Toggle line comment");
         println!("    Ctrl+L              Toggle line numbers");
         println!();
+        println!("  Encoding:");
+        println!(
+            "    Ctrl+E              Change file encoding (utf-8, gbk, big5, shift-jis, etc.)"
+        );
+        println!();
         println!("SUPPORTED COMMENT STYLES:");
         println!("  //  - Rust, C/C++, Java, JavaScript, TypeScript, Go, C#");
         println!("  #   - Python, Shell, PowerShell, Ruby, YAML, TOML");
@@ -208,7 +216,8 @@ fn main() -> Result<()> {
     debug_log!("Starting wedi with file: {:?}", args.file);
     debug_log!("Debug mode enabled");
 
-    let encoding_config = parse_encoding(args.from_encoding.as_deref(), args.to_encoding.as_deref())?;
+    let encoding_config =
+        parse_encoding(args.from_encoding.as_deref(), args.to_encoding.as_deref())?;
 
     debug_log!(
         "Read encoding: {:?}",

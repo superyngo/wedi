@@ -173,6 +173,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -217,12 +222,53 @@ jobs:
             exit 1
           fi
 
+      - name: Get tag message
+        id: tag_message
+        run: |
+          # 獲取當前 tag 名稱
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Tag name: $TAG_NAME"
+
+          # 獲取 tag 的註解消息（如果是 annotated tag）
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' "$TAG_NAME")
+
+          # 如果 tag 沒有消息，使用默認消息
+          if [ -z "$TAG_MESSAGE" ]; then
+            TAG_MESSAGE="Release $TAG_NAME"
+          fi
+
+          # 輸出到 GitHub Actions 輸出變量
+          # 使用多行字符串格式
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "Tag message retrieved successfully"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: release_files/*
           draft: false
           prerelease: false
+          body: |
+            ${{ steps.tag_message.outputs.message }}
+
+            ---
+
+            ## 📦 下載 / Downloads
+
+            請從下方選擇適合您系統的版本下載。
+            Please download the appropriate version for your system from below.
+
+            ## 🔒 檔案校驗 / File Verification
+
+            使用 SHA256SUMS 檔案驗證下載的檔案完整性。
+            Use the SHA256SUMS file to verify the integrity of downloaded files.
+
+            ---
+
+            ## 📝 自動生成的變更日誌 / Auto-generated Changelog
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

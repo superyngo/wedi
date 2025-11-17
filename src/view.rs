@@ -10,7 +10,9 @@ use crossterm::{
 use std::io::{self, Write};
 use unicode_width::UnicodeWidthChar;
 
-const TAB_WIDTH: usize = 4;
+// 視圖配置常量
+const TAB_WIDTH: usize = 4; // Tab 寬度（空格數）
+const CACHE_MULTIPLIER: usize = 3; // 緩存大小倍數（螢幕行數 × 倍數）
 
 #[derive(Clone, Debug)]
 pub struct LineLayout {
@@ -99,7 +101,7 @@ impl View {
     pub fn new(terminal: &Terminal) -> Self {
         let (cols, rows) = terminal.size();
         let screen_rows = rows.saturating_sub(1) as usize; // 減去狀態欄
-        let cache_size = screen_rows.max(1) * 3; // 多留一些緩衝高度
+        let cache_size = screen_rows.max(1) * CACHE_MULTIPLIER;
 
         Self {
             offset_row: 0,
@@ -110,10 +112,31 @@ impl View {
         }
     }
 
+    /// 完全清空緩存（用於大範圍變更或視窗調整）
     pub fn invalidate_cache(&mut self) {
-        let cache_size = self.screen_rows.max(1) * 3;
+        let cache_size = self.screen_rows.max(1) * CACHE_MULTIPLIER;
         self.line_layout_cache.clear();
         self.line_layout_cache.resize(cache_size, None);
+    }
+
+    /// 部分失效：僅清除指定邏輯行的緩存（用於單行編輯）
+    pub fn invalidate_line(&mut self, logical_row: usize) {
+        if logical_row < self.offset_row {
+            return; // 不在可見範圍內，無需清除
+        }
+
+        let cache_index = logical_row.saturating_sub(self.offset_row);
+        if cache_index < self.line_layout_cache.len() {
+            self.line_layout_cache[cache_index] = None;
+        }
+    }
+
+    /// 部分失效：清除指定範圍的緩存（用於多行編輯）
+    #[allow(dead_code)]
+    pub fn invalidate_lines(&mut self, start_row: usize, end_row: usize) {
+        for row in start_row..=end_row {
+            self.invalidate_line(row);
+        }
     }
 
     #[allow(dead_code)]

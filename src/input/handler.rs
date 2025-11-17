@@ -8,6 +8,8 @@ pub enum Direction {
     End,
     PageUp,
     PageDown,
+    TenthUp,   // 跳躍 1/10 文件向上
+    TenthDown, // 跳躍 1/10 文件向下
     FileStart,
     FileEnd,
 }
@@ -84,4 +86,11 @@ pub enum Command {
 
     // 選擇模式切換
     ToggleSelectionMode,
+
+    // 編碼切換
+    ChangeEncoding,
+
+    // 文件 1/10 跳躍
+    JumpTenthUp,
+    JumpTenthDown,
 }

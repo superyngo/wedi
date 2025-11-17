@@ -41,20 +41,27 @@ impl Editor {
             // 如果指定了讀取編碼，設置編碼
             if let Some(enc) = encoding_config.read_encoding {
                 if cfg!(debug_assertions) {
-                    eprintln!("[DEBUG] Editor::new() - Setting read_encoding from config: {}", enc.name());
+                    eprintln!(
+                        "[DEBUG] Editor::new() - Setting read_encoding from config: {}",
+                        enc.name()
+                    );
                 }
                 buffer.set_read_encoding(enc);
             }
             // 如果指定了存檔編碼，設置存檔編碼
             if let Some(enc) = encoding_config.save_encoding {
                 if cfg!(debug_assertions) {
-                    eprintln!("[DEBUG] Editor::new() - Setting save_encoding from config: {}", enc.name());
+                    eprintln!(
+                        "[DEBUG] Editor::new() - Setting save_encoding from config: {}",
+                        enc.name()
+                    );
                 }
                 buffer.set_save_encoding(enc);
             }
 
             if cfg!(debug_assertions) {
-                eprintln!("[DEBUG] Editor::new() - Final buffer save_encoding: {}",
+                eprintln!(
+                    "[DEBUG] Editor::new() - Final buffer save_encoding: {}",
                     if let Some(enc) = encoding_config.save_encoding {
                         enc.name()
                     } else if let Some(enc) = encoding_config.read_encoding {
@@ -143,12 +150,14 @@ impl Editor {
 
                 let pos = self.cursor.char_position(&self.buffer);
                 self.buffer.insert_char(pos, ch);
-                self.view.invalidate_cache();
 
+                // 優化：僅失效當前行（除非是換行符，需要重建整個緩存）
                 if ch == '\n' {
+                    self.view.invalidate_cache(); // 換行影響多行佈局
                     self.cursor.row += 1;
                     self.cursor.reset_to_line_start();
                 } else {
+                    self.view.invalidate_line(self.cursor.row); // 僅失效當前行
                     self.cursor.set_position(
                         &self.buffer,
                         &self.view,
@@ -166,10 +175,11 @@ impl Editor {
                 if self.has_selection() {
                     self.delete_selection();
                 } else if self.cursor.col > 0 {
+                    // 行內刪除
                     let new_col = self.cursor.col - 1;
                     let pos = self.buffer.line_to_char(self.cursor.row) + new_col;
                     self.buffer.delete_char(pos);
-                    self.view.invalidate_cache();
+                    self.view.invalidate_line(self.cursor.row); // 僅失效當前行
                     self.cursor
                         .set_position(&self.buffer, &self.view, self.cursor.row, new_col);
                 } else if self.cursor.row > 0 {
@@ -184,7 +194,7 @@ impl Editor {
 
                     let pos = self.buffer.line_to_char(new_row) + prev_line_len;
                     self.buffer.delete_char(pos);
-                    self.view.invalidate_cache();
+                    self.view.invalidate_cache(); // 行合併影響多行
 
                     self.cursor
                         .set_position(&self.buffer, &self.view, new_row, prev_line_len);
@@ -197,8 +207,18 @@ impl Editor {
                     self.delete_selection();
                 } else {
                     let pos = self.cursor.char_position(&self.buffer);
+                    let line_content = self.buffer.get_line_content(self.cursor.row);
+                    let at_line_end = self.cursor.col
+                        >= line_content.trim_end_matches(['\n', '\r']).chars().count();
+
                     self.buffer.delete_char(pos);
-                    self.view.invalidate_cache();
+
+                    // 優化：如果在行尾刪除（會合併下一行），需要完全失效；否則僅失效當前行
+                    if at_line_end {
+                        self.view.invalidate_cache(); // 行合併影響多行
+                    } else {
+                        self.view.invalidate_line(self.cursor.row); // 僅失效當前行
+                    }
                 }
                 self.selection_mode = false; // 刪除後關閉選擇模式
             }
@@ -264,14 +284,37 @@ impl Editor {
                 self.cursor.move_to_file_end(&self.buffer, &self.view);
                 self.selection = None;
             }
-            // Command::MoveToLineStart => {
-            //     self.cursor.move_to_line_start();
-            //     self.selection = None;
-            // }
-            // Command::MoveToLineEnd => {
-            //     self.cursor.move_to_line_end(&self.buffer, &self.view);
-            //     self.selection = None;
-            // }
+
+            Command::JumpTenthUp => {
+                let total_lines = self.buffer.line_count();
+                let jump_distance = total_lines.max(10) / 10; // 至少跳 1 行
+                self.cursor.row = self.cursor.row.saturating_sub(jump_distance);
+                self.cursor.set_position(
+                    &self.buffer,
+                    &self.view,
+                    self.cursor.row,
+                    self.cursor.col,
+                );
+                self.selection = None;
+            }
+
+            Command::JumpTenthDown => {
+                let total_lines = self.buffer.line_count();
+                let jump_distance = total_lines.max(10) / 10;
+                let new_row = self
+                    .cursor
+                    .row
+                    .saturating_add(jump_distance)
+                    .min(total_lines.saturating_sub(1));
+                self.cursor.row = new_row;
+                self.cursor.set_position(
+                    &self.buffer,
+                    &self.view,
+                    self.cursor.row,
+                    self.cursor.col,
+                );
+                self.selection = None;
+            }
 
             // 選擇操作
             Command::ExtendSelection(direction) => {
@@ -304,6 +347,33 @@ impl Editor {
                         let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
                         self.cursor
                             .move_page_down(&self.buffer, &self.view, effective_rows)
+                    }
+                    Direction::TenthUp => {
+                        let total_lines = self.buffer.line_count();
+                        let jump_distance = total_lines.max(10) / 10;
+                        self.cursor.row = self.cursor.row.saturating_sub(jump_distance);
+                        self.cursor.set_position(
+                            &self.buffer,
+                            &self.view,
+                            self.cursor.row,
+                            self.cursor.col,
+                        );
+                    }
+                    Direction::TenthDown => {
+                        let total_lines = self.buffer.line_count();
+                        let jump_distance = total_lines.max(10) / 10;
+                        let new_row = self
+                            .cursor
+                            .row
+                            .saturating_add(jump_distance)
+                            .min(total_lines.saturating_sub(1));
+                        self.cursor.row = new_row;
+                        self.cursor.set_position(
+                            &self.buffer,
+                            &self.view,
+                            self.cursor.row,
+                            self.cursor.col,
+                        );
                     }
                 }
 
@@ -359,86 +429,28 @@ impl Editor {
 
             // 剪貼板操作
             Command::Copy => {
-                let text = if self.has_selection() {
-                    self.get_selected_text()
-                } else {
-                    // 複製當前整行（完整內容，包括尾部空格和換行符）
-                    let line_text = self.buffer.get_line_full(self.cursor.row);
-                    // 確保以換行符結尾（用於識別整行貼上）
-                    if line_text.ends_with('\n') {
-                        line_text
-                    } else {
-                        format!("{}\n", line_text)
-                    }
-                };
-
-                // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
-                if self.clipboard.set_text(&text).is_err() {
-                    self.internal_clipboard = text;
-                    if !self.clipboard.is_available() {
-                        self.message = Some("Copied (internal clipboard)".to_string());
-                    }
-                } else {
-                    self.internal_clipboard = text; // 同步到內部剪貼簿
-                }
-
+                let text = self.get_copy_text();
+                self.set_clipboard_text(text, true);
                 // 複製後關閉選擇模式但保留選擇範圍
                 self.selection_mode = false;
-
-                // 直接使用內部剪貼簿
-                // self.internal_clipboard = text;
             }
 
             Command::Cut => {
-                let text = if self.has_selection() {
-                    self.get_selected_text()
+                let text = self.get_copy_text();
+                self.set_clipboard_text(text, true);
+
+                // 剪切後刪除內容
+                if self.has_selection() {
+                    self.delete_selection();
                 } else {
-                    // 剪切當前整行（完整內容）
-                    let line_text = self.buffer.get_line_full(self.cursor.row);
-                    // 確保以換行符結尾
-                    if line_text.ends_with('\n') {
-                        line_text
-                    } else {
-                        format!("{}\n", line_text)
+                    self.buffer.delete_line(self.cursor.row);
+                    self.view.invalidate_cache();
+                    // 如果刪除後超出範圍,調整到最後一行
+                    if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
+                        self.cursor.row = self.buffer.line_count() - 1;
                     }
-                };
-
-                // 嘗試系統剪貼簿,失敗則使用內部剪貼簿
-                let copy_success = if self.clipboard.set_text(&text).is_err() {
-                    self.internal_clipboard = text;
-                    if !self.clipboard.is_available() {
-                        self.message = Some("Cut (internal clipboard)".to_string());
-                    }
-                    true
-                } else {
-                    self.internal_clipboard = text; // 同步到內部剪貼簿
-                    true
-                };
-
-                // 直接使用內部剪貼簿
-                // self.internal_clipboard = text;
-                // let copy_success = true;
-
-                // 剪切成功後刪除內容
-                if copy_success {
-                    if self.has_selection() {
-                        self.delete_selection();
-                    } else {
-                        self.buffer.delete_line(self.cursor.row);
-                        self.view.invalidate_cache();
-                        // 剪切後光標上移一行
-                        // if self.cursor.row > 0 {
-                        //     self.cursor.row -= 1;
-                        // }
-                        // 如果刪除後超出範圍,調整到最後一行
-                        if self.cursor.row >= self.buffer.line_count()
-                            && self.buffer.line_count() > 0
-                        {
-                            self.cursor.row = self.buffer.line_count() - 1;
-                        }
-                        self.cursor.col = 0;
-                        self.cursor.desired_visual_col = 0;
-                    }
+                    self.cursor.col = 0;
+                    self.cursor.desired_visual_col = 0;
                 }
 
                 // 剪切後關閉選擇模式並清除選擇
@@ -446,99 +458,21 @@ impl Editor {
             }
 
             Command::Paste => {
-                // 嘗試從系統剪貼簿獲取,失敗則使用內部剪貼簿
-                let text = self.clipboard.get_text().unwrap_or_else(|_| {
-                    if self.internal_clipboard.is_empty() {
-                        if !self.clipboard.is_available() {
-                            self.message =
-                                Some("Nothing to paste (internal clipboard)".to_string());
-                        }
-                        String::new()
-                    } else {
-                        self.internal_clipboard.clone()
-                    }
-                });
-
-                // 使用內部剪貼簿
-                // let text = self.internal_clipboard.clone();
-
-                if !text.is_empty() {
-                    if self.has_selection() {
-                        self.delete_selection();
-                    }
-
-                    // 檢查是否為整行貼上（文字以換行結尾）
-                    let is_whole_line = text.ends_with('\n');
-
-                    if is_whole_line {
-                        // 整行貼上：在光標所在行的開始處插入
-                        // 這樣會將原行內容推到下一行
-                        let line_start = self.buffer.line_to_char(self.cursor.row);
-                        self.buffer.insert(line_start, &text);
-                        self.view.invalidate_cache();
-
-                        // 光標移動到新插入行的開始
-                        self.cursor.col = 0;
-                        self.cursor.desired_visual_col = 0;
-                    } else {
-                        // 普通貼上：在光標位置插入
-                        let pos = self.cursor.char_position(&self.buffer);
-                        self.buffer.insert(pos, &text);
-                        self.view.invalidate_cache();
-
-                        // 移動到貼上內容末尾
-                        for ch in text.chars() {
-                            if ch == '\n' {
-                                self.cursor.row += 1;
-                                self.cursor.col = 0;
-                            } else {
-                                self.cursor.col += 1;
-                            }
-                        }
-                        self.cursor.desired_visual_col = self.cursor.col;
-                    }
-                }
+                let text = self.get_clipboard_text(true);
+                self.paste_text(text);
                 self.selection_mode = false; // 貼上後關閉選擇模式
             }
 
             // 內部剪貼板操作（僅使用內部剪貼簿）
             Command::CopyInternal => {
-                let text = if self.has_selection() {
-                    self.get_selected_text()
-                } else {
-                    // 複製當前整行（完整內容，包括尾部空格和換行符）
-                    let line_text = self.buffer.get_line_full(self.cursor.row);
-                    // 確保以換行符結尾（用於識別整行貼上）
-                    if line_text.ends_with('\n') {
-                        line_text
-                    } else {
-                        format!("{}\n", line_text)
-                    }
-                };
-
-                // 直接使用內部剪貼簿
-                self.internal_clipboard = text;
-                self.message = Some("Copied (internal clipboard)".to_string());
+                let text = self.get_copy_text();
+                self.set_clipboard_text(text, false);
                 self.selection_mode = false; // 複製後關閉選擇模式
             }
 
             Command::CutInternal => {
-                let text = if self.has_selection() {
-                    self.get_selected_text()
-                } else {
-                    // 剪切當前整行（完整內容）
-                    let line_text = self.buffer.get_line_full(self.cursor.row);
-                    // 確保以換行符結尾
-                    if line_text.ends_with('\n') {
-                        line_text
-                    } else {
-                        format!("{}\n", line_text)
-                    }
-                };
-
-                // 直接使用內部剪貼簿
-                self.internal_clipboard = text;
-                self.message = Some("Cut (internal clipboard)".to_string());
+                let text = self.get_copy_text();
+                self.set_clipboard_text(text, false);
 
                 // 剪切後刪除內容
                 if self.has_selection() {
@@ -557,47 +491,8 @@ impl Editor {
             }
 
             Command::PasteInternal => {
-                // 直接使用內部剪貼簿
-                let text = self.internal_clipboard.clone();
-
-                if text.is_empty() {
-                    self.message = Some("Nothing to paste (internal clipboard)".to_string());
-                } else {
-                    if self.has_selection() {
-                        self.delete_selection();
-                    }
-
-                    // 檢查是否為整行貼上（文字以換行結尾）
-                    let is_whole_line = text.ends_with('\n');
-
-                    if is_whole_line {
-                        // 整行貼上：在光標所在行的開始處插入
-                        // 這樣會將原行內容推到下一行
-                        let line_start = self.buffer.line_to_char(self.cursor.row);
-                        self.buffer.insert(line_start, &text);
-                        self.view.invalidate_cache();
-
-                        // 光標移動到新插入行的開始
-                        self.cursor.col = 0;
-                        self.cursor.desired_visual_col = 0;
-                    } else {
-                        // 普通貼上：在光標位置插入
-                        let pos = self.cursor.char_position(&self.buffer);
-                        self.buffer.insert(pos, &text);
-                        self.view.invalidate_cache();
-
-                        // 移動到貼上內容末尾
-                        for ch in text.chars() {
-                            if ch == '\n' {
-                                self.cursor.row += 1;
-                                self.cursor.col = 0;
-                            } else {
-                                self.cursor.col += 1;
-                            }
-                        }
-                        self.cursor.desired_visual_col = self.cursor.col;
-                    }
-                }
+                let text = self.get_clipboard_text(false);
+                self.paste_text(text);
                 self.selection_mode = false; // 貼上後關閉選擇模式
             }
 
@@ -946,6 +841,76 @@ impl Editor {
                     }
                 }
             }
+
+            // 編碼切換
+            Command::ChangeEncoding => {
+                if let Ok(Some(encoding_str)) =
+                    crate::dialog::prompt("Change encoding to:", self.terminal.size())
+                {
+                    if let Some(encoding) = Self::parse_encoding(&encoding_str) {
+                        // 檢查是否有檔案路徑（區分已存在檔案和新建檔案）
+                        if self.buffer.has_file_path() {
+                            // 已存在的檔案：需要重新載入
+                            if self.buffer.is_modified() {
+                                // 有未保存的修改，顯示確認對話框
+                                if let Ok(confirmed) = crate::dialog::confirm(
+                                    "Unsaved changes will be lost. Continue?",
+                                    self.terminal.size(),
+                                ) {
+                                    if confirmed {
+                                        match self.buffer.reload_with_encoding(encoding) {
+                                            Ok(_) => {
+                                                // 重新載入成功，重置游標
+                                                self.cursor.row = 0;
+                                                self.cursor.col = 0;
+                                                self.cursor.desired_visual_col = 0;
+                                                self.cursor.visual_line_index = 0;
+                                                self.view.invalidate_cache();
+                                                self.message = Some(format!(
+                                                    "Encoding changed to {} (file reloaded)",
+                                                    encoding.name()
+                                                ));
+                                            }
+                                            Err(e) => {
+                                                self.message =
+                                                    Some(format!("Failed to reload file: {}", e));
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 沒有未保存的修改，直接重新載入
+                                match self.buffer.reload_with_encoding(encoding) {
+                                    Ok(_) => {
+                                        self.cursor.row = 0;
+                                        self.cursor.col = 0;
+                                        self.cursor.desired_visual_col = 0;
+                                        self.cursor.visual_line_index = 0;
+                                        self.view.invalidate_cache();
+                                        self.message = Some(format!(
+                                            "Encoding changed to {} (file reloaded)",
+                                            encoding.name()
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        self.message =
+                                            Some(format!("Failed to reload file: {}", e));
+                                    }
+                                }
+                            }
+                        } else {
+                            // 新建檔案：只設定編碼，不重新載入
+                            self.buffer.change_encoding(encoding);
+                            self.message = Some(format!(
+                                "Encoding set to {} (will be used on save)",
+                                encoding.name()
+                            ));
+                        }
+                    } else {
+                        self.message = Some(format!("Unsupported encoding: {}", encoding_str));
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -953,6 +918,105 @@ impl Editor {
 
     fn has_selection(&self) -> bool {
         self.selection.is_some()
+    }
+
+    /// 獲取要複製/剪切的文本
+    /// 如果有選擇範圍，返回選擇的文本；否則返回當前整行（帶換行符）
+    fn get_copy_text(&self) -> String {
+        if self.has_selection() {
+            self.get_selected_text()
+        } else {
+            // 複製當前整行（完整內容，包括尾部空格和換行符）
+            let line_text = self.buffer.get_line_full(self.cursor.row);
+            // 確保以換行符結尾（用於識別整行貼上）
+            if line_text.ends_with('\n') {
+                line_text
+            } else {
+                format!("{}\n", line_text)
+            }
+        }
+    }
+
+    /// 設置剪貼簿內容
+    /// use_system: true 表示使用系統剪貼簿，false 表示僅使用內部剪貼簿
+    fn set_clipboard_text(&mut self, text: String, use_system: bool) {
+        if use_system {
+            // 嘗試系統剪貼簿，失敗則回退到內部剪貼簿
+            if self.clipboard.set_text(&text).is_err()
+                && !self.clipboard.is_available() {
+                    self.message = Some("Copied (internal clipboard)".to_string());
+                }
+            self.internal_clipboard = text; // 同步到內部剪貼簿
+        } else {
+            // 僅使用內部剪貼簿
+            self.internal_clipboard = text;
+            self.message = Some("Copied (internal clipboard)".to_string());
+        }
+    }
+
+    /// 獲取剪貼簿內容
+    /// use_system: true 表示優先使用系統剪貼簿，false 表示僅使用內部剪貼簿
+    fn get_clipboard_text(&mut self, use_system: bool) -> String {
+        if use_system {
+            // 嘗試從系統剪貼簿獲取，失敗則使用內部剪貼簿
+            self.clipboard.get_text().unwrap_or_else(|_| {
+                if self.internal_clipboard.is_empty() {
+                    if !self.clipboard.is_available() {
+                        self.message = Some("Nothing to paste (internal clipboard)".to_string());
+                    }
+                    String::new()
+                } else {
+                    self.internal_clipboard.clone()
+                }
+            })
+        } else {
+            // 僅使用內部剪貼簿
+            if self.internal_clipboard.is_empty() {
+                self.message = Some("Nothing to paste (internal clipboard)".to_string());
+                String::new()
+            } else {
+                self.internal_clipboard.clone()
+            }
+        }
+    }
+
+    /// 執行貼上操作
+    fn paste_text(&mut self, text: String) {
+        if text.is_empty() {
+            return;
+        }
+
+        if self.has_selection() {
+            self.delete_selection();
+        }
+
+        // 檢查是否為整行貼上（文字以換行結尾）
+        let is_whole_line = text.ends_with('\n');
+
+        if is_whole_line {
+            // 整行貼上：在光標所在行的開始處插入
+            let line_start = self.buffer.line_to_char(self.cursor.row);
+            self.buffer.insert(line_start, &text);
+            self.view.invalidate_cache();
+            // 光標移動到新插入行的開始
+            self.cursor.col = 0;
+            self.cursor.desired_visual_col = 0;
+        } else {
+            // 普通貼上：在光標位置插入
+            let pos = self.cursor.char_position(&self.buffer);
+            self.buffer.insert(pos, &text);
+            self.view.invalidate_cache();
+            // 移動到貼上內容末尾
+            for ch in text.chars() {
+                if ch == '\n' {
+                    self.cursor.row += 1;
+                    self.cursor.col = 0;
+                } else {
+                    self.cursor.col += 1;
+                }
+            }
+            self.cursor.desired_visual_col = self.cursor.col;
+        }
     }
 
     fn get_selected_text(&self) -> String {
@@ -1097,5 +1161,19 @@ impl Editor {
             selection_char_count,
             selection_visual_width
         )
+    }
+
+    // 解析編碼字串
+    fn parse_encoding(enc_str: &str) -> Option<&'static encoding_rs::Encoding> {
+        match enc_str.to_lowercase().as_str() {
+            "utf-8" | "utf8" => Some(encoding_rs::UTF_8),
+            "utf-16le" | "utf16le" => Some(encoding_rs::UTF_16LE),
+            "utf-16be" | "utf16be" => Some(encoding_rs::UTF_16BE),
+            "gbk" | "cp936" => Some(encoding_rs::GBK),
+            "shift-jis" | "shift_jis" | "sjis" => Some(encoding_rs::SHIFT_JIS),
+            "big5" | "cp950" => encoding_rs::Encoding::for_label(b"big5"),
+            "cp1252" | "windows-1252" => Some(encoding_rs::WINDOWS_1252),
+            _ => encoding_rs::Encoding::for_label(enc_str.as_bytes()),
+        }
     }
 }

@@ -59,8 +59,14 @@ impl RopeBuffer {
 
             if cfg!(debug_assertions) {
                 eprintln!("[DEBUG] Detecting system encoding on Windows:");
-                eprintln!("[DEBUG]   Console Input CP (GetConsoleCP): {}", console_input_cp);
-                eprintln!("[DEBUG]   Console Output CP (GetConsoleOutputCP): {}", console_output_cp);
+                eprintln!(
+                    "[DEBUG]   Console Input CP (GetConsoleCP): {}",
+                    console_input_cp
+                );
+                eprintln!(
+                    "[DEBUG]   Console Output CP (GetConsoleOutputCP): {}",
+                    console_output_cp
+                );
                 eprintln!("[DEBUG]   System ANSI CP (GetACP): {}", system_acp);
             }
 
@@ -72,7 +78,10 @@ impl RopeBuffer {
                 console_output_cp
             } else {
                 if cfg!(debug_assertions) {
-                    eprintln!("[DEBUG]   Console CP is 0, using System ANSI CP: {}", system_acp);
+                    eprintln!(
+                        "[DEBUG]   Console CP is 0, using System ANSI CP: {}",
+                        system_acp
+                    );
                 }
                 system_acp
             };
@@ -310,9 +319,15 @@ impl RopeBuffer {
             if cfg!(debug_assertions) {
                 eprintln!("[DEBUG]   File does not exist, creating new buffer");
                 if encoding_config.read_encoding.is_some() {
-                    eprintln!("[DEBUG]   Using user-specified encoding: {}", encoding_to_use.name());
+                    eprintln!(
+                        "[DEBUG]   Using user-specified encoding: {}",
+                        encoding_to_use.name()
+                    );
                 } else {
-                    eprintln!("[DEBUG]   Using system default encoding: {}", encoding_to_use.name());
+                    eprintln!(
+                        "[DEBUG]   Using system default encoding: {}",
+                        encoding_to_use.name()
+                    );
                 }
             }
 
@@ -476,7 +491,10 @@ impl RopeBuffer {
             self.modified = false;
 
             if cfg!(debug_assertions) {
-                eprintln!("[DEBUG]   File saved successfully with {} encoding", self.save_encoding.name());
+                eprintln!(
+                    "[DEBUG]   File saved successfully with {} encoding",
+                    self.save_encoding.name()
+                );
             }
 
             Ok(())
@@ -654,6 +672,40 @@ impl RopeBuffer {
     #[allow(dead_code)]
     pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
         self.save_encoding
+    }
+
+    /// 使用指定編碼重新載入檔案
+    pub fn reload_with_encoding(&mut self, encoding: &'static encoding_rs::Encoding) -> Result<()> {
+        if let Some(path) = &self.file_path.clone() {
+            let encoding_config = EncodingConfig {
+                read_encoding: Some(encoding),
+                save_encoding: Some(encoding),
+            };
+            let new_buffer = Self::from_file_with_encoding(path, &encoding_config)?;
+
+            // 重置內容但保留檔案路徑
+            self.rope = new_buffer.rope;
+            self.read_encoding = new_buffer.read_encoding;
+            self.save_encoding = new_buffer.save_encoding;
+            self.modified = false;
+            self.history.clear(); // 清除 undo/redo 歷史
+
+            Ok(())
+        } else {
+            anyhow::bail!("No file to reload")
+        }
+    }
+
+    /// 為新建檔案設定編碼（無需重新載入）
+    pub fn change_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+        self.read_encoding = encoding;
+        self.save_encoding = encoding;
+        // 不標記為已修改，因為只是改變未來的編碼設定
+    }
+
+    /// 檢查是否有檔案路徑
+    pub fn has_file_path(&self) -> bool {
+        self.file_path.is_some()
     }
 }
 

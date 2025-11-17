@@ -35,6 +35,12 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
             (KeyCode::PageDown, KeyModifiers::NONE) => {
                 return Some(Command::ExtendSelection(Direction::PageDown))
             }
+            (KeyCode::PageUp, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::TenthUp))
+            }
+            (KeyCode::PageDown, KeyModifiers::CONTROL) => {
+                return Some(Command::ExtendSelection(Direction::TenthDown))
+            }
 
             // Ctrl 快速移動在選擇模式下也轉換為擴展選擇
             (KeyCode::Up, KeyModifiers::CONTROL) => {
@@ -54,12 +60,6 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
             }
             (KeyCode::End, KeyModifiers::CONTROL) => {
                 return Some(Command::ExtendSelection(Direction::FileEnd))
-            }
-            (KeyCode::Char('h'), KeyModifiers::CONTROL) => {
-                return Some(Command::ExtendSelection(Direction::Home))
-            }
-            (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
-                return Some(Command::ExtendSelection(Direction::End))
             }
             _ => {} // 其他按鍵繼續正常處理
         }
@@ -84,8 +84,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // 替代按鍵:Ctrl+Home/End
         (KeyCode::Home, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),
         (KeyCode::End, KeyModifiers::CONTROL) => Some(Command::MoveToFileEnd),
-        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::MoveHome),
-        (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::MoveEnd),
+        // Ctrl+PageUp/PageDown: 跳過文件 1/10 的距離
+        (KeyCode::PageUp, KeyModifiers::CONTROL) => Some(Command::JumpTenthUp),
+        (KeyCode::PageDown, KeyModifiers::CONTROL) => Some(Command::JumpTenthDown),
 
         // 選擇模式移動
         (KeyCode::Up, KeyModifiers::SHIFT) => Some(Command::ExtendSelection(Direction::Up)),
@@ -130,15 +131,15 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         {
             Some(Command::ExtendSelection(Direction::FileEnd))
         }
-        (KeyCode::Char('h'), m)
+        (KeyCode::PageUp, m)
             if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
         {
-            Some(Command::ExtendSelection(Direction::Home))
+            Some(Command::ExtendSelection(Direction::TenthUp))
         }
-        (KeyCode::Char('e'), m)
+        (KeyCode::PageDown, m)
             if m.contains(KeyModifiers::CONTROL) && m.contains(KeyModifiers::SHIFT) =>
         {
-            Some(Command::ExtendSelection(Direction::End))
+            Some(Command::ExtendSelection(Direction::TenthDown))
         }
 
         // 字符輸入
@@ -166,6 +167,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('\\'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('/'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('k'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
+        (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::ChangeEncoding),
 
         // 剪貼板操作
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),
