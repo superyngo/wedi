@@ -23,13 +23,90 @@ A lightweight, easy-to-use console text editor written in Rust.
 
 ## Installation
 
-### From Source
+### Quick Install (One-Line Command)
 
-```bash
-cargo build --release
+#### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/superyngo/wedi/main/install.ps1 | iex
 ```
 
-The binary will be available at `target/release/wedi`.
+**Uninstall:**
+```powershell
+irm https://raw.githubusercontent.com/superyngo/wedi/main/install.ps1 | iex -Uninstall
+```
+
+#### Linux / macOS (Bash)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/superyngo/wedi/main/install.sh | bash
+```
+
+**Uninstall:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/superyngo/wedi/main/install.sh | bash -s uninstall
+```
+
+The installation script will:
+- Automatically detect your OS and architecture
+- Download the latest precompiled binary from GitHub Releases
+- Install to:
+  - Windows: `%LOCALAPPDATA%\Programs\wedi`
+  - Linux/macOS: `~/.local/bin`
+- Add the installation directory to your PATH (if needed)
+
+**Supported Platforms:**
+- Windows (x86_64, ARM64)
+- Linux (x86_64, aarch64)
+- macOS (x86_64, Apple Silicon)
+
+> **Note:** Replace `superyngo` with the actual GitHub superyngo in the URLs above.
+
+### Manual Installation
+
+#### From Precompiled Binaries
+
+Download the latest release for your platform from the [Releases](https://github.com/superyngo/wedi/releases) page.
+
+**Windows:**
+```powershell
+# Extract the downloaded zip file and move wedi.exe to a directory in your PATH
+# For example:
+move wedi.exe %LOCALAPPDATA%\Programs\wedi\
+```
+
+**Linux/macOS:**
+```bash
+# Extract the downloaded tar.gz file and move wedi to a directory in your PATH
+tar -xzf wedi-*.tar.gz
+chmod +x wedi
+mv wedi ~/.local/bin/
+```
+
+#### From Source
+
+If you prefer to build from source, ensure you have [Rust](https://rustup.rs/) installed:
+
+```bash
+# Clone the repository
+git clone https://github.com/superyngo/wedi.git
+cd wedi
+
+# Build release binary
+cargo build --release
+
+# The binary will be available at:
+# - Windows: target\release\wedi.exe
+# - Linux/macOS: target/release/wedi
+
+# Install manually
+# Windows:
+copy target\release\wedi.exe %LOCALAPPDATA%\Programs\wedi\
+
+# Linux/macOS:
+cp target/release/wedi ~/.local/bin/
+chmod +x ~/.local/bin/wedi
+```
 
 ## Usage
 
