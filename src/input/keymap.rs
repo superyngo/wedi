@@ -184,9 +184,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),
 
-        // F3 搜索導航
+        // F3/F4 搜索導航
         (KeyCode::F(3), KeyModifiers::NONE) => Some(Command::FindNext),
-        (KeyCode::F(3), KeyModifiers::SHIFT) => Some(Command::FindPrev),
+        (KeyCode::F(4), KeyModifiers::NONE) => Some(Command::FindPrev),
 
         _ => None,
     }

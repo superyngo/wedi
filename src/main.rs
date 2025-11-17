@@ -186,7 +186,7 @@ impl Args {
         println!("  Search:");
         println!("    Ctrl+F              Find text");
         println!("    F3                  Find next match");
-        println!("    Shift+F3            Find previous match");
+        println!("    F4                  Find previous match");
         println!();
         println!("  Code:");
         println!("    Ctrl+/ \\ K         Toggle line comment");

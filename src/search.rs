@@ -39,7 +39,9 @@ impl Search {
             while let Some(pos) = line_content[start..].find(&self.query) {
                 let actual_pos = start + pos;
                 self.matches.push((line_idx, actual_pos));
-                start = actual_pos + 1;
+                // 使用查詢字符串的字節長度來避免 UTF-8 字符邊界錯誤
+                // 這樣可以正確處理中文等多字節字符
+                start = actual_pos + self.query.len();
             }
         }
     }
@@ -49,9 +51,8 @@ impl Search {
             return None;
         }
 
-        let result = self.matches[self.current_match];
         self.current_match = (self.current_match + 1) % self.matches.len();
-        Some(result)
+        Some(self.matches[self.current_match])
     }
 
     pub fn prev_match(&mut self) -> Option<(usize, usize)> {
@@ -70,6 +71,10 @@ impl Search {
 
     pub fn match_count(&self) -> usize {
         self.matches.len()
+    }
+
+    pub fn current_index(&self) -> usize {
+        self.current_match
     }
 }
 

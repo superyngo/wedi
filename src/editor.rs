@@ -227,12 +227,22 @@ impl Editor {
                 if self.has_selection() {
                     self.delete_selection();
                 } else {
+                    // 記錄是否在最後一行
+                    let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
+
                     self.buffer.delete_line(self.cursor.row);
                     self.view.invalidate_cache();
-                    // 如果刪除後超出範圍,調整到最後一行
+
+                    // 如果刪除的是最後一行且不是唯一一行，光標上移
+                    if was_last_line && self.cursor.row > 0 {
+                        self.cursor.row -= 1;
+                    }
+
+                    // 確保光標在有效範圍內
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
+
                     self.cursor.reset_to_line_start();
                 }
                 self.selection_mode = false; // 刪除後關閉選擇模式
@@ -443,12 +453,22 @@ impl Editor {
                 if self.has_selection() {
                     self.delete_selection();
                 } else {
+                    // 記錄是否在最後一行
+                    let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
+
                     self.buffer.delete_line(self.cursor.row);
                     self.view.invalidate_cache();
-                    // 如果刪除後超出範圍,調整到最後一行
+
+                    // 如果刪除的是最後一行且不是唯一一行，光標上移
+                    if was_last_line && self.cursor.row > 0 {
+                        self.cursor.row -= 1;
+                    }
+
+                    // 確保光標在有效範圍內
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
+
                     self.cursor.col = 0;
                     self.cursor.desired_visual_col = 0;
                 }
@@ -478,12 +498,22 @@ impl Editor {
                 if self.has_selection() {
                     self.delete_selection();
                 } else {
+                    // 記錄是否在最後一行
+                    let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
+
                     self.buffer.delete_line(self.cursor.row);
                     self.view.invalidate_cache();
-                    // 如果刪除後超出範圍,調整到最後一行
+
+                    // 如果刪除的是最後一行且不是唯一一行，光標上移
+                    if was_last_line && self.cursor.row > 0 {
+                        self.cursor.row -= 1;
+                    }
+
+                    // 確保光標在有效範圍內
                     if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
                         self.cursor.row = self.buffer.line_count() - 1;
                     }
+
                     self.cursor.col = 0;
                     self.cursor.desired_visual_col = 0;
                 }
@@ -596,7 +626,7 @@ impl Editor {
                         self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
                             "Match {}/{}",
-                            (self.search.match_count() + 1) % self.search.match_count() + 1,
+                            self.search.current_index() + 1,
                             self.search.match_count()
                         ));
                     }
@@ -613,7 +643,7 @@ impl Editor {
                         self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
                             "Match {}/{}",
-                            (self.search.match_count() + 1) % self.search.match_count() + 1,
+                            self.search.current_index() + 1,
                             self.search.match_count()
                         ));
                     }
@@ -998,7 +1028,12 @@ impl Editor {
             let line_start = self.buffer.line_to_char(self.cursor.row);
             self.buffer.insert(line_start, &text);
             self.view.invalidate_cache();
-            // 光標移動到新插入行的開始
+
+            // 計算插入了多少行
+            let inserted_lines = text.chars().filter(|&c| c == '\n').count();
+
+            // 光標移動到被擠下去的原行首
+            self.cursor.row += inserted_lines;
             self.cursor.col = 0;
             self.cursor.desired_visual_col = 0;
         } else {

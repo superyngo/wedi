@@ -368,6 +368,19 @@ impl View {
 
         let effective_rows = self.get_effective_screen_rows(has_debug_ruler);
 
+        // 大幅跳轉優化：如果跳轉距離超過 3 個螢幕高度，直接設置 offset_row
+        // 這避免了計算中間所有行的視覺高度，大幅提升大文件跳轉性能
+        let jump_threshold = effective_rows * 3;
+        let distance = cursor.row.saturating_sub(self.offset_row);
+
+        if distance > jump_threshold {
+            // 將 offset_row 設置為讓光標位於螢幕中間偏上的位置
+            // 這樣用戶可以看到光標上下文，體驗更好
+            self.offset_row = cursor.row.saturating_sub(effective_rows / 3);
+            self.invalidate_cache();
+            return;
+        }
+
         // 計算目前 offset_row ~ cursor.row 的視覺高度
         let mut visual_offset = 0;
         let available_width = self.get_available_width(buffer);
