@@ -18,7 +18,7 @@ Update the version in `Cargo.toml`:
 ```toml
 [package]
 name = "wedi"
-version = "0.1.17"  # <- Update this
+version = "0.1.18"  # <- Update this
 ```
 
 ### 2. Update Changelog (Optional but Recommended)
@@ -28,7 +28,7 @@ Create or update `CHANGELOG.md` with the new version changes:
 ```markdown
 # Changelog
 
-## [0.1.17] - 2025-11-17
+## [0.1.18] - 2025-11-18
 
 ### Added
 - New feature X
@@ -46,7 +46,7 @@ Create or update `CHANGELOG.md` with the new version changes:
 ```bash
 # Commit version bump
 git add Cargo.toml CHANGELOG.md
-git commit -m "chore: bump version to 0.1.17"
+git commit -m "chore: bump version to 0.1.18"
 git push origin main
 ```
 
@@ -56,7 +56,7 @@ Create an annotated tag with release notes:
 
 ```bash
 # Create annotated tag with message
-git tag -a v0.1.17 -m "Release v0.1.17
+git tag -a v0.1.18 -m "Release v0.1.18
 
 ## New Features
 - Feature X: description
@@ -70,10 +70,10 @@ None
 "
 
 # Push the tag to trigger release workflow
-git push origin v0.1.17
+git push origin v0.1.18
 ```
 
-**Important:** The tag must follow the format `v*.*.*` (e.g., `v0.1.17`, `v1.0.0`) to trigger the release workflow.
+**Important:** The tag must follow the format `v*.*.*` (e.g., `v0.1.18`, `v1.0.0`) to trigger the release workflow.
 
 ### 5. Monitor Release Build
 
@@ -167,16 +167,16 @@ If you need to redo a release:
 
 ```bash
 # Delete local tag
-git tag -d v0.1.17
+git tag -d v0.1.18
 
 # Delete remote tag
-git push origin :refs/tags/v0.1.17
+git push origin :refs/tags/v0.1.18
 
 # Delete the release on GitHub (via web interface)
 
 # Then recreate the tag
-git tag -a v0.1.17 -m "Release notes..."
-git push origin v0.1.17
+git tag -a v0.1.18 -m "Release notes..."
+git push origin v0.1.18
 ```
 
 ### Wrong Version in Binary
@@ -196,8 +196,8 @@ Follow [Semantic Versioning](https://semver.org/):
 - **PATCH** version (0.0.X): Backwards compatible bug fixes
 
 Examples:
-- `v0.1.16` → `v0.1.17`: Bug fixes or minor improvements
-- `v0.1.17` → `v0.2.0`: New features added
+- `v0.1.17` → `v0.1.18`: Bug fixes or minor improvements
+- `v0.1.18` → `v0.2.0`: New features added
 - `v0.2.0` → `v1.0.0`: First stable release or breaking changes
 
 ## Pre-releases
