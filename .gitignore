@@ -1,1 +1,30 @@
-/target
+# 本地設定檔
+.claude/settings.local.json
+
+# Rust build
+/target/
+**/*.rs.bk
+**/*.d
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# OS/其他
+.DS_Store
+Thumbs.db
+
+# 測試/日誌
+*.log
+*.out
+*.test
+
+# 其他常見
+node_modules/
+.env
+.env.*
+
