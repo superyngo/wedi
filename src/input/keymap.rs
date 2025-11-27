@@ -2,6 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::handler::{Command, Direction};
 
+#[allow(dead_code)]
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
     // Ctrl+S 切換選擇模式（優先處理）
     if matches!(event.code, KeyCode::Char('s')) && event.modifiers == KeyModifiers::CONTROL {
@@ -168,6 +169,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('/'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('k'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::ChangeEncoding),
+        // Ctrl+H: 切換語法高亮模式
+        #[cfg(feature = "syntax-highlighting")]
+        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
 
         // 剪貼板操作
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),

@@ -4,8 +4,10 @@ use anyhow::{anyhow, Result};
 // Clipboard Manager
 // ────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct ClipboardManager;
 
+#[allow(dead_code)]
 impl ClipboardManager {
     pub fn new() -> Result<Self> {
         Ok(Self)

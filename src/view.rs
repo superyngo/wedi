@@ -158,6 +158,9 @@ impl View {
         cursor: &Cursor,
         selection: Option<&Selection>,
         message: Option<&str>,
+        #[cfg(feature = "syntax-highlighting")] highlighted_lines: Option<
+            &std::collections::HashMap<usize, String>,
+        >,
     ) -> Result<()> {
         let has_debug_ruler = message.is_some_and(|m| m.starts_with("DEBUG"));
 
@@ -265,7 +268,17 @@ impl View {
                     }
                 }
 
-                // 渲染視覺行，支持selection高亮
+                // 渲染視覺行，支持 selection 高亮和語法高亮
+
+                // 檢查是否有語法高亮（無選擇時）
+                #[cfg(feature = "syntax-highlighting")]
+                let use_syntax_highlight = selection.is_none()
+                    && visual_idx == 0  // 只在第一個 visual line 使用（簡化處理）
+                    && highlighted_lines.and_then(|h| h.get(&file_row)).is_some();
+
+                #[cfg(not(feature = "syntax-highlighting"))]
+                let use_syntax_highlight = false;
+
                 if let Some(((start_row, start_col), (end_row, end_col))) = sel_visual_range {
                     if file_row >= start_row && file_row <= end_row {
                         // 這一行有選擇，需要逐字符渲染
@@ -313,8 +326,25 @@ impl View {
                         queue!(stdout, style::Print(visual_line))?;
                     }
                 } else {
-                    // 沒有選擇，直接打印
-                    queue!(stdout, style::Print(visual_line))?;
+                    // 沒有選擇
+                    if use_syntax_highlight {
+                        // 使用語法高亮
+                        #[cfg(feature = "syntax-highlighting")]
+                        if let Some(highlighted) = highlighted_lines.and_then(|h| h.get(&file_row))
+                        {
+                            // 輸出高亮後的文字（包含 ANSI 色碼）
+                            queue!(stdout, style::Print(highlighted))?;
+                        } else {
+                            // 降級為純文字
+                            queue!(stdout, style::Print(visual_line))?;
+                        }
+
+                        #[cfg(not(feature = "syntax-highlighting"))]
+                        queue!(stdout, style::Print(visual_line))?;
+                    } else {
+                        // 純文字渲染
+                        queue!(stdout, style::Print(visual_line))?;
+                    }
                 }
 
                 queue!(

@@ -3,17 +3,19 @@
 
 use std::path::Path;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommentStyle {
     Line(String), // 單行註解，如 "//"
-    #[allow(dead_code)]
     Block(String, String), // 塊註解，如 "/*" 和 "*/"
 }
 
+#[allow(dead_code)]
 pub struct CommentHandler {
     style: Option<CommentStyle>,
 }
 
+#[allow(dead_code)]
 impl CommentHandler {
     pub fn new() -> Self {
         Self { style: None }

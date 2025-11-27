@@ -19,7 +19,8 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Tab/Shift+Tab indentation** 🎉
 - ✅ **Fast navigation (Ctrl+H/E, Ctrl+Arrows/Home/End)** 🎉
 - ✅ **Chinese character support** 🎉
-- ✅ **Comment highlighting** 🎉
+- ✅ **Syntax highlighting (219+ languages)** 🎉
+- ✅ **Multiple syntax highlight modes (Disabled/Fast/Accurate)** 🎉
 
 ## Installation
 
@@ -227,6 +228,7 @@ wedi file.txt -f gbk
 
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers
+- **Ctrl+H**: Toggle syntax highlight mode (Disabled/Fast/Accurate)
 
 ## Supported Comment Styles
 
@@ -240,6 +242,26 @@ wedi automatically detects file type and applies appropriate comment style:
 
 Comments are highlighted in green color for better visibility.
 
+## Syntax Highlighting
+
+wedi includes comprehensive syntax highlighting powered by [bat](https://github.com/sharkdp/bat)'s syntax definitions, supporting 219+ programming languages including:
+
+- **System Languages**: Rust, Python, JavaScript, TypeScript, Go, C, C++, Java, C#, Swift, Kotlin, etc.
+- **Shell Scripts**: Bash, Zsh, Fish, PowerShell, Batch File, etc.
+- **Markup & Data**: JSON, YAML, TOML, XML, HTML, CSS, Markdown, LaTeX, etc.
+- **Database**: SQL, GraphQL, etc.
+- **Configuration**: Dockerfile, Makefile, Nginx, Git Config, INI, etc.
+
+### Syntax Highlight Modes
+
+wedi offers three syntax highlighting modes to balance between accuracy and performance:
+
+- **Disabled**: No syntax highlighting
+- **Fast**: Highlights only visible lines from initial state (may have minor color differences for multi-line constructs like heredocs)
+- **Accurate**: Processes from line 0 to maintain full syntax state (ensures accurate colors for all multi-line constructs)
+
+Use **Ctrl+H** to cycle through modes. The Fast mode is ideal for large files, while Accurate mode is perfect for code review and editing multi-line syntax constructs.
+
 ## Technical Stack
 
 - **Language**: Rust 2021 Edition
@@ -248,6 +270,8 @@ Comments are highlighted in green color for better visibility.
 - **Clipboard**: arboard (cross-platform clipboard)
 - **CLI Parsing**: clap (command-line argument parsing)
 - **Unicode Support**: unicode-width (proper CJK character handling)
+- **Syntax Highlighting**: syntect (syntax highlighting engine)
+- **Syntax Definitions**: bat project's syntaxes.bin (219+ language definitions)
 
 ## Development
 
@@ -278,6 +302,19 @@ cargo build --release
 ## License
 
 MIT
+
+### Third-Party Acknowledgments
+
+wedi uses syntax definitions from the [bat](https://github.com/sharkdp/bat) project:
+
+- **Source**: https://github.com/sharkdp/bat
+- **File**: `assets/syntaxes.bin` (219+ language definitions)
+- **License**: MIT License / Apache License 2.0 (dual licensed)
+- **Original Syntax Sources**: Sublime Text Packages (MIT License)
+
+The syntax definitions are embedded in the binary and are used under the terms of the MIT License. We are grateful to the bat project maintainers and the Sublime Text community for their excellent work on syntax definitions.
+
+For complete third-party license information, see the bat project repository.
 
 ## Contributing
 

@@ -10,6 +10,7 @@ use unicode_width::UnicodeWidthChar;
 static DEBUG_MODE: AtomicBool = AtomicBool::new(false);
 
 /// 設置調試模式
+#[allow(dead_code)]
 pub fn set_debug_mode(enabled: bool) {
     DEBUG_MODE.store(enabled, Ordering::Relaxed);
 }

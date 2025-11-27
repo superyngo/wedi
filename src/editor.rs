@@ -10,6 +10,42 @@ use crate::view::{Selection, View};
 use anyhow::Result;
 use std::path::Path;
 
+#[cfg(feature = "syntax-highlighting")]
+use crate::highlight::{HighlightCache, HighlightConfig, HighlightEngine};
+
+/// 語法高亮模式
+#[cfg(feature = "syntax-highlighting")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyntaxHighlightMode {
+    /// 關閉高亮
+    Disabled,
+    /// 快速模式：從可見範圍開始處理（接受多行語法色差）
+    Fast,
+    /// 精確模式：從第 0 行開始處理（完整語法狀態，可能有延遲）
+    Accurate,
+}
+
+#[cfg(feature = "syntax-highlighting")]
+impl SyntaxHighlightMode {
+    /// 循環切換到下一個模式
+    pub fn next(self) -> Self {
+        match self {
+            SyntaxHighlightMode::Disabled => SyntaxHighlightMode::Fast,
+            SyntaxHighlightMode::Fast => SyntaxHighlightMode::Accurate,
+            SyntaxHighlightMode::Accurate => SyntaxHighlightMode::Disabled,
+        }
+    }
+
+    /// 取得模式名稱（用於顯示）
+    pub fn name(self) -> &'static str {
+        match self {
+            SyntaxHighlightMode::Disabled => "Disabled",
+            SyntaxHighlightMode::Fast => "Fast",
+            SyntaxHighlightMode::Accurate => "Accurate",
+        }
+    }
+}
+
 pub struct Editor {
     buffer: RopeBuffer,
     cursor: Cursor,
@@ -25,6 +61,17 @@ pub struct Editor {
     message: Option<String>,
     quit_times: u8, // 追蹤連續按 Ctrl+Q 的次數
     debug_mode: bool,
+
+    // 語法高亮（可選功能）
+    #[cfg(feature = "syntax-highlighting")]
+    pub(crate) highlight_engine: Option<HighlightEngine>,
+    #[cfg(feature = "syntax-highlighting")]
+    pub(crate) highlight_cache: HighlightCache,
+    #[cfg(feature = "syntax-highlighting")]
+    #[allow(dead_code)]
+    highlight_config: HighlightConfig,
+    #[cfg(feature = "syntax-highlighting")]
+    highlight_mode: SyntaxHighlightMode,
 }
 
 impl Editor {
@@ -84,6 +131,24 @@ impl Editor {
             comment_handler.detect_from_path(path);
         }
 
+        // 語法高亮初始化
+        #[cfg(feature = "syntax-highlighting")]
+        let (highlight_engine, highlight_cache, highlight_config) = {
+            let config = HighlightConfig::default();
+            let mut engine = if config.enabled {
+                HighlightEngine::new(Some(&config.theme), config.true_color).ok()
+            } else {
+                None
+            };
+
+            // 如果有檔案，設定語法類型
+            if let (Some(path), Some(ref mut eng)) = (file_path, engine.as_mut()) {
+                eng.set_file(Some(path));
+            }
+
+            (engine, HighlightCache::new(), config)
+        };
+
         Ok(Self {
             buffer,
             cursor: Cursor::new(),
@@ -99,6 +164,15 @@ impl Editor {
             message: None,
             quit_times: 0,
             debug_mode,
+
+            #[cfg(feature = "syntax-highlighting")]
+            highlight_engine,
+            #[cfg(feature = "syntax-highlighting")]
+            highlight_cache,
+            #[cfg(feature = "syntax-highlighting")]
+            highlight_config,
+            #[cfg(feature = "syntax-highlighting")]
+            highlight_mode: SyntaxHighlightMode::Fast, // 預設快速模式
         })
     }
 
@@ -113,6 +187,28 @@ impl Editor {
                 None
             };
 
+            // ⚠️ 重要：在計算高亮之前先更新 offset_row
+            // 避免跳頁後 highlighted_lines 使用舊的 offset_row
+            let has_debug_ruler = self.debug_mode;
+            self.view
+                .scroll_if_needed(&self.cursor, &self.buffer, has_debug_ruler);
+
+            // 獲取語法高亮行（根據模式選擇）
+            #[cfg(feature = "syntax-highlighting")]
+            let highlighted_lines = {
+                let start_row = self.view.offset_row;
+                let end_row = start_row + self.view.screen_rows;
+                match self.highlight_mode {
+                    SyntaxHighlightMode::Disabled => std::collections::HashMap::new(),
+                    SyntaxHighlightMode::Fast => {
+                        self.get_highlighted_lines_fast(start_row, end_row)
+                    }
+                    SyntaxHighlightMode::Accurate => {
+                        self.get_highlighted_lines_accurate(start_row, end_row)
+                    }
+                }
+            };
+
             self.view.render(
                 &self.buffer,
                 &self.cursor,
@@ -122,6 +218,8 @@ impl Editor {
                 } else {
                     self.message.as_deref()
                 },
+                #[cfg(feature = "syntax-highlighting")]
+                Some(&highlighted_lines),
             )?;
 
             let key_event = Terminal::read_key()?;
@@ -154,10 +252,14 @@ impl Editor {
                 // 優化：僅失效當前行（除非是換行符，需要重建整個緩存）
                 if ch == '\n' {
                     self.view.invalidate_cache(); // 換行影響多行佈局
+                    #[cfg(feature = "syntax-highlighting")]
+                    self.highlight_cache.clear(); // 語法高亮快取也需要清除
                     self.cursor.row += 1;
                     self.cursor.reset_to_line_start();
                 } else {
                     self.view.invalidate_line(self.cursor.row); // 僅失效當前行
+                    #[cfg(feature = "syntax-highlighting")]
+                    self.invalidate_highlight_cache(self.cursor.row); // 語法高亮快取失效
                     self.cursor.set_position(
                         &self.buffer,
                         &self.view,
@@ -180,6 +282,8 @@ impl Editor {
                     let pos = self.buffer.line_to_char(self.cursor.row) + new_col;
                     self.buffer.delete_char(pos);
                     self.view.invalidate_line(self.cursor.row); // 僅失效當前行
+                    #[cfg(feature = "syntax-highlighting")]
+                    self.invalidate_highlight_cache(self.cursor.row);
                     self.cursor
                         .set_position(&self.buffer, &self.view, self.cursor.row, new_col);
                 } else if self.cursor.row > 0 {
@@ -195,6 +299,8 @@ impl Editor {
                     let pos = self.buffer.line_to_char(new_row) + prev_line_len;
                     self.buffer.delete_char(pos);
                     self.view.invalidate_cache(); // 行合併影響多行
+                    #[cfg(feature = "syntax-highlighting")]
+                    self.highlight_cache.clear();
 
                     self.cursor
                         .set_position(&self.buffer, &self.view, new_row, prev_line_len);
@@ -216,8 +322,12 @@ impl Editor {
                     // 優化：如果在行尾刪除（會合併下一行），需要完全失效；否則僅失效當前行
                     if at_line_end {
                         self.view.invalidate_cache(); // 行合併影響多行
+                        #[cfg(feature = "syntax-highlighting")]
+                        self.highlight_cache.clear();
                     } else {
                         self.view.invalidate_line(self.cursor.row); // 僅失效當前行
+                        #[cfg(feature = "syntax-highlighting")]
+                        self.invalidate_highlight_cache(self.cursor.row);
                     }
                 }
                 self.selection_mode = false; // 刪除後關閉選擇模式
@@ -232,6 +342,8 @@ impl Editor {
 
                     self.buffer.delete_line(self.cursor.row);
                     self.view.invalidate_cache();
+                    #[cfg(feature = "syntax-highlighting")]
+                    self.highlight_cache.clear();
 
                     // 如果刪除的是最後一行且不是唯一一行，光標上移
                     if was_last_line && self.cursor.row > 0 {
@@ -941,6 +1053,13 @@ impl Editor {
                     }
                 }
             }
+
+            // 切換語法高亮模式
+            #[cfg(feature = "syntax-highlighting")]
+            Command::ToggleSyntaxHighlight => {
+                self.highlight_mode = self.highlight_mode.next();
+                self.message = Some(format!("Syntax Highlight: {}", self.highlight_mode.name()));
+            }
         }
 
         Ok(())
@@ -972,10 +1091,9 @@ impl Editor {
     fn set_clipboard_text(&mut self, text: String, use_system: bool) {
         if use_system {
             // 嘗試系統剪貼簿，失敗則回退到內部剪貼簿
-            if self.clipboard.set_text(&text).is_err()
-                && !self.clipboard.is_available() {
-                    self.message = Some("Copied (internal clipboard)".to_string());
-                }
+            if self.clipboard.set_text(&text).is_err() && !self.clipboard.is_available() {
+                self.message = Some("Copied (internal clipboard)".to_string());
+            }
             self.internal_clipboard = text; // 同步到內部剪貼簿
         } else {
             // 僅使用內部剪貼簿
@@ -1196,6 +1314,132 @@ impl Editor {
             selection_char_count,
             selection_visual_width
         )
+    }
+
+    /// 獲取語法高亮後的行（精確模式）
+    ///
+    /// 從第 0 行開始處理到可見區域，維護完整語法狀態（可能有延遲）
+    #[cfg(feature = "syntax-highlighting")]
+    pub fn get_highlighted_lines_accurate(
+        &mut self,
+        start_row: usize,
+        end_row: usize,
+    ) -> std::collections::HashMap<usize, String> {
+        use crate::highlight::CachedLine;
+
+        let mut result = std::collections::HashMap::new();
+
+        // 檢查是否有語法高亮引擎
+        let Some(ref engine) = self.highlight_engine else {
+            return result;
+        };
+
+        // 建立高亮器
+        let Some(mut highlighter) = engine.create_highlighter() else {
+            return result;
+        };
+
+        // 從第一行開始循序處理（維護跨行狀態）
+        // 注意：我們需要從文件開頭處理到可見區域，以正確維護狀態
+        // 但為了效能，先嘗試使用快取
+
+        for row in 0..=end_row.min(self.buffer.line_count().saturating_sub(1)) {
+            let line_text = match self.buffer.line(row) {
+                Some(line) => {
+                    // ⚠️ 重要：保留換行符！syntect 需要換行符才能正確解析語法狀態
+                    // 參考：與 cate 專案相同的修復
+                    let mut text = line.to_string();
+                    // 確保有換行符（syntect 需要）
+                    if !text.ends_with('\n') && !text.ends_with("\r\n") {
+                        text.push('\n');
+                    }
+                    text
+                }
+                None => continue,
+            };
+
+            // 檢查快取
+            if self.highlight_cache.is_valid(row, &line_text) {
+                if row >= start_row {
+                    // 在可見區域內，使用快取
+                    if let Some(cached) = self.highlight_cache.get(row) {
+                        result.insert(row, cached.highlighted.clone());
+                    }
+                }
+                // 即使不在可見區域，也要處理這一行以維護狀態
+                let _ = highlighter.highlight_line(&line_text);
+            } else {
+                // 快取失效，重新高亮
+                let highlighted = highlighter.highlight_line(&line_text);
+
+                // 更新快取
+                self.highlight_cache.insert(
+                    row,
+                    CachedLine {
+                        text: line_text,
+                        highlighted: highlighted.clone(),
+                    },
+                );
+
+                // 如果在可見區域，加入結果
+                if row >= start_row {
+                    result.insert(row, highlighted);
+                }
+            }
+        }
+
+        result
+    }
+
+    /// 獲取語法高亮後的行（快速模式）
+    ///
+    /// 只處理可見範圍，從初始語法狀態開始（接受多行語法色差）
+    #[cfg(feature = "syntax-highlighting")]
+    pub fn get_highlighted_lines_fast(
+        &mut self,
+        start_row: usize,
+        end_row: usize,
+    ) -> std::collections::HashMap<usize, String> {
+        let mut result = std::collections::HashMap::new();
+
+        // 檢查是否有語法高亮引擎
+        let Some(ref engine) = self.highlight_engine else {
+            return result;
+        };
+
+        // 建立高亮器（初始狀態）
+        let Some(mut highlighter) = engine.create_highlighter() else {
+            return result;
+        };
+
+        // 只處理可見範圍
+        for row in start_row..=end_row.min(self.buffer.line_count().saturating_sub(1)) {
+            let line_text = match self.buffer.line(row) {
+                Some(line) => {
+                    // ⚠️ 重要：保留換行符！syntect 需要換行符才能正確解析語法狀態
+                    let mut text = line.to_string();
+                    if !text.ends_with('\n') && !text.ends_with("\r\n") {
+                        text.push('\n');
+                    }
+                    text
+                }
+                None => continue,
+            };
+
+            // 快速模式：不使用快取，每次重新高亮
+            let highlighted = highlighter.highlight_line(&line_text);
+            result.insert(row, highlighted);
+        }
+
+        result
+    }
+
+    /// 使語法高亮快取失效（編輯操作後調用）
+    #[cfg(feature = "syntax-highlighting")]
+    pub fn invalidate_highlight_cache(&mut self, from_line: usize) {
+        use crate::highlight::EditType;
+        self.highlight_cache
+            .invalidate_from_edit(from_line, EditType::CharInsert);
     }
 
     // 解析編碼字串

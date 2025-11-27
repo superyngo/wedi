@@ -11,6 +11,7 @@ use crossterm::{
 use std::io::{self, Write};
 
 /// 顯示輸入對話框並獲取用戶輸入
+#[allow(dead_code)]
 pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
     let mut input = String::new();
     let (cols, rows) = terminal_size;

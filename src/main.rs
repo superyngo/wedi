@@ -146,7 +146,9 @@ impl Args {
         println!("    --debug                            Enable debug mode");
         println!("    -e, --encoding <ENCODING>          Encoding for both reading and saving");
         println!("                                       (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
-        println!("    -f, --from-encoding <ENCODING>     Encoding for reading files (overrides -e)");
+        println!(
+            "    -f, --from-encoding <ENCODING>     Encoding for reading files (overrides -e)"
+        );
         println!("    -t, --to-encoding <ENCODING>       Encoding for saving files (overrides -e)");
         println!();
         println!("KEYBOARD SHORTCUTS:");
@@ -200,6 +202,8 @@ impl Args {
         println!("  Code:");
         println!("    Ctrl+/ \\ K         Toggle line comment");
         println!("    Ctrl+L              Toggle line numbers");
+        #[cfg(feature = "syntax-highlighting")]
+        println!("    Ctrl+H              Toggle syntax highlight (Disabled/Fast/Accurate)");
         println!();
         println!("  Encoding:");
         println!(

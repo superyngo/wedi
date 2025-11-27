@@ -13,7 +13,11 @@
       "Bash(rustup show:*)",
       "Bash(nul)",
       "Bash(cargo clippy:*)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(test:*)",
+      "Bash(grep:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

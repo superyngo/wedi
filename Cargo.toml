@@ -1,6 +1,6 @@
 [package]
 name = "wedi"
-version = "0.1.18"
+version = "0.2.0"
 edition = "2021"
 authors = ["wen"]
 description = "A cross-platform minimalist lightweight CLI text editor"
@@ -13,14 +13,25 @@ ropey = "1.6"           # 文本緩衝區
 unicode-width = "0.1"   # Unicode 字符寬度計算
 anyhow = "1.0"          # 錯誤處理
 encoding_rs = "0.8"     # 編碼處理
+serde = "1.0"           # 序列化（用於 syntect）
+once_cell = "1.19"      # 延遲初始化
+
+# 語法高亮依賴（可選功能）
+syntect = { version = "5.3", default-features = false, features = ["parsing", "regex-onig", "default-themes"], optional = true }
+bincode = { version = "1.3", optional = true }
+ansi_colours = { version = "1.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "windef", "winbase", "memoryapi", "winnls"] }
+winapi = { version = "0.3", features = ["winuser", "windef", "winbase", "memoryapi", "winnls", "consoleapi", "handleapi", "processenv", "wincon"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"      # CLI 測試
 predicates = "3.0"      # 測試斷言
 tempfile = "3.8"        # 臨時文件測試
+
+[features]
+default = ["syntax-highlighting"]
+syntax-highlighting = ["dep:syntect", "dep:bincode", "dep:ansi_colours"]
 
 [profile.release]
 strip = true            # 移除符號以減小二進制文件大小

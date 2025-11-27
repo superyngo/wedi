@@ -3,12 +3,14 @@
 
 use crate::buffer::RopeBuffer;
 
+#[allow(dead_code)]
 pub struct Search {
     query: String,
     matches: Vec<(usize, usize)>, // (line, col) pairs
     current_match: usize,
 }
 
+#[allow(dead_code)]
 impl Search {
     pub fn new() -> Self {
         Self {

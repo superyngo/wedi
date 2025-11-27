@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Up,
@@ -14,6 +15,7 @@ pub enum Direction {
     FileEnd,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     // 字符輸入
@@ -93,4 +95,8 @@ pub enum Command {
     // 文件 1/10 跳躍
     JumpTenthUp,
     JumpTenthDown,
+
+    // 語法高亮模式切換
+    #[cfg(feature = "syntax-highlighting")]
+    ToggleSyntaxHighlight,
 }
