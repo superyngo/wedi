@@ -12,7 +12,7 @@
 
 **目標狀態：**
 - 完整的即時語法高亮
-- 支援 20+ 種常用語言
+- 支援 219 種語言（使用 bat 的語法集）
 - 與現有架構無縫整合
 - 效能優化（增量渲染、快取）
 
@@ -20,13 +20,20 @@
 
 ## 一、實作方案總覽
 
-### 方案選擇：客製化整合 syntect
+### 方案選擇：使用 bat 專案的 syntaxes.bin
 
 **理由：**
-- ✅ 編輯器需要逐行增量高亮（非一次性渲染）
-- ✅ 已有完整的 FileType 檢測框架
-- ✅ 使用 crossterm，需要深度整合
-- ✅ 可以利用現有的視窗渲染邏輯
+- ✅ 完整支援 219 種語言（經過充分測試）
+- ✅ 法律清晰（MIT License / Apache License 2.0）
+- ✅ 無需自行維護語法定義
+- ✅ 與 bat 保持一致性
+- ✅ 檔案大小可控（約 1.6 MB）
+
+**語法集來源：**
+- 使用路徑：`D:\Users\user\Documents\rust\bat\assets\syntaxes.bin`
+- 授權：MIT License / Apache License 2.0（雙授權）
+- 包含 219 種語法定義
+- 原始來源：Sublime Text packages (MIT License)
 
 **技術挑戰：**
 - ⚠️ 需要維護語法解析狀態（跨行狀態）
@@ -40,63 +47,56 @@ highlight/
 ├── detector.rs     - FileType 檢測（已存在）
 ├── engine.rs       - 核心高亮引擎（新建）
 ├── cache.rs        - 語法狀態快取（新建）
-└── theme.rs        - 主題管理（新建）
+└── theme.rs        - 主題管理（可選）
+
+assets/
+└── syntaxes.bin    - 嵌入的語法集（來自 bat）
 ```
 
 ---
 
 ## 二、語法支援清單
 
-### 推薦支援的語言（28 種）
+### 使用 bat 語法集（219 種）
 
-基於 wedi 的目標用戶（系統管理員、開發者），以下是建議的語言清單：
+透過使用 bat 的 syntaxes.bin，wedi 將自動支援 219 種語言，包括：
 
-#### **系統程式語言（9 種）**
-- Rust (.rs) - 已在 FileType 中
-- Python (.py) - 已在 FileType 中
-- JavaScript (.js) - 已在 FileType 中
-- TypeScript (.ts) - 已在 FileType 中
-- Go (.go) - 已在 FileType 中
-- C (.c, .h) - 已在 FileType 中
-- C++ (.cpp, .hpp) - 已在 FileType 中
-- Java (.java) - 已在 FileType 中
-- C# (.cs)
+#### **系統程式語言**
+Rust, Python, JavaScript, TypeScript, Go, C, C++, Java, C#, Kotlin, Swift,
+Objective-C, Haskell, OCaml, Scala, Erlang, Elixir, Clojure, etc.
 
-#### **Shell 腳本（6 種）**
-- Bash (.sh) - 已在 FileType 中
-- PowerShell (.ps1)
-- Batch (.bat, .cmd)
-- Zsh (.zsh)
-- Makefile
-- Dockerfile
+#### **Shell 腳本**
+Bash, Zsh, Fish, PowerShell, Batch File, Shell Script, etc.
 
-#### **標記/資料語言（8 種）**
-- JSON (.json) - 已在 FileType 中
-- YAML (.yml, .yaml) - 已在 FileType 中
-- TOML (.toml)
-- XML (.xml)
-- HTML (.html) - 已在 FileType 中
-- CSS (.css) - 已在 FileType 中
-- Markdown (.md) - 已在 FileType 中
-- INI (.ini)
+#### **標記/資料語言**
+JSON, YAML, TOML, XML, HTML, CSS, Markdown, reStructuredText, LaTeX,
+AsciiDoc, INI, etc.
 
-#### **資料庫與查詢（2 種）**
-- SQL (.sql)
-- GraphQL (.gql)
+#### **資料庫與查詢**
+SQL, GraphQL, etc.
 
-#### **其他常用（3 種）**
-- Git Config (.gitignore, .gitconfig)
-- Log Files (.log)
-- Plain Text (.txt)
+#### **其他**
+Git Config, Dockerfile, Makefile, Nginx, Apache Config, Log files,
+Diff, Patch, RegExp, 等等
 
-**與現有 FileType enum 的對應：**
-wedi 已經定義了 14+ 種 FileType，我們將擴充並映射到 syntect 語法。
+**完整清單：**
+可透過 `Highlighter::available_syntaxes()` 取得完整的 219 種語法名稱。
 
 ---
 
 ## 三、實作步驟
 
-### Step 1: 更新依賴配置
+### Step 1: 複製語法集檔案
+
+首先，將 bat 的 syntaxes.bin 複製到 wedi 專案：
+
+```bash
+# 在 wedi 專案根目錄
+mkdir -p assets
+cp D:/Users/user/Documents/rust/bat/assets/syntaxes.bin assets/
+```
+
+### Step 2: 更新依賴配置
 
 **檔案：`Cargo.toml`**
 
@@ -115,8 +115,12 @@ encoding_rs = "0.8"
 anyhow = "1.0"
 
 # 新增：語法高亮
-syntect = { version = "5.3.0", default-features = false, features = ["parsing"] }
+syntect = { version = "5.3.0", default-features = false, features = ["parsing", "regex-onig", "default-themes"] }
 once_cell = "1.19"
+bincode = "1.3"
+flate2 = { version = "1.0", optional = true }  # 如果 syntaxes.bin 是壓縮的
+ansi_colours = "1.2"  # RGB -> 256 色轉換
+serde = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winnls", "winuser"] }
@@ -130,296 +134,212 @@ panic = "abort"
 
 [features]
 default = ["syntax-highlighting"]
-syntax-highlighting = ["syntect", "once_cell"]
+syntax-highlighting = ["syntect", "once_cell", "bincode", "ansi_colours", "serde"]
 ```
 
-### Step 2: 擴充 FileType 檢測
-
-**修改檔案：`src/highlight/detector.rs`**
-
-```rust
-use std::path::Path;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileType {
-    // 程式語言
-    Rust,
-    Python,
-    JavaScript,
-    TypeScript,
-    Go,
-    C,
-    Cpp,
-    Java,
-    CSharp,
-
-    // 腳本
-    Shell,
-    PowerShell,
-    Batch,
-    Makefile,
-    Dockerfile,
-
-    // 標記語言
-    Html,
-    Css,
-    Markdown,
-    Json,
-    Yaml,
-    Toml,
-    Xml,
-    Ini,
-
-    // 資料庫
-    Sql,
-
-    // 其他
-    Text,
-    Unknown,
-}
-
-impl FileType {
-    /// 從檔案路徑檢測檔案類型
-    pub fn from_path(path: &Path) -> Self {
-        // 檢查特殊檔名
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            match name.to_lowercase().as_str() {
-                "makefile" | "gnumakefile" => return Self::Makefile,
-                "dockerfile" => return Self::Dockerfile,
-                "cargo.toml" => return Self::Toml,
-                "package.json" => return Self::Json,
-                _ => {}
-            }
-        }
-
-        // 從副檔名檢測
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            Self::from_extension(ext)
-        } else {
-            Self::Unknown
-        }
-    }
-
-    /// 從副檔名檢測
-    pub fn from_extension(ext: &str) -> Self {
-        match ext.to_lowercase().as_str() {
-            // 程式語言
-            "rs" => Self::Rust,
-            "py" | "pyw" | "pyi" => Self::Python,
-            "js" | "mjs" | "cjs" => Self::JavaScript,
-            "ts" | "mts" | "cts" => Self::TypeScript,
-            "go" => Self::Go,
-            "c" | "h" => Self::C,
-            "cpp" | "hpp" | "cc" | "cxx" | "hxx" | "c++" | "h++" => Self::Cpp,
-            "java" => Self::Java,
-            "cs" => Self::CSharp,
-
-            // 腳本
-            "sh" | "bash" | "zsh" => Self::Shell,
-            "ps1" | "psm1" | "psd1" => Self::PowerShell,
-            "bat" | "cmd" => Self::Batch,
-
-            // 標記語言
-            "html" | "htm" => Self::Html,
-            "css" | "scss" | "sass" => Self::Css,
-            "md" | "markdown" => Self::Markdown,
-            "json" | "jsonc" => Self::Json,
-            "yml" | "yaml" => Self::Yaml,
-            "toml" => Self::Toml,
-            "xml" => Self::Xml,
-            "ini" | "conf" | "cfg" => Self::Ini,
-
-            // 資料庫
-            "sql" => Self::Sql,
-
-            // 其他
-            "txt" | "text" => Self::Text,
-            _ => Self::Unknown,
-        }
-    }
-
-    /// 取得對應的 syntect 語法名稱
-    pub fn syntect_name(&self) -> Option<&'static str> {
-        match self {
-            Self::Rust => Some("Rust"),
-            Self::Python => Some("Python"),
-            Self::JavaScript => Some("JavaScript"),
-            Self::TypeScript => Some("TypeScript"),
-            Self::Go => Some("Go"),
-            Self::C => Some("C"),
-            Self::Cpp => Some("C++"),
-            Self::Java => Some("Java"),
-            Self::CSharp => Some("C#"),
-            Self::Shell => Some("Bash"),
-            Self::PowerShell => Some("PowerShell"),
-            Self::Batch => Some("Batch File"),
-            Self::Makefile => Some("Makefile"),
-            Self::Dockerfile => Some("Dockerfile"),
-            Self::Html => Some("HTML"),
-            Self::Css => Some("CSS"),
-            Self::Markdown => Some("Markdown"),
-            Self::Json => Some("JSON"),
-            Self::Yaml => Some("YAML"),
-            Self::Toml => Some("TOML"),
-            Self::Xml => Some("XML"),
-            Self::Ini => Some("INI"),
-            Self::Sql => Some("SQL"),
-            Self::Text | Self::Unknown => None,
-        }
-    }
-
-    /// 是否應該啟用語法高亮
-    pub fn supports_highlighting(&self) -> bool {
-        self.syntect_name().is_some()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extension_detection() {
-        assert_eq!(FileType::from_extension("rs"), FileType::Rust);
-        assert_eq!(FileType::from_extension("py"), FileType::Python);
-        assert_eq!(FileType::from_extension("cpp"), FileType::Cpp);
-    }
-
-    #[test]
-    fn test_special_filenames() {
-        assert_eq!(FileType::from_path(Path::new("Makefile")), FileType::Makefile);
-        assert_eq!(FileType::from_path(Path::new("Dockerfile")), FileType::Dockerfile);
-    }
-}
-```
-
-### Step 3: 建立高亮引擎
+### Step 3: 建立高亮引擎（基於 cate 的實作）
 
 **新建檔案：`src/highlight/engine.rs`**
 
 ```rust
-use anyhow::{Result, Context};
-use crossterm::style::Color;
+use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
-use syntect::parsing::{SyntaxSet, SyntaxReference};
-use syntect::highlighting::{Theme, ThemeSet, Style, Highlighter as SyntectHighlighter};
+use std::path::Path;
 use syntect::easy::HighlightLines;
+use syntect::highlighting::{Style, Theme, ThemeSet};
+use syntect::parsing::{SyntaxReference, SyntaxSet};
+use syntect::util::as_24_bit_terminal_escaped;
 
 use super::detector::FileType;
 
-/// 全域語法集
-static SYNTAX_SET: Lazy<SyntaxSet> = Lazy::new(SyntaxSet::load_defaults_newlines);
+/// 嵌入的語法集（來自 bat 專案）
+///
+/// 此檔案來自 bat (https://github.com/sharkdp/bat)
+/// 授權：MIT License / Apache License 2.0
+/// 包含 219 種語法定義，原始來源為 Sublime Text packages (MIT License)
+/// 詳見 THIRD-PARTY-LICENSES.md
+const SERIALIZED_SYNTAX_SET: &[u8] = include_bytes!("../../assets/syntaxes.bin");
 
-/// 全域主題集
+/// 語法集是否壓縮（與 bat 保持一致）
+const COMPRESS_SYNTAXES: bool = false;
+
+/// 全域語法集（延遲載入，使用 bat 的載入方式）
+static SYNTAX_SET: Lazy<SyntaxSet> = Lazy::new(|| {
+    load_from_binary(SERIALIZED_SYNTAX_SET, COMPRESS_SYNTAXES)
+        .expect("Failed to load embedded syntax set")
+});
+
+/// 全域主題集（使用 syntect 內建主題）
 static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
+
+/// 從二進位資料載入（與 bat 的 from_binary 相同邏輯）
+fn load_from_binary<T>(data: &[u8], compressed: bool) -> Result<T>
+where
+    T: for<'de> serde::Deserialize<'de>,
+{
+    if compressed {
+        #[cfg(feature = "flate2")]
+        {
+            bincode::deserialize_from(flate2::read::ZlibDecoder::new(data))
+                .context("Failed to decompress and deserialize")
+        }
+        #[cfg(not(feature = "flate2"))]
+        {
+            anyhow::bail!("Compressed syntax sets require flate2 feature")
+        }
+    } else {
+        bincode::deserialize(data).context("Failed to deserialize")
+    }
+}
 
 /// 語法高亮引擎
 pub struct HighlightEngine {
     theme: Theme,
-    current_file_type: Option<FileType>,
-    syntax: Option<&'static SyntaxReference>,
+    current_syntax: Option<&'static SyntaxReference>,
+    true_color: bool,
 }
 
 impl HighlightEngine {
     /// 建立新的高亮引擎
-    pub fn new(theme_name: Option<&str>) -> Result<Self> {
+    pub fn new(theme_name: Option<&str>, true_color: bool) -> Result<Self> {
         let theme_name = theme_name.unwrap_or("base16-ocean.dark");
-        let theme = THEME_SET.themes.get(theme_name)
+        let theme = THEME_SET
+            .themes
+            .get(theme_name)
             .context(format!("Theme '{}' not found", theme_name))?
             .clone();
 
         Ok(Self {
             theme,
-            current_file_type: None,
-            syntax: None,
+            current_syntax: None,
+            true_color,
         })
     }
 
-    /// 設定當前檔案類型
-    pub fn set_file_type(&mut self, file_type: FileType) {
-        self.current_file_type = Some(file_type);
+    /// 設定當前檔案類型（從路徑檢測）
+    pub fn set_file(&mut self, file_path: Option<&Path>) {
+        self.current_syntax = self.detect_syntax_from_path(file_path);
+    }
 
-        // 查找對應的語法
-        if let Some(syntax_name) = file_type.syntect_name() {
-            self.syntax = SYNTAX_SET.find_syntax_by_name(syntax_name);
-        } else {
-            self.syntax = None;
+    /// 從檔案路徑檢測語法
+    fn detect_syntax_from_path(&self, file_path: Option<&Path>) -> Option<&'static SyntaxReference> {
+        let path = file_path?;
+
+        // 1. 從副檔名檢測
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if let Some(syntax) = SYNTAX_SET.find_syntax_by_extension(ext) {
+                return Some(syntax);
+            }
         }
+
+        // 2. 從檔名檢測（例如 Makefile, Dockerfile）
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if let Some(syntax) = SYNTAX_SET.find_syntax_by_name(name) {
+                return Some(syntax);
+            }
+
+            // 特殊檔名處理
+            match name.to_lowercase().as_str() {
+                "makefile" | "gnumakefile" => {
+                    return SYNTAX_SET.find_syntax_by_name("Makefile");
+                }
+                "dockerfile" => {
+                    return SYNTAX_SET.find_syntax_by_name("Dockerfile");
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    /// 從內容檢測語法（shebang）
+    pub fn detect_syntax_from_content(&self, content: &str) -> Option<&'static SyntaxReference> {
+        if let Some(first_line) = content.lines().next() {
+            if first_line.starts_with("#!") {
+                return SYNTAX_SET.find_syntax_by_first_line(first_line);
+            }
+        }
+        None
     }
 
     /// 建立新的高亮器（用於逐行高亮）
     pub fn create_highlighter(&self) -> Option<LineHighlighter> {
-        self.syntax.map(|syntax| {
-            LineHighlighter::new(syntax, &self.theme)
+        self.current_syntax.map(|syntax| {
+            LineHighlighter::new(syntax, &self.theme, self.true_color)
         })
-    }
-
-    /// 取得主題的預設前景色
-    pub fn default_foreground(&self) -> Color {
-        let settings = &self.theme.settings;
-        if let Some(fg) = settings.foreground {
-            syntect_to_crossterm_color(fg)
-        } else {
-            Color::White
-        }
-    }
-
-    /// 取得主題的預設背景色
-    pub fn default_background(&self) -> Color {
-        let settings = &self.theme.settings;
-        if let Some(bg) = settings.background {
-            syntect_to_crossterm_color(bg)
-        } else {
-            Color::Black
-        }
     }
 
     /// 是否已啟用語法高亮
     pub fn is_enabled(&self) -> bool {
-        self.syntax.is_some()
+        self.current_syntax.is_some()
     }
 
     /// 取得可用主題清單
     pub fn available_themes() -> Vec<String> {
         THEME_SET.themes.keys().cloned().collect()
     }
+
+    /// 取得可用語法清單
+    pub fn available_syntaxes() -> Vec<String> {
+        SYNTAX_SET
+            .syntaxes()
+            .iter()
+            .map(|s| s.name.clone())
+            .collect()
+    }
 }
 
 /// 逐行高亮器（維護跨行狀態）
 pub struct LineHighlighter {
     inner: HighlightLines<'static>,
+    true_color: bool,
 }
 
 impl LineHighlighter {
-    fn new(syntax: &'static SyntaxReference, theme: &Theme) -> Self {
+    fn new(syntax: &'static SyntaxReference, theme: &Theme, true_color: bool) -> Self {
         Self {
             inner: HighlightLines::new(syntax, theme),
+            true_color,
         }
     }
 
-    /// 高亮單行，返回帶顏色的文字片段
-    pub fn highlight_line(&mut self, line: &str) -> Result<Vec<(Color, String)>> {
-        let regions = self.inner
+    /// 高亮單行，返回 ANSI 色碼字串
+    pub fn highlight_line(&mut self, line: &str) -> Result<String> {
+        let ranges: Vec<(Style, &str)> = self
+            .inner
             .highlight_line(line, &SYNTAX_SET)
             .context("Failed to highlight line")?;
 
-        Ok(regions
-            .into_iter()
-            .map(|(style, text)| {
-                let color = syntect_to_crossterm_color(style.foreground);
-                (color, text.to_string())
-            })
-            .collect())
+        let escaped = if self.true_color {
+            as_24_bit_terminal_escaped(&ranges[..], false)
+        } else {
+            self.as_8bit_terminal_escaped(&ranges[..])
+        };
+
+        Ok(escaped)
+    }
+
+    /// 將 syntect 顏色轉為 8-bit ANSI 色碼（相容模式）
+    fn as_8bit_terminal_escaped(&self, ranges: &[(Style, &str)]) -> String {
+        let mut output = String::new();
+
+        for (style, text) in ranges {
+            // 使用 ansi_colours 庫進行精確的 RGB -> 256 色映射（與 bat 相同）
+            let fg = style.foreground;
+            let color_code = ansi_colours::ansi256_from_rgb((fg.r, fg.g, fg.b));
+            output.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", color_code, text));
+        }
+
+        output
     }
 }
 
-/// 將 syntect 顏色轉為 crossterm 顏色
-fn syntect_to_crossterm_color(color: syntect::highlighting::Color) -> Color {
-    Color::Rgb {
-        r: color.r,
-        g: color.g,
-        b: color.b,
-    }
+/// 檢測終端是否支援 24-bit 真彩色
+pub fn supports_true_color() -> bool {
+    std::env::var("COLORTERM")
+        .map(|v| v == "truecolor" || v == "24bit")
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -428,19 +348,25 @@ mod tests {
 
     #[test]
     fn test_engine_creation() {
-        let engine = HighlightEngine::new(None);
+        let engine = HighlightEngine::new(None, true);
         assert!(engine.is_ok());
     }
 
     #[test]
     fn test_rust_highlighting() {
-        let mut engine = HighlightEngine::new(None).unwrap();
-        engine.set_file_type(FileType::Rust);
+        let mut engine = HighlightEngine::new(None, true).unwrap();
+        engine.set_file(Some(Path::new("test.rs")));
         assert!(engine.is_enabled());
 
         let mut highlighter = engine.create_highlighter().unwrap();
         let result = highlighter.highlight_line("fn main() {}");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_syntax_count() {
+        let syntaxes = HighlightEngine::available_syntaxes();
+        assert!(syntaxes.len() >= 200, "Should have 200+ syntaxes from bat");
     }
 }
 ```
@@ -451,15 +377,14 @@ mod tests {
 
 ```rust
 use std::collections::HashMap;
-use crossterm::style::Color;
 
 /// 單行的高亮快取項目
 #[derive(Clone, Debug)]
 pub struct CachedLine {
-    /// 原始文字內容
+    /// 原始文字內容（用於驗證）
     pub text: String,
-    /// 高亮後的片段：(顏色, 文字)
-    pub segments: Vec<(Color, String)>,
+    /// 高亮後的 ANSI 字串
+    pub highlighted: String,
 }
 
 /// 語法狀態快取（用於優化效能）
@@ -556,7 +481,7 @@ mod tests {
         let mut cache = HighlightCache::new();
         let cached = CachedLine {
             text: "test".to_string(),
-            segments: vec![(Color::White, "test".to_string())],
+            highlighted: "\x1b[0mtest\x1b[0m".to_string(),
         };
 
         cache.insert(0, cached.clone());
@@ -569,7 +494,7 @@ mod tests {
         let mut cache = HighlightCache::new();
         let cached = CachedLine {
             text: "test".to_string(),
-            segments: vec![],
+            highlighted: String::new(),
         };
 
         cache.insert(0, cached);
@@ -591,7 +516,7 @@ mod engine;
 mod cache;
 
 pub use detector::{FileType, self};
-pub use engine::{HighlightEngine, LineHighlighter};
+pub use engine::{HighlightEngine, LineHighlighter, supports_true_color};
 pub use cache::{HighlightCache, CachedLine};
 
 /// 語法高亮設定
@@ -601,6 +526,8 @@ pub struct HighlightConfig {
     pub enabled: bool,
     /// 主題名稱
     pub theme: String,
+    /// 是否使用真彩色
+    pub true_color: bool,
 }
 
 impl Default for HighlightConfig {
@@ -608,320 +535,100 @@ impl Default for HighlightConfig {
         Self {
             enabled: true,
             theme: "base16-ocean.dark".to_string(),
+            true_color: supports_true_color(),
         }
     }
 }
 ```
 
-### Step 6: 整合到 Editor
+### Step 6: 建立第三方授權文件
 
-**修改檔案：`src/editor.rs`**
+**新建檔案：`THIRD-PARTY-LICENSES.md`**
 
-在 Editor 結構中加入高亮相關欄位：
+```markdown
+# Third-Party Licenses and Acknowledgements
 
-```rust
-use crate::highlight::{HighlightEngine, HighlightCache, HighlightConfig, FileType};
+This project uses third-party software and resources. Below are the acknowledgements and license information.
 
-pub struct Editor {
-    // ... 現有欄位
+## Syntax Definitions
 
-    // 新增：語法高亮
-    highlight_engine: Option<HighlightEngine>,
-    highlight_cache: HighlightCache,
-    highlight_config: HighlightConfig,
-    current_file_type: Option<FileType>,
-}
+The syntax highlighting feature uses syntax definitions (`assets/syntaxes.bin`) from the [bat](https://github.com/sharkdp/bat) project.
 
-impl Editor {
-    pub fn new(/* ... */) -> Result<Self> {
-        // ... 現有初始化
+- **Source**: https://github.com/sharkdp/bat
+- **License**: MIT License / Apache License 2.0 (dual licensed)
+- **Original Syntax Sources**: Sublime Text Packages (MIT License)
+- **Number of Syntaxes**: 219 languages
 
-        // 初始化語法高亮
-        let highlight_config = HighlightConfig::default();
-        let highlight_engine = if highlight_config.enabled {
-            HighlightEngine::new(Some(&highlight_config.theme)).ok()
-        } else {
-            None
-        };
+### bat Project License (MIT)
 
-        Ok(Self {
-            // ... 現有欄位
-            highlight_engine,
-            highlight_cache: HighlightCache::new(),
-            highlight_config,
-            current_file_type: None,
-        })
-    }
+```
+Copyright (c) 2018-2024 bat-developers
 
-    /// 載入檔案後檢測檔案類型
-    pub fn detect_and_set_file_type(&mut self, file_path: &std::path::Path) {
-        let file_type = FileType::from_path(file_path);
-        self.current_file_type = Some(file_type);
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-        if let Some(engine) = &mut self.highlight_engine {
-            engine.set_file_type(file_type);
-        }
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-        // 清除舊快取
-        self.highlight_cache.clear();
-    }
-
-    /// 切換語法高亮開關
-    pub fn toggle_syntax_highlighting(&mut self) -> Result<()> {
-        if self.highlight_engine.is_some() {
-            self.highlight_engine = None;
-            self.highlight_config.enabled = false;
-        } else {
-            self.highlight_engine =
-                Some(HighlightEngine::new(Some(&self.highlight_config.theme))?);
-            self.highlight_config.enabled = true;
-
-            // 重新設定檔案類型
-            if let Some(file_type) = self.current_file_type {
-                self.highlight_engine.as_mut().unwrap().set_file_type(file_type);
-            }
-        }
-
-        // 清除快取以觸發重繪
-        self.highlight_cache.clear();
-        Ok(())
-    }
-
-    /// 更換主題
-    pub fn set_theme(&mut self, theme_name: &str) -> Result<()> {
-        self.highlight_config.theme = theme_name.to_string();
-        self.highlight_engine = Some(HighlightEngine::new(Some(theme_name))?);
-
-        // 重新設定檔案類型
-        if let Some(file_type) = self.current_file_type {
-            self.highlight_engine.as_mut().unwrap().set_file_type(file_type);
-        }
-
-        self.highlight_cache.clear();
-        Ok(())
-    }
-
-    /// 取得語法高亮引擎的參考
-    pub fn highlight_engine(&self) -> Option<&HighlightEngine> {
-        self.highlight_engine.as_ref()
-    }
-
-    /// 取得快取的可變參考
-    pub fn highlight_cache_mut(&mut self) -> &mut HighlightCache {
-        &mut self.highlight_cache
-    }
-
-    /// 文字修改時使快取失效
-    pub fn on_text_modified(&mut self, line_idx: usize) {
-        // 使當前行及後續幾行失效（因為語法狀態可能影響後續行）
-        self.highlight_cache.invalidate_range(line_idx, line_idx + 10);
-    }
-}
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
-### Step 7: 整合到 View 渲染
+## Rust Dependencies
 
-**修改檔案：`src/view.rs`**
+This project also uses various Rust crates. Run `cargo license` to see a full list of dependencies and their licenses.
 
-```rust
-use crate::highlight::{HighlightEngine, HighlightCache, CachedLine};
-use crossterm::style::{Color, SetForegroundColor, ResetColor};
-
-impl View {
-    /// 渲染單行（帶語法高亮）
-    pub fn render_line_with_highlight(
-        &self,
-        line_idx: usize,
-        line_text: &str,
-        highlight_engine: Option<&HighlightEngine>,
-        highlight_cache: &mut HighlightCache,
-    ) -> Result<()> {
-        let stdout = std::io::stdout();
-        let mut handle = stdout.lock();
-
-        // 如果沒有高亮引擎或未啟用，直接渲染純文字
-        if highlight_engine.is_none() || !highlight_engine.unwrap().is_enabled() {
-            queue!(handle, Print(line_text))?;
-            return Ok(());
-        }
-
-        let engine = highlight_engine.unwrap();
-
-        // 檢查快取
-        if highlight_cache.is_valid(line_idx, line_text) {
-            // 使用快取
-            if let Some(cached) = highlight_cache.get(line_idx) {
-                for (color, text) in &cached.segments {
-                    queue!(
-                        handle,
-                        SetForegroundColor(*color),
-                        Print(text),
-                    )?;
-                }
-                queue!(handle, ResetColor)?;
-                return Ok(());
-            }
-        }
-
-        // 需要重新高亮
-        if let Some(mut highlighter) = engine.create_highlighter() {
-            match highlighter.highlight_line(line_text) {
-                Ok(segments) => {
-                    // 渲染
-                    for (color, text) in &segments {
-                        queue!(
-                            handle,
-                            SetForegroundColor(*color),
-                            Print(text),
-                        )?;
-                    }
-                    queue!(handle, ResetColor)?;
-
-                    // 加入快取
-                    highlight_cache.insert(line_idx, CachedLine {
-                        text: line_text.to_string(),
-                        segments,
-                    });
-                }
-                Err(_) => {
-                    // 高亮失敗，渲染純文字
-                    queue!(handle, Print(line_text))?;
-                }
-            }
-        } else {
-            // 無法建立高亮器，渲染純文字
-            queue!(handle, Print(line_text))?;
-        }
-
-        Ok(())
-    }
-
-    /// 修改後的渲染迴圈（整合高亮）
-    pub fn render(&mut self, editor: &Editor) -> Result<()> {
-        let mut stdout = std::io::stdout();
-        queue!(stdout, crossterm::terminal::Clear(ClearType::All))?;
-
-        let start_line = self.scroll_offset;
-        let end_line = (start_line + self.viewport_height).min(self.buffer.line_count());
-
-        for line_idx in start_line..end_line {
-            let line_text = self.buffer.line(line_idx);
-
-            // 渲染行號（如果啟用）
-            if self.show_line_numbers {
-                self.render_line_number(line_idx)?;
-            }
-
-            // 渲染行內容（帶高亮）
-            self.render_line_with_highlight(
-                line_idx,
-                line_text,
-                editor.highlight_engine(),
-                editor.highlight_cache_mut(),
-            )?;
-
-            queue!(stdout, Print("\r\n"))?;
-        }
-
-        stdout.flush()?;
-        Ok(())
-    }
-}
+**Key Dependencies:**
+- syntect (MIT License)
+- crossterm (MIT License)
+- ropey (MIT License)
+- encoding_rs (Apache-2.0 OR MIT)
+- anyhow (MIT OR Apache-2.0)
 ```
 
-### Step 8: 新增快捷鍵
+### Step 7: 更新 README
 
-**修改檔案：`src/input/keymap.rs`**
+**修改檔案：`README.md`**
 
-新增語法高亮相關命令：
+在 Features 章節加入：
 
-```rust
-use crossterm::event::{KeyCode, KeyModifiers};
+```markdown
+## Features
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Command {
-    // ... 現有命令
-
-    // 新增：語法高亮
-    ToggleSyntaxHighlight,   // F5 或 Ctrl+H
-    NextTheme,               // Ctrl+T
-    PrevTheme,
-}
-
-pub fn map_key_to_command(key_code: KeyCode, modifiers: KeyModifiers) -> Option<Command> {
-    match (key_code, modifiers) {
-        // ... 現有映射
-
-        // 語法高亮快捷鍵
-        (KeyCode::F(5), KeyModifiers::NONE) => Some(Command::ToggleSyntaxHighlight),
-        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
-        (KeyCode::Char('t'), KeyModifiers::CONTROL) => Some(Command::NextTheme),
-
-        _ => None,
-    }
-}
+- 基本文字編輯操作
+- 撤銷/重做 (Ctrl+Z / Ctrl+Y)
+- 複製/貼上 (Ctrl+C / Ctrl+V)
+- 搜尋 (Ctrl+F)
+- 行號顯示
+- **語法高亮 (支援 219 種語言)** ← 新增
+- **可自訂主題 (7+ 種內建主題)** ← 新增
+- 多編碼支援 (UTF-8, GBK, Big5, Shift-JIS 等)
+- 跨平台支援 (Windows, macOS, Linux)
 ```
 
-### Step 9: 處理命令
+在 License 章節加入：
 
-**修改檔案：`src/input/handler.rs`**
+```markdown
+## Third-Party Resources
 
-```rust
-impl CommandHandler {
-    pub fn execute(&mut self, command: Command, editor: &mut Editor) -> Result<()> {
-        match command {
-            // ... 現有命令處理
+This project uses syntax definitions from the [bat](https://github.com/sharkdp/bat) project, which are licensed under MIT License / Apache License 2.0. The syntax definitions are originally derived from Sublime Text packages (MIT License).
 
-            Command::ToggleSyntaxHighlight => {
-                editor.toggle_syntax_highlighting()?;
-                self.set_status_message("Syntax highlighting toggled");
-            }
+For complete third-party license information, see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 
-            Command::NextTheme => {
-                let themes = HighlightEngine::available_themes();
-                if !themes.is_empty() {
-                    let current_idx = themes
-                        .iter()
-                        .position(|t| t == &editor.highlight_config.theme)
-                        .unwrap_or(0);
-                    let next_idx = (current_idx + 1) % themes.len();
-                    let next_theme = &themes[next_idx];
+### Acknowledgements
 
-                    editor.set_theme(next_theme)?;
-                    self.set_status_message(&format!("Theme: {}", next_theme));
-                }
-            }
-
-            _ => {}
-        }
-        Ok(())
-    }
-}
-```
-
-### Step 10: 更新 main.rs
-
-**修改檔案：`src/main.rs`**
-
-在載入檔案後檢測檔案類型：
-
-```rust
-fn main() -> Result<()> {
-    // ... 解析參數
-
-    let mut editor = Editor::new(/* ... */)?;
-
-    // 如果有檔案，載入並檢測類型
-    if let Some(file_path) = args.file {
-        editor.load_file(&file_path)?;
-        editor.detect_and_set_file_type(&file_path);
-    }
-
-    // ... 進入主迴圈
-    editor.run()?;
-
-    Ok(())
-}
+- **bat project** - For the excellent syntax definition collection
+- **Sublime Text community** - For maintaining the original syntax definitions
+- **syntect** - For the syntax highlighting engine
 ```
 
 ---
@@ -989,8 +696,8 @@ impl Editor {
     pub fn on_insert_char(&mut self, ch: char) {
         self.buffer.insert_char(self.cursor.line, self.cursor.column, ch);
 
-        // 只使當前行失效
-        self.highlight_cache.invalidate(self.cursor.line);
+        // 只使當前行失效（因為跨行狀態，可能需要使後續幾行失效）
+        self.highlight_cache.invalidate_range(self.cursor.line, self.cursor.line + 5);
     }
 
     pub fn on_delete_line(&mut self) {
@@ -1045,48 +752,19 @@ impl Editor {
 
 ---
 
-## 六、疑難排解
+## 六、與 cate 專案的差異
 
-### 問題 1: 高亮渲染閃爍
+### 相同點
+- ✅ 使用相同的 bat syntaxes.bin（219 種語言）
+- ✅ 使用相同的 syntect 配置
+- ✅ 使用相同的授權處理方式
+- ✅ 支援真彩色和 256 色模式
 
-**原因：** 每次按鍵都重繪整個螢幕
-
-**解決方案：**
-- 只重繪修改的行
-- 使用 crossterm 的 cursor positioning
-- 實作髒行追蹤（dirty line tracking）
-
-### 問題 2: 大檔案卡頓
-
-**原因：** 對整個檔案進行高亮
-
-**解決方案：**
-- 實作可見區域高亮（Step 4.1）
-- 背景執行緒預計算
-- 自動降級策略
-
-### 問題 3: 語法狀態不一致
-
-**原因：** 跨行語法（如多行註解）狀態管理錯誤
-
-**解決方案：**
-```rust
-// 在 LineHighlighter 中維護正確的狀態
-pub struct LineHighlighter {
-    inner: HighlightLines<'static>,
-    // 記錄上一行的結束狀態
-    last_state: Option<syntect::parsing::ParseState>,
-}
-```
-
-### 問題 4: 記憶體使用過高
-
-**原因：** 快取過大
-
-**解決方案：**
-- 限制快取大小（已在 cache.rs 實作）
-- 實作 LRU 策略
-- 定期清理不可見行的快取
+### 差異點
+- ⚠️ **wedi 是編輯器**：需要逐行即時高亮，維護狀態
+- ⚠️ **cate 是查看器**：一次性高亮整個檔案
+- ⚠️ **wedi 需要快取**：因為編輯時需要重複渲染相同的行
+- ⚠️ **wedi 需要狀態管理**：編輯操作會影響高亮狀態
 
 ---
 
@@ -1096,22 +774,21 @@ pub struct LineHighlighter {
 
 **目標：** 基本語法高亮能正常運作
 
-- [x] 整合 syntect 依賴
-- [ ] 實作 HighlightEngine
-- [ ] 實作 FileType 檢測
+- [x] 複製 syntaxes.bin 到專案
+- [ ] 整合 syntect 依賴（與 cate 相同配置）
+- [ ] 實作 HighlightEngine（基於 cate 的實作）
 - [ ] 修改 View 渲染邏輯
-- [ ] 支援 5 種語言（Rust, Python, JS, C, C++）
-- [ ] 基本測試
+- [ ] 基本測試（5 種常用語言）
 
 ### Phase 2: 完整功能（2-3 天）
 
-**目標：** 支援所有常用語言和主題切換
+**目標：** 支援所有語言和主題切換
 
-- [ ] 擴充到 28 種語言支援
+- [ ] 驗證所有 219 種語法可用
 - [ ] 實作 HighlightCache
 - [ ] 新增快捷鍵（F5, Ctrl+T）
 - [ ] 主題切換功能
-- [ ] 設定檔整合
+- [ ] 建立 THIRD-PARTY-LICENSES.md
 
 ### Phase 3: 效能優化（1-2 天）
 
@@ -1129,199 +806,19 @@ pub struct LineHighlighter {
 
 - [ ] 狀態列顯示當前主題
 - [ ] 狀態列顯示檔案類型
-- [ ] 主題預覽（在狀態列顯示）
+- [ ] 主題預覽
 - [ ] 說明文件更新
 - [ ] 快捷鍵說明
 
 ---
 
-## 八、設定檔整合
-
-**新建/修改檔案：`src/config.rs`**
-
-```rust
-use serde::{Serialize, Deserialize};
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Config {
-    // ... 現有設定
-
-    // 語法高亮設定
-    #[serde(default)]
-    pub syntax_highlighting: SyntaxHighlightConfig,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SyntaxHighlightConfig {
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-
-    #[serde(default = "default_theme")]
-    pub theme: String,
-
-    #[serde(default = "default_large_file_threshold")]
-    pub large_file_threshold_mb: u64,
-}
-
-fn default_enabled() -> bool { true }
-fn default_theme() -> String { "base16-ocean.dark".to_string() }
-fn default_large_file_threshold_mb() -> u64 { 10 }
-
-impl Default for SyntaxHighlightConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            theme: "base16-ocean.dark".to_string(),
-            large_file_threshold_mb: 10,
-        }
-    }
-}
-```
-
-**設定檔範例：`~/.wedirc` 或 `wedi.toml`**
-
-```toml
-[syntax_highlighting]
-enabled = true
-theme = "Monokai Extended"
-large_file_threshold_mb = 10
-```
-
----
-
-## 九、文件更新
-
-### README.md 更新
-
-```markdown
-## Features
-
-- 基本文字編輯操作
-- 撤銷/重做 (Ctrl+Z / Ctrl+Y)
-- 複製/貼上 (Ctrl+C / Ctrl+V)
-- 搜尋 (Ctrl+F)
-- 行號顯示
-- **語法高亮 (支援 28+ 種語言)** ← 新增
-- **可自訂主題 (18+ 種內建主題)** ← 新增
-- 多編碼支援 (UTF-8, GBK, Big5, Shift-JIS 等)
-- 跨平台支援 (Windows, macOS, Linux)
-
-## Keyboard Shortcuts
-
-... (現有快捷鍵)
-
-### Syntax Highlighting
-
-- `F5` - Toggle syntax highlighting on/off
-- `Ctrl+H` - Toggle syntax highlighting (alternative)
-- `Ctrl+T` - Switch to next theme
-
-## Supported Languages
-
-Rust, Python, JavaScript, TypeScript, Go, C, C++, Java, C#,
-Bash, PowerShell, Batch, Makefile, Dockerfile,
-HTML, CSS, Markdown, JSON, YAML, TOML, XML, INI, SQL, and more.
-
-## Configuration
-
-Create `~/.wedirc` or `wedi.toml`:
-
-```toml
-[syntax_highlighting]
-enabled = true
-theme = "Monokai Extended"
-large_file_threshold_mb = 10
-```
-```
-
----
-
-## 十、效能基準測試
-
-建立效能測試腳本：
-
-**新建檔案：`benches/highlighting_bench.rs`**
-
-```rust
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use wedi::highlight::{HighlightEngine, FileType};
-
-fn bench_rust_highlighting(c: &mut Criterion) {
-    let mut engine = HighlightEngine::new(None).unwrap();
-    engine.set_file_type(FileType::Rust);
-    let mut highlighter = engine.create_highlighter().unwrap();
-
-    let code = "fn main() { println!(\"Hello, world!\"); }";
-
-    c.bench_function("highlight_rust_line", |b| {
-        b.iter(|| {
-            highlighter.highlight_line(black_box(code))
-        })
-    });
-}
-
-criterion_group!(benches, bench_rust_highlighting);
-criterion_main!(benches);
-```
-
-在 `Cargo.toml` 中加入：
-
-```toml
-[[bench]]
-name = "highlighting_bench"
-harness = false
-
-[dev-dependencies]
-criterion = "0.5"
-```
-
-執行基準測試：
-
-```bash
-cargo bench
-```
-
----
-
-## 十一、預估時程與資源
-
-| 階段 | 任務 | 預估時間 | 難度 |
-|------|------|---------|------|
-| Phase 1 | MVP 實作 | 1-2 天 | 中 |
-| Phase 2 | 完整功能 | 2-3 天 | 中 |
-| Phase 3 | 效能優化 | 1-2 天 | 高 |
-| Phase 4 | UX 改善 | 1 天 | 低 |
-| **總計** | | **5-8 天** | |
-
----
-
-## 十二、參考資源
+## 八、參考資源
 
 - [syntect 文件](https://docs.rs/syntect/)
+- [bat 專案](https://github.com/sharkdp/bat)
+- [cate 專案實作](../cate/src/highlighter.rs) - 參考相同方案
 - [crossterm 顏色](https://docs.rs/crossterm/latest/crossterm/style/enum.Color.html)
-- [bat 原始碼](https://github.com/sharkdp/bat)
 - [ropey 文件](https://docs.rs/ropey/) - 文字緩衝區
-- [Sublime Text 語法](https://www.sublimetext.com/docs/syntax.html)
-
----
-
-## 附錄：主題推薦清單
-
-**適合編輯器的主題（視覺友善）：**
-
-**暗色主題：**
-- base16-ocean.dark (推薦預設)
-- Monokai Extended
-- Dracula
-- Nord
-- OneHalfDark
-- Solarized (dark)
-
-**亮色主題：**
-- Solarized (light)
-- InspiredGitHub
-- Monokai Extended Light
-- OneHalfLight
 
 ---
 
@@ -1333,10 +830,9 @@ cargo bench
 - [ ] 無編譯警告
 - [ ] 效能符合預期（<100ms 啟動，流暢編輯）
 - [ ] 二進位大小合理（<5MB）
-- [ ] 文件已更新（README, CHANGELOG）
-- [ ] 設定檔支援
-- [ ] 快捷鍵說明完整
-- [ ] 錯誤處理完善
+- [ ] 文件已更新（README, THIRD-PARTY-LICENSES.md）
+- [ ] syntaxes.bin 已包含在專案中
+- [ ] 授權資訊完整
 - [ ] 跨平台測試（Windows, Linux, macOS）
 
 ---
@@ -1344,4 +840,4 @@ cargo bench
 **預估總開發時間：5-8 天**
 **建議開發順序：Phase 1 → Phase 2 → Phase 4 → Phase 3**
 
-祝實作順利！如遇問題請參考疑難排解章節。
+**重要：** 此方案與 cate 專案使用相同的技術棧，可參考 cate 的實作細節。主要差異在於 wedi 是編輯器，需要處理即時編輯和狀態管理。
