@@ -29,7 +29,7 @@ impl Default for HighlightConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            theme: "base16-ocean.dark".to_string(),
+            theme: "base16-eighties.dark".to_string(),
             true_color: supports_true_color(),
         }
     }

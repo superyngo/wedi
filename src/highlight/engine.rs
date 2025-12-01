@@ -40,7 +40,7 @@ pub struct HighlightEngine {
 impl HighlightEngine {
     /// 建立新的高亮引擎
     pub fn new(theme_name: Option<&str>, true_color: bool) -> Result<Self> {
-        let theme_name = theme_name.unwrap_or("base16-ocean.dark");
+        let theme_name = theme_name.unwrap_or("base16-eighties.dark");
         let theme = THEME_SET
             .themes
             .get(theme_name)

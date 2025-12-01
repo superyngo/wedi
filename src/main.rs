@@ -81,6 +81,11 @@ struct Args {
     debug: bool,
     from_encoding: Option<String>,
     to_encoding: Option<String>,
+    #[cfg(feature = "syntax-highlighting")]
+    theme: Option<String>,
+    #[cfg(feature = "syntax-highlighting")]
+    #[allow(dead_code)]
+    list_themes: bool,
 }
 
 impl Args {
@@ -99,7 +104,20 @@ impl Args {
             std::process::exit(0);
         }
 
+        // 檢查是否有 --list-themes
+        #[cfg(feature = "syntax-highlighting")]
+        if pargs.contains("--list-themes") {
+            Self::print_themes();
+            std::process::exit(0);
+        }
+
         let debug = pargs.contains("--debug");
+
+        // 解析主題參數
+        #[cfg(feature = "syntax-highlighting")]
+        let theme = pargs.opt_value_from_str("--theme")?;
+        #[cfg(feature = "syntax-highlighting")]
+        let list_themes = false; // 已在上面處理
 
         // -e/--encoding 同時設定讀取和保存編碼
         let encoding = pargs.opt_value_from_str(["-e", "--encoding"])?;
@@ -127,11 +145,34 @@ impl Args {
             debug,
             from_encoding,
             to_encoding,
+            #[cfg(feature = "syntax-highlighting")]
+            theme,
+            #[cfg(feature = "syntax-highlighting")]
+            list_themes,
         })
     }
 
     fn print_version() {
         println!("wedi {}", env!("CARGO_PKG_VERSION"));
+    }
+
+    #[cfg(feature = "syntax-highlighting")]
+    fn print_themes() {
+        use highlight::HighlightEngine;
+
+        println!("Available syntax highlighting themes:\n");
+
+        let themes = HighlightEngine::available_themes();
+        let mut sorted_themes = themes.clone();
+        sorted_themes.sort();
+
+        for (i, theme) in sorted_themes.iter().enumerate() {
+            println!("  {:<2}. {}", i + 1, theme);
+        }
+
+        println!("\nUsage: wedi --theme <THEME_NAME> <FILE>");
+        println!("Example: wedi --theme \"Solarized (dark)\" myfile.rs");
+        println!("\nDefault theme: base16-eighties.dark");
     }
 
     fn print_help() {
@@ -150,6 +191,10 @@ impl Args {
             "    -f, --from-encoding <ENCODING>     Encoding for reading files (overrides -e)"
         );
         println!("    -t, --to-encoding <ENCODING>       Encoding for saving files (overrides -e)");
+        #[cfg(feature = "syntax-highlighting")]
+        println!("    --theme <THEME>                    Set syntax highlighting theme");
+        #[cfg(feature = "syntax-highlighting")]
+        println!("    --list-themes                      List all available themes");
         println!();
         println!("KEYBOARD SHORTCUTS:");
         println!();
@@ -242,7 +287,13 @@ fn main() -> Result<()> {
     );
 
     // 創建並運行編輯器
-    let mut editor = Editor::new(Some(&args.file), args.debug, &encoding_config)?;
+    let mut editor = Editor::new(
+        Some(&args.file),
+        args.debug,
+        &encoding_config,
+        #[cfg(feature = "syntax-highlighting")]
+        args.theme.as_deref(),
+    )?;
 
     // 設置 panic hook 以確保終端正常恢復
     let original_hook = std::panic::take_hook();

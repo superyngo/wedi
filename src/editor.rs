@@ -79,6 +79,7 @@ impl Editor {
         file_path: Option<&Path>,
         debug_mode: bool,
         encoding_config: &EncodingConfig,
+        #[cfg(feature = "syntax-highlighting")] theme: Option<&str>,
     ) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
             // 使用新的方法，支持指定編碼
@@ -134,7 +135,13 @@ impl Editor {
         // 語法高亮初始化
         #[cfg(feature = "syntax-highlighting")]
         let (highlight_engine, highlight_cache, highlight_config) = {
-            let config = HighlightConfig::default();
+            let mut config = HighlightConfig::default();
+
+            // 如果提供了自定義主題，使用它；否則使用默認主題
+            if let Some(custom_theme) = theme {
+                config.theme = custom_theme.to_string();
+            }
+
             let mut engine = if config.enabled {
                 HighlightEngine::new(Some(&config.theme), config.true_color).ok()
             } else {

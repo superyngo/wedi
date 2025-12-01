@@ -21,6 +21,7 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Chinese character support** 🎉
 - ✅ **Syntax highlighting (219+ languages)** 🎉
 - ✅ **Multiple syntax highlight modes (Disabled/Fast/Accurate)** 🎉
+- ✅ **Customizable syntax themes (7 built-in themes)** 🎉
 
 ## Installation
 
@@ -171,6 +172,41 @@ wedi file.txt -t utf-16le
 # Read GBK, save as GBK
 wedi file.txt -f gbk
 ```
+
+### Theme Options
+
+wedi supports customizable syntax highlighting themes. You can choose from 7 built-in themes:
+
+```bash
+# List all available themes
+wedi --list-themes
+
+# Use a specific theme
+wedi --theme <THEME_NAME> <filename>
+```
+
+**Available Themes:**
+1. InspiredGitHub (light theme)
+2. Solarized (dark)
+3. Solarized (light)
+4. base16-eighties.dark (default)
+5. base16-mocha.dark
+6. base16-ocean.dark
+7. base16-ocean.light
+
+**Examples:**
+```bash
+# Use Solarized Dark theme
+wedi --theme "Solarized (dark)" myfile.rs
+
+# Use Mocha theme
+wedi --theme "base16-mocha.dark" myfile.py
+
+# List all themes
+wedi --list-themes
+```
+
+**Note:** The default theme is `base16-eighties.dark`. If you don't specify a theme, this will be used automatically.
 
 ## Keyboard Shortcuts
 
