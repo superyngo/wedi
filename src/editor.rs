@@ -560,8 +560,9 @@ impl Editor {
             Command::Copy => {
                 let text = self.get_copy_text();
                 self.set_clipboard_text(text, true);
-                // 複製後關閉選擇模式但保留選擇範圍
+                // 複製後關閉選擇模式並清除選擇範圍
                 self.selection_mode = false;
+                self.selection = None;
             }
 
             Command::Cut => {
@@ -607,6 +608,7 @@ impl Editor {
                 let text = self.get_copy_text();
                 self.set_clipboard_text(text, false);
                 self.selection_mode = false; // 複製後關閉選擇模式
+                self.selection = None; // 複製後清除選擇範圍
             }
 
             Command::CutInternal => {
