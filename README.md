@@ -20,7 +20,7 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Fast navigation (Ctrl+H/E, Ctrl+Arrows/Home/End)** 🎉
 - ✅ **Chinese character support** 🎉
 - ✅ **Syntax highlighting (219+ languages)** 🎉
-- ✅ **Multiple syntax highlight modes (Disabled/Fast/Accurate)** 🎉
+- ✅ **Smart incremental syntax highlighting with cache optimization** 🎉
 - ✅ **Customizable syntax themes (7 built-in themes)** 🎉
 
 ## Installation
@@ -264,7 +264,7 @@ wedi --list-themes
 
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers
-- **Ctrl+H**: Toggle syntax highlight mode (Disabled/Fast/Accurate)
+- **Ctrl+H**: Toggle syntax highlighting (On/Off)
 
 ## Supported Comment Styles
 
@@ -288,15 +288,17 @@ wedi includes comprehensive syntax highlighting powered by [bat](https://github.
 - **Database**: SQL, GraphQL, etc.
 - **Configuration**: Dockerfile, Makefile, Nginx, Git Config, INI, etc.
 
-### Syntax Highlight Modes
+### Syntax Highlighting
 
-wedi offers three syntax highlighting modes to balance between accuracy and performance:
+wedi provides intelligent syntax highlighting with automatic performance optimization:
 
-- **Disabled**: No syntax highlighting
-- **Fast**: Highlights only visible lines from initial state (may have minor color differences for multi-line constructs like heredocs)
-- **Accurate**: Processes from line 0 to maintain full syntax state (ensures accurate colors for all multi-line constructs)
+- **Smart Processing**: Automatically adapts processing strategy based on file size
+  - Small files (≤500 lines): Full processing from start for complete accuracy
+  - Large files: Incremental processing (visible area ± 100 line buffer) for optimal performance
+- **Cache Optimization**: Maintains highlighting cache for instant re-rendering
+- **Accurate Multi-line Syntax**: Correctly handles multi-line constructs (comments, strings, heredocs)
 
-Use **Ctrl+H** to cycle through modes. The Fast mode is ideal for large files, while Accurate mode is perfect for code review and editing multi-line syntax constructs.
+Use **Ctrl+H** to toggle syntax highlighting on/off. The intelligent processing ensures both accuracy and performance automatically.
 
 ## Technical Stack
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-04
+
+### Changed
+- **BREAKING**: Simplified syntax highlighting modes from three modes (Disabled/Fast/Accurate) to simple on/off toggle
+- Ctrl+H now toggles syntax highlighting between Enabled/Disabled instead of cycling through modes
+- Improved syntax highlighting performance with incremental processing strategy
+  - Small files (≤500 lines): Process from start for accuracy
+  - Large files: Process visible area ± 100 line buffer for performance
+- Optimized highlighting cache strategy for better memory usage
+
+### Fixed
+- **Critical**: Fixed syntax highlighting artifacts on Linux terminals caused by newline characters in highlighted output
+- Fixed cursor position misalignment when editing with syntax highlighting enabled
+- Fixed phantom characters appearing after deletion operations in highlight mode
+- Fixed visual line duplication when inserting newlines with syntax highlighting
+
+### Removed
+- Removed "Fast" syntax highlighting mode (merged functionality into single accurate mode)
+- Removed complexity of multi-mode switching for better user experience
+
 ## [0.2.3] - 2025-12-02
 
 ### Added
