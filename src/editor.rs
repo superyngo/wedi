@@ -358,14 +358,32 @@ impl Editor {
             }
             Command::PageUp => {
                 let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                // 記錄光標在屏幕上的 Y 位置
+                let cursor_screen_y = self.view.get_cursor_screen_y(&self.cursor, &self.buffer);
+                // 翻頁並維持光標屏幕位置
+                let (new_row, new_visual_line_index) =
+                    self.view
+                        .scroll_page(-1, cursor_screen_y, &self.buffer, effective_rows);
+                // 更新光標位置
+                self.cursor.row = new_row;
+                self.cursor.visual_line_index = new_visual_line_index;
                 self.cursor
-                    .move_page_up(&self.buffer, &self.view, effective_rows);
+                    .set_position(&self.buffer, &self.view, new_row, self.cursor.col);
                 self.selection = None;
             }
             Command::PageDown => {
                 let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                // 記錄光標在屏幕上的 Y 位置
+                let cursor_screen_y = self.view.get_cursor_screen_y(&self.cursor, &self.buffer);
+                // 翻頁並維持光標屏幕位置
+                let (new_row, new_visual_line_index) =
+                    self.view
+                        .scroll_page(1, cursor_screen_y, &self.buffer, effective_rows);
+                // 更新光標位置
+                self.cursor.row = new_row;
+                self.cursor.visual_line_index = new_visual_line_index;
                 self.cursor
-                    .move_page_down(&self.buffer, &self.view, effective_rows);
+                    .set_position(&self.buffer, &self.view, new_row, self.cursor.col);
                 self.selection = None;
             }
 
@@ -433,13 +451,33 @@ impl Editor {
                     }
                     Direction::PageUp => {
                         let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                        let cursor_screen_y =
+                            self.view.get_cursor_screen_y(&self.cursor, &self.buffer);
+                        let (new_row, new_visual_line_index) = self.view.scroll_page(
+                            -1,
+                            cursor_screen_y,
+                            &self.buffer,
+                            effective_rows,
+                        );
+                        self.cursor.row = new_row;
+                        self.cursor.visual_line_index = new_visual_line_index;
                         self.cursor
-                            .move_page_up(&self.buffer, &self.view, effective_rows)
+                            .set_position(&self.buffer, &self.view, new_row, self.cursor.col);
                     }
                     Direction::PageDown => {
                         let effective_rows = self.view.get_effective_screen_rows(self.debug_mode);
+                        let cursor_screen_y =
+                            self.view.get_cursor_screen_y(&self.cursor, &self.buffer);
+                        let (new_row, new_visual_line_index) = self.view.scroll_page(
+                            1,
+                            cursor_screen_y,
+                            &self.buffer,
+                            effective_rows,
+                        );
+                        self.cursor.row = new_row;
+                        self.cursor.visual_line_index = new_visual_line_index;
                         self.cursor
-                            .move_page_down(&self.buffer, &self.view, effective_rows)
+                            .set_position(&self.buffer, &self.view, new_row, self.cursor.col);
                     }
                     Direction::TenthUp => {
                         let total_lines = self.buffer.line_count();
@@ -1294,7 +1332,11 @@ impl Editor {
 
     /// 獲取語法高亮後的行
     ///
-    /// 使用增量處理策略：智慧選擇起始行，維護語法狀態的正確性和效能平衡
+    /// 使用增量處理策略：
+    /// - 小檔案（≤500行）：從第 0 行開始，確保跨行語法正確性
+    /// - 大檔案跳轉首頁：從第 0 行開始
+    /// - 大檔案跳轉尾頁：只處理可見區域（犧牲少量正確性換取性能）
+    /// - 大檔案中間位置：從 start_row - BUFFER 開始
     #[cfg(feature = "syntax-highlighting")]
     pub fn get_highlighted_lines(
         &mut self,
@@ -1315,31 +1357,36 @@ impl Editor {
             return result;
         };
 
-        // 增量處理策略：智慧選擇起始行
-        // 1. 小檔案或接近檔案開頭：從第 0 行開始（保證正確性）
-        // 2. 大檔案：從 start_row - BUFFER 開始，平衡效能和正確性
+        // 增量處理策略常數
         const BUFFER_LINES: usize = 100; // 緩衝範圍
         const SMALL_FILE_THRESHOLD: usize = 500; // 小檔案閾值
+        const LARGE_FILE_JUMP_THRESHOLD: usize = 1000; // 大檔案跳轉閾值
 
         let total_lines = self.buffer.line_count();
         let is_small_file = total_lines <= SMALL_FILE_THRESHOLD;
         let is_near_start = start_row < BUFFER_LINES;
 
+        // 大檔案跳轉尾頁優化：直接從可見區域開始，不從頭處理
+        let is_large_file_end_jump =
+            !is_small_file && start_row > LARGE_FILE_JUMP_THRESHOLD && start_row > total_lines / 2;
+
         // 決定處理起始行
         let process_start = if is_small_file || is_near_start {
             0 // 小檔案或接近開頭，從第 0 行開始確保正確性
+        } else if is_large_file_end_jump {
+            // 大檔案跳轉尾頁：直接從可見區域開始
+            // 這可能導致跨行語法（如多行註解）顯示不正確，但大幅提升性能
+            start_row
         } else {
-            start_row.saturating_sub(BUFFER_LINES) // 大檔案，從緩衝區開始
+            start_row.saturating_sub(BUFFER_LINES) // 大檔案中間位置，從緩衝區開始
         };
 
         // 循序處理（維護跨行狀態）
         for row in process_start..=end_row.min(total_lines.saturating_sub(1)) {
             let line_text = match self.buffer.line(row) {
                 Some(line) => {
-                    // ⚠️ 重要：保留換行符！syntect 需要換行符才能正確解析語法狀態
-                    // 參考：與 cate 專案相同的修復
+                    // syntect 需要換行符才能正確解析語法狀態
                     let mut text = line.to_string();
-                    // 確保有換行符（syntect 需要）
                     if !text.ends_with('\n') && !text.ends_with("\r\n") {
                         text.push('\n');
                     }
@@ -1360,11 +1407,8 @@ impl Editor {
                 let _ = highlighter.highlight_line(&line_text);
             } else {
                 // 快取失效，重新高亮
-                let mut highlighted = highlighter.highlight_line(&line_text);
-
-                // ⚠️ 修復：去除末尾的換行符，避免在 Linux 終端產生殘影
-                // syntect 需要換行符來解析語法狀態，但渲染時不應輸出換行符
-                highlighted = highlighted.trim_end_matches(&['\n', '\r'][..]).to_string();
+                // 注意：engine.rs 已在 token 層級處理換行符，此處無需 trim
+                let highlighted = highlighter.highlight_line(&line_text);
 
                 // 更新快取
                 self.highlight_cache.insert(

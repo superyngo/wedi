@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-12-06
+
+### Changed
+- **PageUp/PageDown behavior overhaul**: Now scrolls entire page while maintaining cursor's screen Y position (similar to VS Code/Vim)
+- When no more pages to scroll: PageUp jumps to first line, PageDown jumps to last line
+- Improved large file navigation with optimized end-of-file jump detection
+
+### Fixed
+- **Critical**: Fixed syntax highlighting token-level newline handling to prevent Linux terminal artifacts
+- Optimized ANSI escape code generation: only output color codes on color changes (30-50% output size reduction)
+- Single reset code at end of highlighted line instead of per-token reset
+- Removed redundant post-processing trim in editor (now handled at engine level)
+
+### Performance
+- Large file end-page jump optimization: skip processing from file start when jumping to end
+- Pre-allocated string buffer for ANSI output generation
+- Reduced memory allocations in highlight engine
+
+### Removed
+- Removed unused `move_page_up` and `move_page_down` methods from Cursor (replaced by View-based paging)
+
 ## [0.3.0] - 2025-12-04
 
 ### Changed

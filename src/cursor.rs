@@ -112,39 +112,6 @@ impl Cursor {
         }
     }
 
-    pub fn move_page_up(&mut self, buffer: &RopeBuffer, view: &View, effective_rows: usize) {
-        let mut target_row = self.row;
-        let mut visual_count = 0;
-
-        // 向上累積視覺行直到達到約一個螢幕
-        while target_row > 0 && visual_count < effective_rows {
-            target_row -= 1;
-            let vlines = view.calculate_visual_lines_for_row(buffer, target_row);
-            visual_count += vlines.len();
-        }
-
-        self.row = target_row;
-        self.visual_line_index = 0;
-        self.update_logical_col_from_visual(buffer, view);
-    }
-
-    pub fn move_page_down(&mut self, buffer: &RopeBuffer, view: &View, effective_rows: usize) {
-        let max_row = buffer.line_count().saturating_sub(1);
-        let mut target_row = self.row;
-        let mut visual_count = 0;
-
-        // 向下累積視覺行直到達到約一個螢幕
-        while target_row < max_row && visual_count < effective_rows {
-            let vlines = view.calculate_visual_lines_for_row(buffer, target_row);
-            visual_count += vlines.len();
-            target_row += 1;
-        }
-
-        self.row = target_row.min(max_row);
-        self.visual_line_index = 0;
-        self.update_logical_col_from_visual(buffer, view);
-    }
-
     #[allow(dead_code)]
     pub fn move_to_line(&mut self, buffer: &RopeBuffer, view: &View, line: usize) {
         self.row = line.min(buffer.line_count().saturating_sub(1));

@@ -673,6 +673,164 @@ impl View {
         }
     }
 
+    /// 計算光標在屏幕上的視覺 Y 位置（從 offset_row 開始計算）
+    ///
+    /// 返回：屏幕上的視覺行號（0-based）
+    pub fn get_cursor_screen_y(&self, cursor: &Cursor, buffer: &RopeBuffer) -> usize {
+        let mut screen_y = 0;
+        let available_width = self.get_available_width(buffer);
+
+        // 從 offset_row 累計到 cursor.row 的視覺行數
+        for row in self.offset_row..cursor.row {
+            let cache_index = row.saturating_sub(self.offset_row);
+            let height = if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
+                layout.visual_height
+            } else if let Some(layout) = LineLayout::new(buffer, row, available_width) {
+                layout.visual_height
+            } else {
+                1
+            };
+            screen_y += height;
+        }
+
+        // 加上光標在當前行內的視覺行偏移
+        screen_y + cursor.visual_line_index
+    }
+
+    /// 根據屏幕 Y 位置找到對應的邏輯行和視覺行索引
+    ///
+    /// 返回：(邏輯行號, 視覺行索引)
+    pub fn get_row_at_screen_y(
+        &self,
+        target_screen_y: usize,
+        buffer: &RopeBuffer,
+    ) -> (usize, usize) {
+        let mut screen_y = 0;
+        let mut row = self.offset_row;
+        let available_width = self.get_available_width(buffer);
+        let max_row = buffer.line_count().saturating_sub(1);
+
+        while row <= max_row {
+            let cache_index = row.saturating_sub(self.offset_row);
+            let height = if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
+                layout.visual_height
+            } else if let Some(layout) = LineLayout::new(buffer, row, available_width) {
+                layout.visual_height
+            } else {
+                1
+            };
+
+            if screen_y + height > target_screen_y {
+                // 目標位置在這一行內
+                let visual_line_index = target_screen_y.saturating_sub(screen_y);
+                return (row, visual_line_index.min(height.saturating_sub(1)));
+            }
+
+            screen_y += height;
+            row += 1;
+        }
+
+        // 超出文件末尾，返回最後一行
+        (max_row, 0)
+    }
+
+    /// 翻頁：滾動 offset_row 並返回新的光標位置
+    ///
+    /// - `page_delta`: 正數向下翻頁，負數向上翻頁
+    /// - `cursor_screen_y`: 光標當前在屏幕上的 Y 位置
+    /// - 返回：新的 (邏輯行號, 視覺行索引)
+    ///
+    /// 當無頁可翻時：
+    /// - PageUp 且已在首頁：光標跳到第一行
+    /// - PageDown 且已在尾頁：光標跳到最後一行
+    pub fn scroll_page(
+        &mut self,
+        page_delta: isize,
+        cursor_screen_y: usize,
+        buffer: &RopeBuffer,
+        effective_rows: usize,
+    ) -> (usize, usize) {
+        let available_width = self.get_available_width(buffer);
+        let max_row = buffer.line_count().saturating_sub(1);
+        let old_offset = self.offset_row;
+
+        if page_delta > 0 {
+            // PageDown：向下翻頁
+            let mut visual_count = 0;
+            let mut new_offset = self.offset_row;
+
+            // 累計足夠的視覺行來滾動一頁
+            while new_offset <= max_row && visual_count < effective_rows {
+                let height =
+                    if let Some(layout) = LineLayout::new(buffer, new_offset, available_width) {
+                        layout.visual_height
+                    } else {
+                        1
+                    };
+                visual_count += height;
+                new_offset += 1;
+            }
+
+            // 計算最後一頁的起始位置
+            let mut last_page_offset = max_row;
+            let mut visual_from_end = 0;
+            while last_page_offset > 0 && visual_from_end < effective_rows {
+                last_page_offset -= 1;
+                let height =
+                    if let Some(layout) = LineLayout::new(buffer, last_page_offset, available_width)
+                    {
+                        layout.visual_height
+                    } else {
+                        1
+                    };
+                visual_from_end += height;
+            }
+            if visual_from_end < effective_rows {
+                last_page_offset = 0;
+            }
+
+            new_offset = new_offset.min(last_page_offset + 1).min(max_row);
+
+            // 檢查是否無頁可翻（已在最後一頁）
+            if new_offset == old_offset || old_offset >= last_page_offset {
+                // 無頁可翻，跳到最後一行
+                return (max_row, 0);
+            }
+
+            self.offset_row = new_offset;
+        } else {
+            // PageUp：向上翻頁
+
+            // 檢查是否已在第一頁
+            if self.offset_row == 0 {
+                // 無頁可翻，跳到第一行
+                return (0, 0);
+            }
+
+            let mut visual_count = 0;
+            let mut new_offset = self.offset_row;
+
+            // 累計足夠的視覺行來滾動一頁
+            while new_offset > 0 && visual_count < effective_rows {
+                new_offset -= 1;
+                let height =
+                    if let Some(layout) = LineLayout::new(buffer, new_offset, available_width) {
+                        layout.visual_height
+                    } else {
+                        1
+                    };
+                visual_count += height;
+            }
+
+            self.offset_row = new_offset;
+        }
+
+        self.invalidate_cache();
+
+        // 根據保持的屏幕 Y 位置計算新的光標行
+        self.get_row_at_screen_y(cursor_screen_y, buffer)
+    }
+
     /// 獲取cursor的視覺位置（螢幕座標）
     pub fn get_cursor_visual_position(
         &self,
