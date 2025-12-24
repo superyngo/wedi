@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-12-24
+
+### Added
+- **In-editor help dialog**: Press Ctrl+H to display keyboard shortcuts and usage guide
+  - Scrollable full-screen help dialog with all keyboard shortcuts
+  - Supports navigation with arrow keys, Page Up/Down, Home/End
+  - Press ESC to close and return to editing
+- Centralized help content system - both `--help` and Ctrl+H use the same source
+
+### Changed
+- Ctrl+H now opens help dialog (previously used as alternative for Home key)
+- Refactored help message system for consistency between CLI and in-editor help
+
 ## [0.4.0] - 2025-12-24
 
 ### Added

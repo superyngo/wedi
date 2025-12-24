@@ -10,6 +10,127 @@ use crossterm::{
 };
 use std::io::{self, Write};
 
+/// 顯示幫助對話框
+#[allow(dead_code)]
+pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
+    let (cols, rows) = terminal_size;
+
+    // 從 help 模組獲取幫助內容
+    let mut help_lines =
+        vec!["═══════════════════════ WEDI HELP ════════════════════════".to_string()];
+    help_lines.push(String::new());
+    help_lines.extend(crate::help::get_keyboard_shortcuts());
+    help_lines.push(String::new());
+    help_lines.push("Press ESC to close this help".to_string());
+    help_lines.push("═══════════════════════════════════════════════════════════".to_string());
+
+    let total_lines = help_lines.len();
+    let max_display_lines = (rows.saturating_sub(3)) as usize;
+    let mut scroll_offset = 0;
+
+    loop {
+        // 清除螢幕
+        execute!(io::stdout(), terminal::Clear(ClearType::All))?;
+
+        // 計算可顯示的行數
+        let visible_lines = total_lines.min(max_display_lines);
+        let end_line = (scroll_offset + visible_lines).min(total_lines);
+
+        // 顯示幫助內容
+        for (i, line) in help_lines[scroll_offset..end_line].iter().enumerate() {
+            queue!(
+                io::stdout(),
+                cursor::MoveTo(0, i as u16),
+                style::SetForegroundColor(Color::Cyan),
+            )?;
+
+            // 截斷過長的行
+            let display_line = if line.chars().count() > cols as usize {
+                line.chars().take(cols as usize).collect::<String>()
+            } else {
+                line.to_string()
+            };
+
+            queue!(io::stdout(), style::Print(display_line))?;
+        }
+
+        queue!(io::stdout(), style::ResetColor)?;
+
+        // 顯示滾動提示
+        if total_lines > max_display_lines {
+            let status_row = rows.saturating_sub(1);
+            queue!(
+                io::stdout(),
+                cursor::MoveTo(0, status_row),
+                style::SetBackgroundColor(Color::DarkBlue),
+                style::SetForegroundColor(Color::White),
+            )?;
+
+            let scroll_info = format!(
+                " Lines {}-{}/{} | Use ↑/↓ or PgUp/PgDn to scroll | ESC to close ",
+                scroll_offset + 1,
+                end_line,
+                total_lines
+            );
+
+            let padded = if scroll_info.len() < cols as usize {
+                format!(
+                    "{}{}",
+                    scroll_info,
+                    " ".repeat(cols as usize - scroll_info.len())
+                )
+            } else {
+                scroll_info.chars().take(cols as usize).collect()
+            };
+
+            queue!(io::stdout(), style::Print(padded), style::ResetColor)?;
+        }
+
+        io::stdout().flush()?;
+
+        // 處理按鍵
+        loop {
+            if let Event::Key(key_event) = event::read()? {
+                if key_event.kind != KeyEventKind::Press {
+                    continue;
+                }
+
+                match key_event.code {
+                    KeyCode::Esc => return Ok(()),
+                    KeyCode::Up => {
+                        scroll_offset = scroll_offset.saturating_sub(1);
+                        break;
+                    }
+                    KeyCode::Down => {
+                        if scroll_offset + max_display_lines < total_lines {
+                            scroll_offset += 1;
+                        }
+                        break;
+                    }
+                    KeyCode::PageUp => {
+                        scroll_offset = scroll_offset.saturating_sub(max_display_lines / 2);
+                        break;
+                    }
+                    KeyCode::PageDown => {
+                        scroll_offset = (scroll_offset + max_display_lines / 2)
+                            .min(total_lines.saturating_sub(max_display_lines));
+                        break;
+                    }
+                    KeyCode::Home => {
+                        scroll_offset = 0;
+                        break;
+                    }
+                    KeyCode::End => {
+                        scroll_offset = total_lines.saturating_sub(max_display_lines);
+                        break;
+                    }
+                    _ => break,
+                }
+            }
+        }
+    }
+}
+
 /// 顯示輸入對話框並獲取用戶輸入
 #[allow(dead_code)]
 pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
@@ -18,7 +139,11 @@ pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<Str
 
 /// 顯示輸入對話框並獲取用戶輸入，支持預設值
 #[allow(dead_code)]
-pub fn prompt_with_default(prompt_text: &str, default: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
+pub fn prompt_with_default(
+    prompt_text: &str,
+    default: &str,
+    terminal_size: (u16, u16),
+) -> Result<Option<String>> {
     let mut input = default.to_string();
     let mut cursor_pos = input.chars().count(); // 光標位置（字符索引）
     let (cols, rows) = terminal_size;
@@ -91,7 +216,8 @@ pub fn prompt_with_default(prompt_text: &str, default: &str, terminal_size: (u16
                     KeyCode::Backspace => {
                         // 刪除光標前的字符
                         if cursor_pos > 0 {
-                            let byte_pos = input.chars().take(cursor_pos - 1).collect::<String>().len();
+                            let byte_pos =
+                                input.chars().take(cursor_pos - 1).collect::<String>().len();
                             input.remove(byte_pos);
                             cursor_pos -= 1;
                         }
@@ -107,9 +233,7 @@ pub fn prompt_with_default(prompt_text: &str, default: &str, terminal_size: (u16
                     }
                     KeyCode::Left => {
                         // 向左移動光標
-                        if cursor_pos > 0 {
-                            cursor_pos -= 1;
-                        }
+                        cursor_pos = cursor_pos.saturating_sub(1);
                         break;
                     }
                     KeyCode::Right => {

@@ -161,6 +161,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('z'), KeyModifiers::CONTROL) => Some(Command::Undo),
         (KeyCode::Char('y'), KeyModifiers::CONTROL) => Some(Command::Redo),
         (KeyCode::Char('f'), KeyModifiers::CONTROL) => Some(Command::Find),
+        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ShowHelp),
         (KeyCode::Char('l'), KeyModifiers::CONTROL) => Some(Command::ToggleLineNumbers),
         (KeyCode::Char('g'), KeyModifiers::CONTROL) => Some(Command::GoToLine),
         (KeyCode::Char('a'), KeyModifiers::CONTROL) => Some(Command::SelectAll),

@@ -5,6 +5,7 @@ mod config;
 mod cursor;
 mod dialog;
 mod editor;
+mod help;
 mod highlight;
 mod input;
 mod search;
@@ -176,91 +177,7 @@ impl Args {
     }
 
     fn print_help() {
-        println!("wedi - A easy-to-use text editor");
-        println!();
-        println!("USAGE:");
-        println!("    wedi [OPTIONS] [FILE]");
-        println!();
-        println!("OPTIONS:");
-        println!("    -h, --help                         Show this help message");
-        println!("    -v, --version                      Show version information");
-        println!("    --debug                            Enable debug mode");
-        println!("    -e, --encoding <ENCODING>          Encoding for both reading and saving");
-        println!("                                       (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
-        println!(
-            "    -f, --from-encoding <ENCODING>     Encoding for reading files (overrides -e)"
-        );
-        println!("    -t, --to-encoding <ENCODING>       Encoding for saving files (overrides -e)");
-        #[cfg(feature = "syntax-highlighting")]
-        println!("    --theme <THEME>                    Set syntax highlighting theme");
-        #[cfg(feature = "syntax-highlighting")]
-        println!("    --list-themes                      List all available themes");
-        println!();
-        println!("KEYBOARD SHORTCUTS:");
-        println!();
-        println!("  Basic Editing:");
-        println!("    Ctrl+W              Save file");
-        println!("    Ctrl+Q              Quit (press twice if modified)");
-        println!("    Ctrl+Z              Undo");
-        println!("    Ctrl+Y              Redo");
-        println!("    Backspace           Delete character before cursor or selected text");
-        println!("    Delete              Delete character under cursor or selected text");
-        println!("    Ctrl+D              Delete current line or selected lines");
-        println!("    Tab                 Indent (insert 4 spaces or indent selected lines)");
-        println!("    Shift+Tab           Unindent (remove up to 4 leading spaces)");
-        println!();
-        println!("  Navigation:");
-        println!("    Arrow Keys          Move cursor");
-        println!("    Ctrl+Left/Home      Move to line start");
-        println!("    Ctrl+Right/End      Move to line end");
-        println!("    Ctrl+Up/Ctrl+Home   Move to first line");
-        println!("    Ctrl+Down/Ctrl+End  Move to last line");
-        println!("    Page Up/Down        Scroll page up/down");
-        println!("    Ctrl+PageUp/Down    Jump 1/10 of file");
-        println!("    Ctrl+G              Go to line number");
-        println!();
-        println!("  Selection:");
-        println!(
-            "    Ctrl+S              Toggle selection mode (for terminals without Shift support)"
-        );
-        println!("    Shift+Arrows        Select text");
-        println!("    Shift+Ctrl+Arrows   Quick select to line/file boundaries");
-        println!("    Shift+Home/End      Select to line boundaries");
-        println!("    Shift+Ctrl+Home/End Quick select to file boundaries");
-        println!("    Shift+PgUp/Dn       Select page up/down");
-        println!("    Ctrl+A              Select all");
-        println!("    ESC                 Clear selection and messages");
-        println!();
-        println!("  Clipboard:");
-        println!("    Ctrl+C              Copy (selection or current line)");
-        println!("    Ctrl+X              Cut (selection or current line)");
-        println!("    Ctrl+V              Paste");
-        println!("    Alt+C               Internal Copy (selection or current line)");
-        println!("    Alt+X               Internal Cut (selection or current line)");
-        println!("    Alt+V               Internal Paste");
-        println!();
-        println!("  Search:");
-        println!("    Ctrl+F                 Find text (with last search term pre-filled)");
-        println!("    PageDown / Ctrl+N      Find next match (or PageDown if no search)");
-        println!("    PageUp / Ctrl+P        Find previous match (or PageUp if no search)");
-        println!();
-        println!("  Code:");
-        println!("    Ctrl+/ \\ K         Toggle line comment");
-        println!("    Ctrl+L              Toggle line numbers");
-        #[cfg(feature = "syntax-highlighting")]
-        println!("    Ctrl+J              Toggle syntax highlight (Disabled/Fast/Accurate)");
-        println!();
-        println!("  Encoding:");
-        println!(
-            "    Ctrl+E              Change file encoding (utf-8, gbk, big5, shift-jis, etc.)"
-        );
-        println!();
-        println!("SUPPORTED COMMENT STYLES:");
-        println!("  //  - Rust, C/C++, Java, JavaScript, TypeScript, Go, C#");
-        println!("  #   - Python, Shell, PowerShell, Ruby, YAML, TOML");
-        println!("  --  - SQL, Lua, Haskell");
-        println!("  REM - Batch, CMD");
-        println!("  \"   - Vim");
+        help::print_help();
     }
 }
 

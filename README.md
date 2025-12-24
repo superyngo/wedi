@@ -13,11 +13,12 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Ctrl+S Selection Mode** (for terminals without Shift key support) 🎉
 - ✅ Smart line operations
 - ✅ **Undo/Redo (Ctrl+Z/Y)** 🎉
-- ✅ **Search functionality (Ctrl+F, F3)** 🎉
+- ✅ **Search functionality (Ctrl+F)** 🎉
 - ✅ **Comment toggling (Ctrl+K/\\//)** 🎉
 - ✅ **Go to line (Ctrl+G)** 🎉
 - ✅ **Tab/Shift+Tab indentation** 🎉
-- ✅ **Fast navigation (Ctrl+H/E, Ctrl+Arrows/Home/End)** 🎉
+- ✅ **Fast navigation (Ctrl+Arrows/Home/End)** 🎉
+- ✅ **In-editor help (Ctrl+H)** 🎉
 - ✅ **Chinese character support** 🎉
 - ✅ **Syntax highlighting (219+ languages)** 🎉
 - ✅ **Smart incremental syntax highlighting with cache optimization** 🎉
@@ -227,8 +228,8 @@ wedi --list-themes
 - **Arrow Keys**: Move cursor
 - **Ctrl+Up** / **Ctrl+Home**: Move to first line
 - **Ctrl+Down** / **Ctrl+End**: Move to last line
-- **Home** / **Ctrl+H**: Move to line start
-- **End** / **Ctrl+E**: Move to line end
+- **Home** / **Ctrl+Left**: Move to line start
+- **End** / **Ctrl+Right**: Move to line end
 - **Page Up / Page Down**: Scroll page up/down
 - **Ctrl+G**: Go to line number
 
@@ -239,11 +240,10 @@ wedi --list-themes
 - **Shift + Home / End**: Select to line start/end
 - **Shift + Page Up / Down**: Select page up/down
 - **Shift + Ctrl + Arrows**: Quick select to line/file start/end
-- **Shift + Ctrl + H / E**: Quick select to line start/end
 - **Ctrl+A**: Select all
 - **ESC**: Clear selection and messages
 
-> **Note**: In Ctrl+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows, Ctrl+H/E) will extend selection. Press Ctrl+S again, ESC, or perform any editing operation to exit selection mode.
+> **Note**: In Ctrl+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press Ctrl+S again, ESC, or perform any editing operation to exit selection mode.
 
 ### Clipboard
 
@@ -269,6 +269,10 @@ wedi --list-themes
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers
 - **Ctrl+J**: Toggle syntax highlighting (On/Off)
+
+### Help
+
+- **Ctrl+H**: Show in-editor help dialog with all keyboard shortcuts
 
 ## Supported Comment Styles
 
@@ -302,7 +306,7 @@ wedi provides intelligent syntax highlighting with automatic performance optimiz
 - **Cache Optimization**: Maintains highlighting cache for instant re-rendering
 - **Accurate Multi-line Syntax**: Correctly handles multi-line constructs (comments, strings, heredocs)
 
-Use **Ctrl+H** to toggle syntax highlighting on/off. The intelligent processing ensures both accuracy and performance automatically.
+Use **Ctrl+J** to toggle syntax highlighting on/off. The intelligent processing ensures both accuracy and performance automatically.
 
 ## Technical Stack
 

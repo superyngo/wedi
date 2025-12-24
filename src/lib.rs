@@ -11,6 +11,7 @@ mod comment;
 mod config;
 mod cursor;
 mod dialog;
+mod help;
 mod input;
 mod search;
 mod terminal;

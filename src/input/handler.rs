@@ -99,4 +99,7 @@ pub enum Command {
     // 語法高亮模式切換
     #[cfg(feature = "syntax-highlighting")]
     ToggleSyntaxHighlight,
+
+    // 顯示幫助
+    ShowHelp,
 }

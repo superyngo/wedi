@@ -13,7 +13,6 @@ use std::path::Path;
 #[cfg(feature = "syntax-highlighting")]
 use crate::highlight::{HighlightCache, HighlightConfig, HighlightEngine};
 
-
 pub struct Editor {
     buffer: RopeBuffer,
     cursor: Cursor,
@@ -685,7 +684,11 @@ impl Editor {
             Command::Find => {
                 // 獲取搜索查詢，使用上次的搜索詞作為預設值
                 let default_query = self.search.get_query();
-                if let Ok(Some(query)) = crate::dialog::prompt_with_default("Search:", default_query, self.terminal.size()) {
+                if let Ok(Some(query)) = crate::dialog::prompt_with_default(
+                    "Search:",
+                    default_query,
+                    self.terminal.size(),
+                ) {
                     if !query.is_empty() {
                         self.search.set_query(query.clone());
                         self.search.find_matches(&self.buffer);
@@ -1041,8 +1044,22 @@ impl Editor {
                 self.highlight_enabled = !self.highlight_enabled;
                 self.message = Some(format!(
                     "Syntax Highlight: {}",
-                    if self.highlight_enabled { "Enabled" } else { "Disabled" }
+                    if self.highlight_enabled {
+                        "Enabled"
+                    } else {
+                        "Disabled"
+                    }
                 ));
+            }
+
+            // 顯示幫助
+            Command::ShowHelp => {
+                // 保存當前終端狀態
+                if let Err(e) = crate::dialog::show_help(self.terminal.size()) {
+                    self.message = Some(format!("Failed to show help: {}", e));
+                }
+                // 重新繪製編輯器畫面
+                self.view.invalidate_cache();
             }
         }
 
@@ -1392,7 +1409,6 @@ impl Editor {
 
         result
     }
-
 
     /// 使語法高亮快取失效（編輯操作後調用）
     #[cfg(feature = "syntax-highlighting")]

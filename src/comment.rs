@@ -6,7 +6,7 @@ use std::path::Path;
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommentStyle {
-    Line(String), // 單行註解，如 "//"
+    Line(String),          // 單行註解，如 "//"
     Block(String, String), // 塊註解，如 "/*" 和 "*/"
 }
 
