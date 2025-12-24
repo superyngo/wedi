@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-12-24
+
+### Added
+- Smart search mode with state management (Ctrl+F to enter, ESC to exit)
+- Search query persistence - previous search term is automatically filled in next search
+- Cursor movement support in search dialog (Left/Right arrows, Home/End, Delete)
+- Smart navigation shortcuts:
+  - Ctrl+N/P: Jump to next/previous search result when in search mode, otherwise PageDown/PageUp
+  - PageUp/Down: Jump to search results when in search mode, otherwise normal paging
+
+### Changed
+- **BREAKING**: Changed syntax highlighting toggle from Ctrl+H to Ctrl+J
+- **BREAKING**: Removed F3/F4 keybindings (replaced by smart PageUp/Down and Ctrl+N/P)
+- Search mode now has explicit state - ESC exits search mode while preserving search results
+- Improved search dialog with full cursor editing capabilities
+
+### Fixed
+- Search mode now properly toggles between search navigation and normal paging
+- Search results are preserved until a new search is initiated
+
 ## [0.3.0] - 2025-12-04
 
 ### Changed

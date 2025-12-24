@@ -240,15 +240,15 @@ impl Args {
         println!("    Alt+V               Internal Paste");
         println!();
         println!("  Search:");
-        println!("    Ctrl+F              Find text");
-        println!("    F3                  Find next match");
-        println!("    F4                  Find previous match");
+        println!("    Ctrl+F                 Find text (with last search term pre-filled)");
+        println!("    PageDown / Ctrl+N      Find next match (or PageDown if no search)");
+        println!("    PageUp / Ctrl+P        Find previous match (or PageUp if no search)");
         println!();
         println!("  Code:");
         println!("    Ctrl+/ \\ K         Toggle line comment");
         println!("    Ctrl+L              Toggle line numbers");
         #[cfg(feature = "syntax-highlighting")]
-        println!("    Ctrl+H              Toggle syntax highlight (Disabled/Fast/Accurate)");
+        println!("    Ctrl+J              Toggle syntax highlight (Disabled/Fast/Accurate)");
         println!();
         println!("  Encoding:");
         println!(

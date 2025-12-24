@@ -78,6 +78,10 @@ impl Search {
     pub fn current_index(&self) -> usize {
         self.current_match
     }
+
+    pub fn get_query(&self) -> &str {
+        &self.query
+    }
 }
 
 impl Default for Search {

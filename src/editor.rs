@@ -22,6 +22,7 @@ pub struct Editor {
     clipboard: ClipboardManager,
     internal_clipboard: String, // 內部剪貼簿作為後備
     search: Search,
+    search_mode: bool, // 搜尋模式開關（Ctrl+F 開啟，ESC 關閉）
     comment_handler: CommentHandler,
     should_quit: bool,
     selection: Option<Selection>,
@@ -132,6 +133,7 @@ impl Editor {
             clipboard,
             internal_clipboard: String::new(), // 初始化內部剪貼簿
             search: Search::new(),
+            search_mode: false, // 預設關閉搜尋模式
             comment_handler,
             should_quit: false,
             selection: None,
@@ -499,6 +501,7 @@ impl Editor {
             Command::ClearMessage => {
                 self.selection = None;
                 self.selection_mode = false; // ESC 關閉選擇模式但保留選擇範圍
+                self.search_mode = false; // ESC 關閉搜尋模式（保留搜尋結果）
                 self.message = None;
             }
 
@@ -680,11 +683,13 @@ impl Editor {
 
             // 搜索
             Command::Find => {
-                // 獲取搜索查詢
-                if let Ok(Some(query)) = crate::dialog::prompt("Search:", self.terminal.size()) {
+                // 獲取搜索查詢，使用上次的搜索詞作為預設值
+                let default_query = self.search.get_query();
+                if let Ok(Some(query)) = crate::dialog::prompt_with_default("Search:", default_query, self.terminal.size()) {
                     if !query.is_empty() {
                         self.search.set_query(query.clone());
                         self.search.find_matches(&self.buffer);
+                        self.search_mode = true; // 開啟搜尋模式
 
                         if self.search.match_count() > 0 {
                             if let Some((row, col)) = self.search.next_match() {
@@ -692,48 +697,51 @@ impl Editor {
                                 self.cursor.col = col;
                                 self.cursor.desired_visual_col = col;
                                 self.message = Some(format!(
-                                    "Found {} matches (F3: next, Shift+F3: prev)",
+                                    "Found {} matches (ESC to exit search mode)",
                                     self.search.match_count()
                                 ));
                             }
                         } else {
                             self.message = Some(format!("No matches found for '{}'", query));
+                            self.search_mode = false; // 沒有結果就關閉搜尋模式
                         }
                     }
                 }
             }
 
             Command::FindNext => {
-                if self.search.match_count() > 0 {
+                if self.search_mode && self.search.match_count() > 0 {
                     if let Some((row, col)) = self.search.next_match() {
                         self.cursor.row = row;
                         self.cursor.col = col;
                         self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
-                            "Match {}/{}",
+                            "Match {}/{} (ESC to exit search mode)",
                             self.search.current_index() + 1,
                             self.search.match_count()
                         ));
                     }
                 } else {
-                    self.message = Some("No active search".to_string());
+                    // 沒有搜尋模式時，執行 PageDown
+                    return self.handle_command(Command::PageDown);
                 }
             }
 
             Command::FindPrev => {
-                if self.search.match_count() > 0 {
+                if self.search_mode && self.search.match_count() > 0 {
                     if let Some((row, col)) = self.search.prev_match() {
                         self.cursor.row = row;
                         self.cursor.col = col;
                         self.cursor.desired_visual_col = col;
                         self.message = Some(format!(
-                            "Match {}/{}",
+                            "Match {}/{} (ESC to exit search mode)",
                             self.search.current_index() + 1,
                             self.search.match_count()
                         ));
                     }
                 } else {
-                    self.message = Some("No active search".to_string());
+                    // 沒有搜尋模式時，執行 PageUp
+                    return self.handle_command(Command::PageUp);
                 }
             }
 

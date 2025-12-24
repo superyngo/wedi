@@ -74,8 +74,8 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Right, KeyModifiers::NONE) => Some(Command::MoveRight),
         (KeyCode::Home, KeyModifiers::NONE) => Some(Command::MoveHome),
         (KeyCode::End, KeyModifiers::NONE) => Some(Command::MoveEnd),
-        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::PageUp),
-        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::PageDown),
+        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::FindPrev),
+        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::FindNext),
 
         // Ctrl 快速移動
         (KeyCode::Up, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),
@@ -169,9 +169,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('/'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('k'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::ChangeEncoding),
-        // Ctrl+H: 切換語法高亮模式
+        // Ctrl+J: 切換語法高亮模式
         #[cfg(feature = "syntax-highlighting")]
-        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
+        (KeyCode::Char('j'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
 
         // 剪貼板操作
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),
@@ -188,9 +188,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),
 
-        // F3/F4 搜索導航
-        (KeyCode::F(3), KeyModifiers::NONE) => Some(Command::FindNext),
-        (KeyCode::F(4), KeyModifiers::NONE) => Some(Command::FindPrev),
+        // Ctrl+N/P: 智慧跳轉 (一般模式下等同PageDown/PageUp，搜尋模式下等同FindNext/FindPrev)
+        (KeyCode::Char('n'), KeyModifiers::CONTROL) => Some(Command::FindNext),
+        (KeyCode::Char('p'), KeyModifiers::CONTROL) => Some(Command::FindPrev),
 
         _ => None,
     }

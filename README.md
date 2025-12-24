@@ -256,15 +256,19 @@ wedi --list-themes
 
 ### Search
 
-- **Ctrl+F**: Find text
-- **F3**: Find next match
-- **Shift+F3**: Find previous match
+- **Ctrl+F**: Find text (shows search dialog with previous search term)
+- **PageUp/Down**: Smart navigation - jump to previous/next match in search mode, normal paging otherwise
+- **Ctrl+N**: Smart jump down - next search match in search mode, page down otherwise
+- **Ctrl+P**: Smart jump up - previous search match in search mode, page up otherwise
+- **ESC**: Exit search mode (preserves search results)
+
+> **Note**: Search mode is activated when you press Ctrl+F and find matches. Press ESC to exit search mode and return to normal navigation. The search query and results are preserved until you perform a new search.
 
 ### Code
 
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers
-- **Ctrl+H**: Toggle syntax highlighting (On/Off)
+- **Ctrl+J**: Toggle syntax highlighting (On/Off)
 
 ## Supported Comment Styles
 

@@ -13,7 +13,14 @@ use std::io::{self, Write};
 /// 顯示輸入對話框並獲取用戶輸入
 #[allow(dead_code)]
 pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
-    let mut input = String::new();
+    prompt_with_default(prompt_text, "", terminal_size)
+}
+
+/// 顯示輸入對話框並獲取用戶輸入，支持預設值
+#[allow(dead_code)]
+pub fn prompt_with_default(prompt_text: &str, default: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
+    let mut input = default.to_string();
+    let mut cursor_pos = input.chars().count(); // 光標位置（字符索引）
     let (cols, rows) = terminal_size;
     let dialog_row = rows.saturating_sub(2);
 
@@ -50,8 +57,8 @@ pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<Str
 
         queue!(io::stdout(), style::ResetColor)?;
 
-        // 設置光標位置
-        let cursor_x = (prompt_text.len() + 2 + input.len()).min(cols as usize - 1) as u16;
+        // 設置光標位置（基於字符位置，不是字節位置）
+        let cursor_x = (prompt_text.len() + 2 + cursor_pos).min(cols as usize - 1) as u16;
         execute!(io::stdout(), cursor::MoveTo(cursor_x, dialog_row))?;
         execute!(io::stdout(), cursor::Show)?;
 
@@ -75,13 +82,51 @@ pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<Str
                         return Ok(None);
                     }
                     KeyCode::Char(c) => {
-                        // 添加字符
-                        input.push(c);
+                        // 在光標位置插入字符
+                        let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
+                        input.insert(byte_pos, c);
+                        cursor_pos += 1;
                         break;
                     }
                     KeyCode::Backspace => {
-                        // 刪除字符
-                        input.pop();
+                        // 刪除光標前的字符
+                        if cursor_pos > 0 {
+                            let byte_pos = input.chars().take(cursor_pos - 1).collect::<String>().len();
+                            input.remove(byte_pos);
+                            cursor_pos -= 1;
+                        }
+                        break;
+                    }
+                    KeyCode::Delete => {
+                        // 刪除光標後的字符
+                        if cursor_pos < input.chars().count() {
+                            let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
+                            input.remove(byte_pos);
+                        }
+                        break;
+                    }
+                    KeyCode::Left => {
+                        // 向左移動光標
+                        if cursor_pos > 0 {
+                            cursor_pos -= 1;
+                        }
+                        break;
+                    }
+                    KeyCode::Right => {
+                        // 向右移動光標
+                        if cursor_pos < input.chars().count() {
+                            cursor_pos += 1;
+                        }
+                        break;
+                    }
+                    KeyCode::Home => {
+                        // 移動到開頭
+                        cursor_pos = 0;
+                        break;
+                    }
+                    KeyCode::End => {
+                        // 移動到結尾
+                        cursor_pos = input.chars().count();
                         break;
                     }
                     _ => {
