@@ -257,9 +257,8 @@ impl LineHighlighter {
             let fg = style.foreground;
 
             // 只在顏色變化時輸出色碼（效能優化）
-            let color_changed = last_color.is_none_or(|last| {
-                last.r != fg.r || last.g != fg.g || last.b != fg.b
-            });
+            let color_changed =
+                last_color.is_none_or(|last| last.r != fg.r || last.g != fg.g || last.b != fg.b);
 
             if color_changed {
                 if self.true_color {
@@ -447,12 +446,18 @@ mod tests {
         // 測試帶換行符的輸入
         let result = highlighter.highlight_line("fn main() {}\n");
         assert!(!result.contains('\n'), "Output should not contain newline");
-        assert!(!result.contains('\r'), "Output should not contain carriage return");
+        assert!(
+            !result.contains('\r'),
+            "Output should not contain carriage return"
+        );
 
         // 測試 Windows 換行符
         let result2 = highlighter.highlight_line("let x = 1;\r\n");
         assert!(!result2.contains('\n'), "Output should not contain newline");
-        assert!(!result2.contains('\r'), "Output should not contain carriage return");
+        assert!(
+            !result2.contains('\r'),
+            "Output should not contain carriage return"
+        );
     }
 
     #[test]
@@ -466,10 +471,16 @@ mod tests {
 
         // 應該只有一個 reset code（在最後）
         let reset_count = result.matches("\x1b[0m").count();
-        assert_eq!(reset_count, 1, "Should have exactly one reset code at the end");
+        assert_eq!(
+            reset_count, 1,
+            "Should have exactly one reset code at the end"
+        );
 
         // 確保輸出以 reset code 結尾
-        assert!(result.ends_with("\x1b[0m"), "Output should end with reset code");
+        assert!(
+            result.ends_with("\x1b[0m"),
+            "Output should end with reset code"
+        );
     }
 
     #[test]
@@ -482,10 +493,7 @@ mod tests {
         let result = highlighter.highlight_line("fn main() {}");
 
         // 應該使用 256 色格式 \x1b[38;5;XXXm
-        assert!(
-            result.contains("\x1b[38;5;"),
-            "Should use 256-color format"
-        );
+        assert!(result.contains("\x1b[38;5;"), "Should use 256-color format");
         // 不應該使用真彩色格式
         assert!(
             !result.contains("\x1b[38;2;"),
