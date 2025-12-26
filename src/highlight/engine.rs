@@ -9,7 +9,6 @@ use std::path::Path;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style, Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
-use syntect::util::as_24_bit_terminal_escaped;
 
 /// 嵌入的語法集（來自 bat 專案）
 ///
@@ -215,7 +214,7 @@ impl LineHighlighter {
         match self.inner.highlight_line(line, &SYNTAX_SET) {
             Ok(ranges) => {
                 if self.true_color {
-                    as_24_bit_terminal_escaped(&ranges[..], false)
+                    self.as_24bit_terminal_escaped(&ranges[..])
                 } else {
                     self.as_8bit_terminal_escaped(&ranges[..])
                 }
@@ -225,9 +224,29 @@ impl LineHighlighter {
                 if cfg!(debug_assertions) {
                     eprintln!("[WARN] Syntax highlighting failed: {}", e);
                 }
-                line.to_string()
+                line.trim_end_matches(&['\n', '\r'][..]).to_string()
             }
         }
+    }
+
+    /// 將 syntect 顏色轉為 24-bit ANSI 色碼（真彩色模式）
+    fn as_24bit_terminal_escaped(&self, ranges: &[(Style, &str)]) -> String {
+        let mut output = String::new();
+
+        for (style, text) in ranges {
+            // 跳過換行符，避免在終端產生殘影
+            // syntect 會把換行符作為獨立的 token 處理
+            if *text == "\n" || *text == "\r\n" || *text == "\r" {
+                continue;
+            }
+            let fg = style.foreground;
+            output.push_str(&format!(
+                "\x1b[38;2;{};{};{}m{}\x1b[0m",
+                fg.r, fg.g, fg.b, text
+            ));
+        }
+
+        output
     }
 
     /// 將 syntect 顏色轉為 8-bit ANSI 色碼（256 色模式）
@@ -235,6 +254,11 @@ impl LineHighlighter {
         let mut output = String::new();
 
         for (style, text) in ranges {
+            // 跳過換行符，避免在終端產生殘影
+            // syntect 會把換行符作為獨立的 token 處理
+            if *text == "\n" || *text == "\r\n" || *text == "\r" {
+                continue;
+            }
             // 使用 ansi_colours 庫進行精確的 RGB -> 256 色映射（與 bat 相同）
             let fg = style.foreground;
             let color_code = ansi_colours::ansi256_from_rgb((fg.r, fg.g, fg.b));
