@@ -1,5 +1,7 @@
+mod ansi_slice;
 mod line_wrapper;
 
+pub use ansi_slice::slice_ansi_text;
 #[allow(unused_imports)]
 pub use line_wrapper::LineWrapper;
 

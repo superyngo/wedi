@@ -21,36 +21,38 @@ impl Cursor {
     }
 
     pub fn move_up(&mut self, buffer: &RopeBuffer, view: &View) {
-        if self.visual_line_index > 0 {
-            // 在同一邏輯行內向上移動到上一個視覺行
+        if view.wrap_mode && self.visual_line_index > 0 {
+            // 多行模式：在視覺行間移動
             self.visual_line_index -= 1;
             self.update_logical_col_from_visual(buffer, view);
-        } else {
-            // 移動到上一個邏輯行
-            if self.row > 0 {
-                self.row -= 1;
-                // 移動到該邏輯行的最後一個視覺行
+        } else if self.row > 0 {
+            // 單行模式或已在第一個視覺行：移動到上一邏輯行
+            self.row -= 1;
+            if view.wrap_mode {
                 let visual_lines = view.calculate_visual_lines_for_row(buffer, self.row);
                 self.visual_line_index = visual_lines.len().saturating_sub(1);
-                self.update_logical_col_from_visual(buffer, view);
+            } else {
+                self.visual_line_index = 0; // 單行模式永遠 = 0
             }
+            self.update_logical_col_from_visual(buffer, view);
         }
     }
 
     pub fn move_down(&mut self, buffer: &RopeBuffer, view: &View) {
-        let visual_lines = view.calculate_visual_lines_for_row(buffer, self.row);
-
-        if self.visual_line_index + 1 < visual_lines.len() {
-            // 在同一邏輯行內向下移動到下一個視覺行
-            self.visual_line_index += 1;
-            self.update_logical_col_from_visual(buffer, view);
-        } else {
-            // 移動到下一個邏輯行
-            if self.row + 1 < buffer.line_count() {
-                self.row += 1;
-                self.visual_line_index = 0;
+        if view.wrap_mode {
+            let visual_lines = view.calculate_visual_lines_for_row(buffer, self.row);
+            if self.visual_line_index + 1 < visual_lines.len() {
+                self.visual_line_index += 1;
                 self.update_logical_col_from_visual(buffer, view);
+                return;
             }
+        }
+
+        // 移動到下一邏輯行
+        if self.row + 1 < buffer.line_count() {
+            self.row += 1;
+            self.visual_line_index = 0;
+            self.update_logical_col_from_visual(buffer, view);
         }
     }
 

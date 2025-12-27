@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2025-12-27
+
+### Added
+- **Single-line/Multi-line display mode toggle**: Press Ctrl+L to switch between modes
+  - **Multi-line mode (default)**: Shows line numbers, long lines wrap to next visual line
+  - **Single-line mode**: Hides line numbers, long lines scroll horizontally
+- **Horizontal scrolling** in single-line mode with automatic cursor following
+- **Full syntax highlighting support** in single-line mode using ANSI escape code slicing
+- New `src/utils/ansi_slice.rs` module for proper ANSI escape sequence handling
+
+### Fixed
+- Fixed syntax highlighting display bug in wrap mode where characters were duplicated at visual line boundaries
+- Syntax highlighting now correctly renders across all visual lines (previously only worked on first visual line)
+
+### Technical
+- Added `offset_col` and `wrap_mode` fields to View struct
+- Added `slice_ansi_text()` function for slicing text with ANSI codes by visual width
+- Modified `LineLayout::new()` to support wrap parameter
+- Updated cursor movement (`move_up`/`move_down`) to handle single-line mode correctly
+
 ## [0.5.0] - 2025-12-24
 
 ### Added

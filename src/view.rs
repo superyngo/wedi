@@ -1,7 +1,7 @@
 use crate::buffer::RopeBuffer;
 use crate::cursor::Cursor;
 use crate::terminal::Terminal;
-use crate::utils::visual_width;
+use crate::utils::{slice_ansi_text, visual_width};
 use anyhow::Result;
 use crossterm::{
     cursor, execute, queue,
@@ -13,6 +13,7 @@ use unicode_width::UnicodeWidthChar;
 // 視圖配置常量
 const TAB_WIDTH: usize = 4; // Tab 寬度（空格數）
 const CACHE_MULTIPLIER: usize = 3; // 緩存大小倍數（螢幕行數 × 倍數）
+const HORIZONTAL_SCROLL_MARGIN: usize = 5; // 水平滾動邊界預留
 
 #[derive(Clone, Debug)]
 pub struct LineLayout {
@@ -25,7 +26,7 @@ pub struct LineLayout {
 }
 
 impl LineLayout {
-    pub fn new(buffer: &RopeBuffer, row: usize, available_width: usize) -> Option<Self> {
+    pub fn new(buffer: &RopeBuffer, row: usize, available_width: usize, wrap: bool) -> Option<Self> {
         let line = buffer.line(row)?;
         let mut line_str = line.to_string();
         // 去掉結尾換行符
@@ -34,7 +35,11 @@ impl LineLayout {
         }
 
         let (displayed_line, logical_to_visual) = expand_tabs_and_build_map(&line_str);
-        let visual_lines = wrap_line(&displayed_line, available_width);
+        let visual_lines = if wrap {
+            wrap_line(&displayed_line, available_width)
+        } else {
+            vec![displayed_line] // 單行模式：不切分
+        };
         let visual_height = visual_lines.len();
 
         Some(LineLayout {
@@ -90,7 +95,9 @@ pub struct Selection {
 
 pub struct View {
     pub offset_row: usize, // 視窗頂部顯示的行號（邏輯行）
+    pub offset_col: usize, // 水平偏移（單行模式用）
     pub show_line_numbers: bool,
+    pub wrap_mode: bool, // 換行模式（true=多行換行, false=單行水平滾動）
     pub screen_rows: usize,
     pub screen_cols: usize,
     // 行快取：從 offset_row 起往下的數行
@@ -105,7 +112,9 @@ impl View {
 
         Self {
             offset_row: 0,
+            offset_col: 0,
             show_line_numbers: true,
+            wrap_mode: true,
             screen_rows,
             screen_cols: cols as usize,
             line_layout_cache: vec![None; cache_size],
@@ -235,7 +244,7 @@ impl View {
 
             let layout = if let Some(layout) = layout_opt {
                 layout
-            } else if let Some(new_layout) = LineLayout::new(buffer, file_row, available_width) {
+            } else if let Some(new_layout) = LineLayout::new(buffer, file_row, available_width, self.wrap_mode) {
                 if cache_index < self.line_layout_cache.len() {
                     self.line_layout_cache[cache_index] = Some(new_layout.clone());
                 }
@@ -271,9 +280,17 @@ impl View {
                 // 渲染視覺行，支持 selection 高亮和語法高亮
 
                 // 檢查是否有語法高亮（無選擇時）
+                // 計算這個 visual_line 在邏輯行中的視覺起始位置
+                let visual_line_start_col: usize = layout
+                    .visual_lines
+                    .iter()
+                    .take(visual_idx)
+                    .map(|line| visual_width(line))
+                    .sum();
+                let visual_line_width = visual_width(visual_line);
+
                 #[cfg(feature = "syntax-highlighting")]
                 let use_syntax_highlight = selection.is_none()
-                    && visual_idx == 0  // 只在第一個 visual line 使用（簡化處理）
                     && highlighted_lines.and_then(|h| h.get(&file_row)).is_some();
 
                 #[cfg(not(feature = "syntax-highlighting"))]
@@ -282,19 +299,22 @@ impl View {
                 if let Some(((start_row, start_col), (end_row, end_col))) = sel_visual_range {
                     if file_row >= start_row && file_row <= end_row {
                         // 這一行有選擇，需要逐字符渲染
-                        // 計算這個visual_line在整個邏輯行中的視覺起始位置
-                        let visual_line_start: usize = layout
-                            .visual_lines
-                            .iter()
-                            .take(visual_idx)
-                            .map(|line| visual_width(line))
-                            .sum();
-
                         let chars: Vec<char> = visual_line.chars().collect();
-                        let mut current_visual_pos = visual_line_start;
+                        let mut current_visual_pos = visual_line_start_col;
 
                         for &ch in chars.iter() {
                             let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+
+                            // 單行模式：跳過 offset_col 之前的字符
+                            if !self.wrap_mode && current_visual_pos + ch_width <= self.offset_col {
+                                current_visual_pos += ch_width;
+                                continue;
+                            }
+
+                            // 單行模式：超出可見範圍則停止
+                            if !self.wrap_mode && current_visual_pos >= self.offset_col + available_width {
+                                break;
+                            }
 
                             // 判斷這個字符是否在選擇範圍內
                             let is_selected = if file_row == start_row && file_row == end_row {
@@ -322,8 +342,13 @@ impl View {
                             current_visual_pos += ch_width;
                         }
                     } else {
-                        // 這一行沒有選擇，直接打印
-                        queue!(stdout, style::Print(visual_line))?;
+                        // 這一行沒有選擇，直接打印（單行模式需要截取）
+                        let display_text = if self.wrap_mode {
+                            visual_line.clone()
+                        } else {
+                            self.slice_visible_text(visual_line, self.offset_col, available_width)
+                        };
+                        queue!(stdout, style::Print(display_text))?;
                     }
                 } else {
                     // 沒有選擇
@@ -332,18 +357,42 @@ impl View {
                         #[cfg(feature = "syntax-highlighting")]
                         if let Some(highlighted) = highlighted_lines.and_then(|h| h.get(&file_row))
                         {
-                            // 輸出高亮後的文字（包含 ANSI 色碼）
-                            queue!(stdout, style::Print(highlighted))?;
+                            if self.wrap_mode {
+                                // 多行模式：截取當前視覺行對應的部分
+                                let sliced = slice_ansi_text(highlighted, visual_line_start_col, visual_line_width);
+                                queue!(stdout, style::Print(sliced))?;
+                            } else {
+                                // 單行模式：使用 ANSI 切割函數截取可見部分
+                                let sliced = slice_ansi_text(highlighted, self.offset_col, available_width);
+                                queue!(stdout, style::Print(sliced))?;
+                            }
                         } else {
                             // 降級為純文字
-                            queue!(stdout, style::Print(visual_line))?;
+                            let display_text = if self.wrap_mode {
+                                visual_line.to_string()
+                            } else {
+                                self.slice_visible_text(visual_line, self.offset_col, available_width)
+                            };
+                            queue!(stdout, style::Print(display_text))?;
                         }
 
                         #[cfg(not(feature = "syntax-highlighting"))]
-                        queue!(stdout, style::Print(visual_line))?;
+                        {
+                            let display_text = if self.wrap_mode {
+                                visual_line.to_string()
+                            } else {
+                                self.slice_visible_text(visual_line, self.offset_col, available_width)
+                            };
+                            queue!(stdout, style::Print(display_text))?;
+                        }
                     } else {
                         // 純文字渲染
-                        queue!(stdout, style::Print(visual_line))?;
+                        let display_text = if self.wrap_mode {
+                            visual_line.to_string()
+                        } else {
+                            self.slice_visible_text(visual_line, self.offset_col, available_width)
+                        };
+                        queue!(stdout, style::Print(display_text))?;
                     }
                 }
 
@@ -389,6 +438,9 @@ impl View {
         buffer: &RopeBuffer,
         has_debug_ruler: bool,
     ) {
+        // 水平滾動（單行模式）
+        self.scroll_horizontal_if_needed(cursor, buffer);
+
         // 向上滾動
         if cursor.row < self.offset_row {
             self.offset_row = cursor.row;
@@ -419,7 +471,7 @@ impl View {
             let cache_index = row.saturating_sub(self.offset_row);
             if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
                 visual_offset += layout.visual_height;
-            } else if let Some(layout) = LineLayout::new(buffer, row, available_width) {
+            } else if let Some(layout) = LineLayout::new(buffer, row, available_width, self.wrap_mode) {
                 visual_offset += layout.visual_height;
                 if cache_index < self.line_layout_cache.len() {
                     self.line_layout_cache[cache_index] = Some(layout);
@@ -442,7 +494,7 @@ impl View {
 
             if let Some(layout) = top_layout_opt {
                 visual_offset = visual_offset.saturating_sub(layout.visual_height);
-            } else if let Some(layout) = LineLayout::new(buffer, self.offset_row, available_width) {
+            } else if let Some(layout) = LineLayout::new(buffer, self.offset_row, available_width, self.wrap_mode) {
                 visual_offset = visual_offset.saturating_sub(layout.visual_height);
                 if !self.line_layout_cache.is_empty() {
                     self.line_layout_cache[0] = Some(layout);
@@ -455,6 +507,35 @@ impl View {
                 self.line_layout_cache.remove(0);
                 self.line_layout_cache.push(None);
             }
+        }
+    }
+
+    /// 水平滾動（單行模式專用）
+    pub fn scroll_horizontal_if_needed(&mut self, cursor: &Cursor, buffer: &RopeBuffer) {
+        if self.wrap_mode {
+            self.offset_col = 0;
+            return;
+        }
+
+        let available_width = self.get_available_width(buffer);
+
+        // 計算游標的視覺列
+        let line = buffer
+            .line(cursor.row)
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let line = line.trim_end_matches(['\n', '\r']);
+        let cursor_visual_col = self.logical_col_to_visual_col(line, cursor.col);
+
+        // 游標超出右邊界
+        if cursor_visual_col >= self.offset_col + available_width - HORIZONTAL_SCROLL_MARGIN {
+            self.offset_col = cursor_visual_col
+                .saturating_sub(available_width - HORIZONTAL_SCROLL_MARGIN - 1);
+        }
+
+        // 游標超出左邊界
+        if cursor_visual_col < self.offset_col + HORIZONTAL_SCROLL_MARGIN {
+            self.offset_col = cursor_visual_col.saturating_sub(HORIZONTAL_SCROLL_MARGIN);
         }
     }
 
@@ -522,6 +603,35 @@ impl View {
 
     pub fn toggle_line_numbers(&mut self) {
         self.show_line_numbers = !self.show_line_numbers;
+        self.wrap_mode = self.show_line_numbers; // 連動切換換行模式
+        self.offset_col = 0; // 重置水平偏移
+        self.invalidate_cache();
+    }
+
+    /// 截取可見文字（處理中文寬度，用於單行模式）
+    fn slice_visible_text(&self, text: &str, start_col: usize, width: usize) -> String {
+        let mut result = String::new();
+        let mut current_col = 0;
+
+        for ch in text.chars() {
+            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+
+            // 跳過 offset 之前的字符
+            if current_col + ch_width <= start_col {
+                current_col += ch_width;
+                continue;
+            }
+
+            // 超出可見範圍則停止
+            if current_col >= start_col + width {
+                break;
+            }
+
+            result.push(ch);
+            current_col += ch_width;
+        }
+
+        result
     }
 
     /// 計算行號寬度（包含右側空格）
@@ -561,7 +671,11 @@ impl View {
         }
 
         let (displayed_line, _) = expand_tabs_and_build_map(&line);
-        wrap_line(&displayed_line, available_width)
+        if self.wrap_mode {
+            wrap_line(&displayed_line, available_width)
+        } else {
+            vec![displayed_line]
+        }
     }
 
     /// 將邏輯列轉換為視覺列（考慮 Tab 展開和字符寬度）
@@ -696,7 +810,7 @@ impl View {
             let layout = if let Some(layout) = layout_opt {
                 layout
             } else {
-                LineLayout::new(buffer, file_row, self.get_available_width(buffer)).unwrap_or_else(
+                LineLayout::new(buffer, file_row, self.get_available_width(buffer), self.wrap_mode).unwrap_or_else(
                     || LineLayout {
                         visual_lines: vec![String::new()],
                         visual_height: 1,
@@ -737,8 +851,15 @@ impl View {
             // 在當前視覺行內的col
             let visual_col_in_line = cursor_visual_col.saturating_sub(accumulated_width);
 
+            // 單行模式：減去水平偏移
+            let adjusted_col = if self.wrap_mode {
+                visual_col_in_line
+            } else {
+                visual_col_in_line.saturating_sub(self.offset_col)
+            };
+
             // 加上行號寬度
-            screen_x += visual_col_in_line;
+            screen_x += adjusted_col;
         }
 
         (screen_x, screen_y)
