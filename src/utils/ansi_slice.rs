@@ -116,7 +116,10 @@ pub fn slice_ansi_text(text: &str, start_col: usize, width: usize) -> String {
 }
 
 /// 收集完整的 ANSI escape sequence
-fn collect_escape_sequence(first_char: char, chars: &mut std::iter::Peekable<std::str::Chars>) -> String {
+fn collect_escape_sequence(
+    first_char: char,
+    chars: &mut std::iter::Peekable<std::str::Chars>,
+) -> String {
     let mut seq = String::new();
     seq.push(first_char); // '\x1b'
 

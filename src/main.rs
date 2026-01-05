@@ -209,7 +209,7 @@ impl Args {
                 println!();
             }
         }
-        if syntaxes.len() % cols != 0 {
+        if !syntaxes.len().is_multiple_of(cols) {
             println!();
         }
 

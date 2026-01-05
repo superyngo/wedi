@@ -26,7 +26,12 @@ pub struct LineLayout {
 }
 
 impl LineLayout {
-    pub fn new(buffer: &RopeBuffer, row: usize, available_width: usize, wrap: bool) -> Option<Self> {
+    pub fn new(
+        buffer: &RopeBuffer,
+        row: usize,
+        available_width: usize,
+        wrap: bool,
+    ) -> Option<Self> {
         let line = buffer.line(row)?;
         let mut line_str = line.to_string();
         // 去掉結尾換行符
@@ -244,7 +249,9 @@ impl View {
 
             let layout = if let Some(layout) = layout_opt {
                 layout
-            } else if let Some(new_layout) = LineLayout::new(buffer, file_row, available_width, self.wrap_mode) {
+            } else if let Some(new_layout) =
+                LineLayout::new(buffer, file_row, available_width, self.wrap_mode)
+            {
                 if cache_index < self.line_layout_cache.len() {
                     self.line_layout_cache[cache_index] = Some(new_layout.clone());
                 }
@@ -312,7 +319,9 @@ impl View {
                             }
 
                             // 單行模式：超出可見範圍則停止
-                            if !self.wrap_mode && current_visual_pos >= self.offset_col + available_width {
+                            if !self.wrap_mode
+                                && current_visual_pos >= self.offset_col + available_width
+                            {
                                 break;
                             }
 
@@ -359,11 +368,16 @@ impl View {
                         {
                             if self.wrap_mode {
                                 // 多行模式：截取當前視覺行對應的部分
-                                let sliced = slice_ansi_text(highlighted, visual_line_start_col, visual_line_width);
+                                let sliced = slice_ansi_text(
+                                    highlighted,
+                                    visual_line_start_col,
+                                    visual_line_width,
+                                );
                                 queue!(stdout, style::Print(sliced))?;
                             } else {
                                 // 單行模式：使用 ANSI 切割函數截取可見部分
-                                let sliced = slice_ansi_text(highlighted, self.offset_col, available_width);
+                                let sliced =
+                                    slice_ansi_text(highlighted, self.offset_col, available_width);
                                 queue!(stdout, style::Print(sliced))?;
                             }
                         } else {
@@ -371,7 +385,11 @@ impl View {
                             let display_text = if self.wrap_mode {
                                 visual_line.to_string()
                             } else {
-                                self.slice_visible_text(visual_line, self.offset_col, available_width)
+                                self.slice_visible_text(
+                                    visual_line,
+                                    self.offset_col,
+                                    available_width,
+                                )
                             };
                             queue!(stdout, style::Print(display_text))?;
                         }
@@ -381,7 +399,11 @@ impl View {
                             let display_text = if self.wrap_mode {
                                 visual_line.to_string()
                             } else {
-                                self.slice_visible_text(visual_line, self.offset_col, available_width)
+                                self.slice_visible_text(
+                                    visual_line,
+                                    self.offset_col,
+                                    available_width,
+                                )
                             };
                             queue!(stdout, style::Print(display_text))?;
                         }
@@ -471,7 +493,9 @@ impl View {
             let cache_index = row.saturating_sub(self.offset_row);
             if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
                 visual_offset += layout.visual_height;
-            } else if let Some(layout) = LineLayout::new(buffer, row, available_width, self.wrap_mode) {
+            } else if let Some(layout) =
+                LineLayout::new(buffer, row, available_width, self.wrap_mode)
+            {
                 visual_offset += layout.visual_height;
                 if cache_index < self.line_layout_cache.len() {
                     self.line_layout_cache[cache_index] = Some(layout);
@@ -494,7 +518,9 @@ impl View {
 
             if let Some(layout) = top_layout_opt {
                 visual_offset = visual_offset.saturating_sub(layout.visual_height);
-            } else if let Some(layout) = LineLayout::new(buffer, self.offset_row, available_width, self.wrap_mode) {
+            } else if let Some(layout) =
+                LineLayout::new(buffer, self.offset_row, available_width, self.wrap_mode)
+            {
                 visual_offset = visual_offset.saturating_sub(layout.visual_height);
                 if !self.line_layout_cache.is_empty() {
                     self.line_layout_cache[0] = Some(layout);
@@ -529,8 +555,8 @@ impl View {
 
         // 游標超出右邊界
         if cursor_visual_col >= self.offset_col + available_width - HORIZONTAL_SCROLL_MARGIN {
-            self.offset_col = cursor_visual_col
-                .saturating_sub(available_width - HORIZONTAL_SCROLL_MARGIN - 1);
+            self.offset_col =
+                cursor_visual_col.saturating_sub(available_width - HORIZONTAL_SCROLL_MARGIN - 1);
         }
 
         // 游標超出左邊界
@@ -810,13 +836,17 @@ impl View {
             let layout = if let Some(layout) = layout_opt {
                 layout
             } else {
-                LineLayout::new(buffer, file_row, self.get_available_width(buffer), self.wrap_mode).unwrap_or_else(
-                    || LineLayout {
-                        visual_lines: vec![String::new()],
-                        visual_height: 1,
-                        logical_to_visual: vec![0],
-                    },
+                LineLayout::new(
+                    buffer,
+                    file_row,
+                    self.get_available_width(buffer),
+                    self.wrap_mode,
                 )
+                .unwrap_or_else(|| LineLayout {
+                    visual_lines: vec![String::new()],
+                    visual_height: 1,
+                    logical_to_visual: vec![0],
+                })
             };
 
             screen_y += layout.visual_height;

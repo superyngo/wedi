@@ -1,4 +1,6 @@
-use anyhow::{anyhow, Result};
+#[cfg(windows)]
+use anyhow::anyhow;
+use anyhow::Result;
 
 // ────────────────────────────────────────────────────────────────
 // Clipboard Manager
@@ -83,7 +85,7 @@ impl ClipboardManager {
             if result.is_err() {
                 // Fallback to xclip
                 let mut child = std::process::Command::new("xclip")
-                    .args(&["-selection", "clipboard"])
+                    .args(["-selection", "clipboard"])
                     .stdin(std::process::Stdio::piped())
                     .spawn()?;
 
@@ -155,7 +157,7 @@ impl ClipboardManager {
                 Err(_) => {
                     // Fallback to xclip
                     let output = std::process::Command::new("xclip")
-                        .args(&["-selection", "clipboard", "-o"])
+                        .args(["-selection", "clipboard", "-o"])
                         .output()?;
                     Ok(String::from_utf8_lossy(&output.stdout).to_string())
                 }
