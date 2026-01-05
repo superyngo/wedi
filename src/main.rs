@@ -85,6 +85,8 @@ struct Args {
     #[cfg(feature = "syntax-highlighting")]
     theme: Option<String>,
     #[cfg(feature = "syntax-highlighting")]
+    language: Option<String>,
+    #[cfg(feature = "syntax-highlighting")]
     #[allow(dead_code)]
     list_themes: bool,
 }
@@ -112,11 +114,20 @@ impl Args {
             std::process::exit(0);
         }
 
+        // 檢查是否有 --list-languages
+        #[cfg(feature = "syntax-highlighting")]
+        if pargs.contains("--list-languages") {
+            Self::print_languages();
+            std::process::exit(0);
+        }
+
         let debug = pargs.contains("--debug");
 
         // 解析主題參數
         #[cfg(feature = "syntax-highlighting")]
         let theme = pargs.opt_value_from_str("--theme")?;
+        #[cfg(feature = "syntax-highlighting")]
+        let language = pargs.opt_value_from_str(["-l", "--language"])?;
         #[cfg(feature = "syntax-highlighting")]
         let list_themes = false; // 已在上面處理
 
@@ -149,6 +160,8 @@ impl Args {
             #[cfg(feature = "syntax-highlighting")]
             theme,
             #[cfg(feature = "syntax-highlighting")]
+            language,
+            #[cfg(feature = "syntax-highlighting")]
             list_themes,
         })
     }
@@ -174,6 +187,37 @@ impl Args {
         println!("\nUsage: wedi --theme <THEME_NAME> <FILE>");
         println!("Example: wedi --theme \"Solarized (dark)\" myfile.rs");
         println!("\nDefault theme: base16-eighties.dark");
+    }
+
+    #[cfg(feature = "syntax-highlighting")]
+    fn print_languages() {
+        use highlight::HighlightEngine;
+
+        println!("Available syntax highlighting languages:\n");
+
+        let mut syntaxes = HighlightEngine::available_syntaxes();
+        syntaxes.sort();
+
+        // 顯示為多欄格式
+        let max_len = syntaxes.iter().map(|s| s.len()).max().unwrap_or(20);
+        let col_width = max_len + 2;
+        let cols = 3;
+
+        for (i, syntax) in syntaxes.iter().enumerate() {
+            print!("{:<width$}", syntax, width = col_width);
+            if (i + 1) % cols == 0 {
+                println!();
+            }
+        }
+        if syntaxes.len() % cols != 0 {
+            println!();
+        }
+
+        println!("\nTotal: {} languages", syntaxes.len());
+        println!("\nUsage: wedi -l <LANGUAGE> <FILE>");
+        println!("       wedi --language <LANGUAGE> <FILE>");
+        println!("Example: wedi -l rust script");
+        println!("         wedi --language python myfile.txt");
     }
 
     fn print_help() {
@@ -210,6 +254,8 @@ fn main() -> Result<()> {
         &encoding_config,
         #[cfg(feature = "syntax-highlighting")]
         args.theme.as_deref(),
+        #[cfg(feature = "syntax-highlighting")]
+        args.language.as_deref(),
     )?;
 
     // 設置 panic hook 以確保終端正常恢復

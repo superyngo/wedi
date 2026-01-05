@@ -104,6 +104,10 @@ pub fn print_help() {
     println!("    --theme <THEME>                    Set syntax highlighting theme");
     #[cfg(feature = "syntax-highlighting")]
     println!("    --list-themes                      List all available themes");
+    #[cfg(feature = "syntax-highlighting")]
+    println!("    -l, --language <LANG>              Set syntax highlighting language");
+    #[cfg(feature = "syntax-highlighting")]
+    println!("    --list-languages                   List all available languages");
     println!();
     println!("KEYBOARD SHORTCUTS:");
     println!();

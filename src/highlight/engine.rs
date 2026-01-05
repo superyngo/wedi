@@ -63,6 +63,40 @@ impl HighlightEngine {
         self.current_syntax = self.detect_syntax_from_path(file_path);
     }
 
+    /// 手動設定語法（透過語法名稱或副檔名）
+    ///
+    /// 嘗試順序：
+    /// 1. 精確匹配語法名稱（如 "Rust", "Python"）
+    /// 2. 匹配副檔名（如 "rs", "py"）
+    /// 3. 不區分大小寫匹配語法名稱
+    pub fn set_syntax_by_name(&mut self, language: &str) -> Result<()> {
+        // 1. 嘗試精確匹配語法名稱
+        if let Some(syntax) = SYNTAX_SET.find_syntax_by_name(language) {
+            self.current_syntax = Some(syntax);
+            return Ok(());
+        }
+
+        // 2. 嘗試匹配副檔名
+        if let Some(syntax) = SYNTAX_SET.find_syntax_by_extension(language) {
+            self.current_syntax = Some(syntax);
+            return Ok(());
+        }
+
+        // 3. 不區分大小寫匹配語法名稱
+        let language_lower = language.to_lowercase();
+        for syntax in SYNTAX_SET.syntaxes() {
+            if syntax.name.to_lowercase() == language_lower {
+                self.current_syntax = Some(syntax);
+                return Ok(());
+            }
+        }
+
+        anyhow::bail!(
+            "Language '{}' not found. Use --list-languages to see available options.",
+            language
+        )
+    }
+
     /// 從檔案路徑檢測語法
     fn detect_syntax_from_path(
         &self,

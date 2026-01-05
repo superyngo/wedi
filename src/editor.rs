@@ -48,6 +48,7 @@ impl Editor {
         debug_mode: bool,
         encoding_config: &EncodingConfig,
         #[cfg(feature = "syntax-highlighting")] theme: Option<&str>,
+        #[cfg(feature = "syntax-highlighting")] language: Option<&str>,
     ) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
             // 使用新的方法，支持指定編碼
@@ -116,9 +117,21 @@ impl Editor {
                 None
             };
 
-            // 如果有檔案，設定語法類型
-            if let (Some(path), Some(ref mut eng)) = (file_path, engine.as_mut()) {
-                eng.set_file(Some(path));
+            // 設定語法類型：優先使用命令列指定的語言，否則從檔案路徑自動檢測
+            if let Some(ref mut eng) = engine.as_mut() {
+                if let Some(lang) = language {
+                    // 使用者指定了語言，嘗試設定
+                    if let Err(e) = eng.set_syntax_by_name(lang) {
+                        eprintln!("Warning: {}", e);
+                        // 失敗時回退到自動檢測
+                        if let Some(path) = file_path {
+                            eng.set_file(Some(path));
+                        }
+                    }
+                } else if let Some(path) = file_path {
+                    // 沒有指定語言，從檔案路徑自動檢測
+                    eng.set_file(Some(path));
+                }
             }
 
             (engine, HighlightCache::new(), config)
