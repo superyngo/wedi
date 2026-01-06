@@ -27,28 +27,36 @@ A lightweight, easy-to-use console text editor written in Rust.
 
 ## Installation
 
+### Using Wenget
+
+You can install wedi using [Wenget](https://github.com/superyngo/Wenget).
+
+### Using Winget
+
+You can install wedi using Winget (Windows Package Manager).
+
 ### Quick Install (One-Line Command)
 
 #### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/superyngo/wedi/main/install.ps1 | iex
+$env:APP_NAME="wedi"; $env:REPO="superyngo/wedi"; $env:UNINSTALL="false"; irm https://gist.githubusercontent.com/superyngo/a6b786af38b8b4c2ce15a70ae5387bd7/raw/gpinstall.ps1 | iex
 ```
 
 **Uninstall:**
 ```powershell
-irm https://raw.githubusercontent.com/superyngo/wedi/main/install.ps1 | iex -Uninstall
+$env:APP_NAME="wedi"; $env:REPO="superyngo/wedi"; $env:UNINSTALL="true"; irm https://gist.githubusercontent.com/superyngo/a6b786af38b8b4c2ce15a70ae5387bd7/raw/gpinstall.ps1 | iex
 ```
 
 #### Linux / macOS (Bash)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/superyngo/wedi/main/install.sh | bash
+curl -fsSL https://gist.githubusercontent.com/superyngo/a6b786af38b8b4c2ce15a70ae5387bd7/raw/gpinstall.sh | APP_NAME="wedi" REPO="superyngo/wedi" bash
 ```
 
 **Uninstall:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/superyngo/wedi/main/install.sh | bash -s uninstall
+curl -fsSL https://gist.githubusercontent.com/superyngo/a6b786af38b8b4c2ce15a70ae5387bd7/raw/gpinstall.sh | APP_NAME="wedi" REPO="superyngo/wedi" bash -s uninstall
 ```
 
 The installation script will:

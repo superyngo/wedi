@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-01-06
+
+### Added
+- **Syntax highlighting theme parameter**: Use `--theme <THEME>` to set theme via command line
+- **Installation options**: Added support for Wenget and Winget package managers
+
+### Fixed
+- Resolved cargo fmt and clippy warnings for cleaner codebase
+
 ## [0.5.2] - 2025-12-27
 
 ### Added
