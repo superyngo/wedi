@@ -61,7 +61,8 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
 
     lines.push("Code:".to_string());
     lines.push("  Ctrl+/ \\ K         Toggle line comment".to_string());
-    lines.push("  Ctrl+L              Toggle line numbers".to_string());
+    lines.push("  Ctrl+L              Toggle line numbers (& display mode)".to_string());
+    lines.push("  Ctrl+O              Toggle display mode (wrap/scroll)".to_string());
     #[cfg(feature = "syntax-highlighting")]
     lines.push("  Ctrl+J              Toggle syntax highlight".to_string());
     lines.push(String::new());

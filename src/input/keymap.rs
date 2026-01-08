@@ -170,6 +170,8 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('/'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('k'), KeyModifiers::CONTROL) => Some(Command::ToggleComment),
         (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::ChangeEncoding),
+        // Ctrl+O: 切換顯示模式（單行/多行）
+        (KeyCode::Char('o'), KeyModifiers::CONTROL) => Some(Command::ToggleDisplayMode),
         // Ctrl+J: 切換語法高亮模式
         #[cfg(feature = "syntax-highlighting")]
         (KeyCode::Char('j'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),

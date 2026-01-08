@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-01-08
+
+### Added
+- **Ctrl+O shortcut**: Toggle display mode (wrap/scroll) independently from line numbers
+- Separated display mode toggle from line number toggle for more flexible control
+
+### Changed
+- **Ctrl+L behavior**: Now only toggles line numbers (previously also toggled display mode)
+- **Delete line in selection mode**: Now deletes all lines that contain the selection (previously only deleted selected text)
+
+### Removed
+- Removed development documentation files (moved to devs/ folder)
+- Removed install scripts (install.ps1, install.sh)
+
 ## [0.6.0] - 2026-01-06
 
 ### Added

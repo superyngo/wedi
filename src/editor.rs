@@ -320,7 +320,27 @@ impl Editor {
 
             Command::DeleteLine => {
                 if self.has_selection() {
-                    self.delete_selection();
+                    // 選取模式下刪除所有包含選取的整行
+                    if let Some(sel) = self.selection {
+                        let (start_row, _) = sel.start.min(sel.end);
+                        let (end_row, _) = sel.start.max(sel.end);
+
+                        // 從後往前刪除，避免行號變化影響
+                        for row in (start_row..=end_row).rev() {
+                            if row < self.buffer.line_count() {
+                                self.buffer.delete_line(row);
+                            }
+                        }
+
+                        self.view.invalidate_cache();
+                        #[cfg(feature = "syntax-highlighting")]
+                        self.highlight_cache.clear();
+
+                        // 確保光標在有效範圍內
+                        self.cursor.row = start_row.min(self.buffer.line_count().saturating_sub(1));
+                        self.cursor.reset_to_line_start();
+                        self.selection = None;
+                    }
                 } else {
                     // 記錄是否在最後一行
                     let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
@@ -764,6 +784,15 @@ impl Editor {
             // 視圖控制
             Command::ToggleLineNumbers => {
                 self.view.toggle_line_numbers();
+            }
+
+            // 切換顯示模式（單行/多行）
+            Command::ToggleDisplayMode => {
+                self.view.toggle_display_mode();
+                self.message = Some(format!(
+                    "Display Mode: {}",
+                    self.view.get_display_mode_name()
+                ));
             }
 
             // 註解切換

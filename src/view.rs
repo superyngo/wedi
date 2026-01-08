@@ -634,6 +634,22 @@ impl View {
         self.invalidate_cache();
     }
 
+    /// 切換顯示模式（單行/多行），不影響行號顯示
+    pub fn toggle_display_mode(&mut self) {
+        self.wrap_mode = !self.wrap_mode;
+        self.offset_col = 0; // 重置水平偏移
+        self.invalidate_cache();
+    }
+
+    /// 獲取當前顯示模式名稱
+    pub fn get_display_mode_name(&self) -> &'static str {
+        if self.wrap_mode {
+            "Multi-line (Wrap)"
+        } else {
+            "Single-line (Scroll)"
+        }
+    }
+
     /// 截取可見文字（處理中文寬度，用於單行模式）
     fn slice_visible_text(&self, text: &str, start_col: usize, width: usize) -> String {
         let mut result = String::new();

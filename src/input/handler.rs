@@ -102,4 +102,7 @@ pub enum Command {
 
     // 顯示幫助
     ShowHelp,
+
+    // 切換顯示模式（單行/多行）
+    ToggleDisplayMode,
 }

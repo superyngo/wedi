@@ -23,7 +23,7 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Syntax highlighting (219+ languages)** 🎉
 - ✅ **Smart incremental syntax highlighting with cache optimization** 🎉
 - ✅ **Customizable syntax themes (7 built-in themes)** 🎉
-- ✅ **Single-line/Multi-line display mode toggle (Ctrl+L)** 🎉
+- ✅ **Single-line/Multi-line display mode toggle (Ctrl+L/Ctrl+O)** 🎉
 
 ## Installation
 
@@ -276,7 +276,8 @@ wedi --list-themes
 ### Code
 
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
-- **Ctrl+L**: Toggle display mode (line numbers + wrap ↔ no line numbers + horizontal scroll)
+- **Ctrl+L**: Toggle line numbers (also toggles display mode)
+- **Ctrl+O**: Toggle display mode only (wrap ↔ horizontal scroll)
 - **Ctrl+J**: Toggle syntax highlighting (On/Off)
 
 ### Help
