@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::handler::{Command, Direction};
+use super::command::{Command, Direction};
 
 #[allow(dead_code)]
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {

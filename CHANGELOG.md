@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-12
+
+### Added
+- **Workspace refactoring**: Split into `wedi-core` and `wedi-widget` crates for reusability
+- **crates.io ready**: Both library crates now include proper metadata for publishing
+  - `wedi-core`: Core editor primitives (buffer, cursor, keymap, syntax highlighting)
+  - `wedi-widget`: TUI widget for embedding wedi editor in applications
+- Added `repository`, `homepage`, `documentation`, `keywords`, `categories` to Cargo.toml
+
+### Changed
+- **Architecture**: Refactored from monolithic to workspace structure
+- `Keymap` now implements `Default` trait via derive macro
+- Conditional compilation for syntax-highlighting related imports
+
+### Fixed
+- Fixed `test_partial_wide_char` test - now correctly checks visual width instead of byte length
+- Fixed unused import warnings in `view.rs` with proper `#[cfg]` attributes
+
 ## [0.7.0] - 2026-01-08
 
 ### Added

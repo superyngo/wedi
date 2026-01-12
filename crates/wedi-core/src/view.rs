@@ -1,7 +1,9 @@
 use crate::buffer::RopeBuffer;
 use crate::cursor::Cursor;
 use crate::terminal::Terminal;
-use crate::utils::{slice_ansi_text, visual_width};
+#[cfg(feature = "syntax-highlighting")]
+use crate::utils::slice_ansi_text;
+use crate::utils::visual_width;
 use anyhow::Result;
 use crossterm::{
     cursor, execute, queue,
@@ -294,6 +296,7 @@ impl View {
                     .take(visual_idx)
                     .map(|line| visual_width(line))
                     .sum();
+                #[cfg(feature = "syntax-highlighting")]
                 let visual_line_width = visual_width(visual_line);
 
                 #[cfg(feature = "syntax-highlighting")]

@@ -1,17 +1,19 @@
-use crate::buffer::{EncodingConfig, RopeBuffer};
-use crate::clipboard::ClipboardManager;
-use crate::comment::CommentHandler;
-use crate::cursor::Cursor;
-use crate::input::{handle_key_event, Command, Direction};
-use crate::search::Search;
-use crate::terminal::Terminal;
-use crate::utils::visual_width;
-use crate::view::{Selection, View};
 use anyhow::Result;
 use std::path::Path;
+use wedi_core::{
+    buffer::{EncodingConfig, RopeBuffer},
+    clipboard::ClipboardManager,
+    comment::CommentHandler,
+    cursor::Cursor,
+    keymap::{handle_key_event, Command, Direction},
+    search::Search,
+    terminal::Terminal,
+    utils::visual_width,
+    view::{Selection, View},
+};
 
 #[cfg(feature = "syntax-highlighting")]
-use crate::highlight::{HighlightCache, HighlightConfig, HighlightEngine};
+use wedi_core::highlight::{HighlightCache, HighlightConfig, HighlightEngine};
 
 pub struct Editor {
     buffer: RopeBuffer,
@@ -1368,7 +1370,7 @@ impl Editor {
         start_row: usize,
         end_row: usize,
     ) -> std::collections::HashMap<usize, String> {
-        use crate::highlight::CachedLine;
+        use wedi_core::highlight::CachedLine;
 
         let mut result = std::collections::HashMap::new();
 
@@ -1455,7 +1457,7 @@ impl Editor {
     /// 使語法高亮快取失效（編輯操作後調用）
     #[cfg(feature = "syntax-highlighting")]
     pub fn invalidate_highlight_cache(&mut self, from_line: usize) {
-        use crate::highlight::EditType;
+        use wedi_core::highlight::EditType;
         self.highlight_cache
             .invalidate_from_edit(from_line, EditType::CharInsert);
     }

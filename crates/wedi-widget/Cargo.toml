@@ -1,0 +1,26 @@
+[package]
+name = "wedi-widget"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "TUI widget for embedding wedi editor in applications"
+repository = "https://github.com/superyngo/wedi"
+homepage = "https://github.com/superyngo/wedi"
+documentation = "https://docs.rs/wedi-widget"
+readme = "../../README.md"
+keywords = ["editor", "text-editor", "tui", "terminal", "widget"]
+categories = ["text-editors", "command-line-utilities"]
+
+[dependencies]
+wedi-core = { path = "../wedi-core", version = "0.8.0" }
+crossterm = { version = "0.27", optional = true }
+ratatui = { version = "0.26", optional = true }
+anyhow = "1.0"
+unicode-width = "0.1"
+
+[features]
+default = ["crossterm"]
+crossterm = ["dep:crossterm"]
+ratatui = ["dep:ratatui"]
+syntax-highlighting = ["wedi-core/syntax-highlighting"]

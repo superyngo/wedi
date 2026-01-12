@@ -244,10 +244,16 @@ mod tests {
     fn test_partial_wide_char() {
         // 測試寬字符被切割的情況
         let text = "A你好B";
-        // 從位置 1 開始（'你' 開始於 1，但只顯示後半部分）
+        // 從位置 1 開始，'你' 正好從位置 1 開始，所以完整顯示
         let result = slice_ansi_text(text, 1, 4);
-        // 應該是 " 好B" 或類似（'你' 被部分切割，用空格填充）
-        assert_eq!(result.len(), 4); // 視覺寬度應該是 4
+        // 結果應該是 "你好"（視覺寬度 4）
+        assert_eq!(ansi_visual_width(&result), 4); // 視覺寬度應該是 4
+
+        // 測試真正的部分切割：從位置 2 開始（'你' 的後半部分）
+        let result2 = slice_ansi_text(text, 2, 4);
+        // '你' 被部分切割（用空格填充），然後 '好' 完整，然後 'B'
+        // 位置 2: 空格（'你'的後半）, 位置 3-4: '好', 位置 5: 'B'
+        assert_eq!(ansi_visual_width(&result2), 4);
     }
 
     #[test]

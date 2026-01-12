@@ -1,23 +1,15 @@
-mod buffer;
-mod clipboard;
-mod comment;
-mod config;
-mod cursor;
 mod dialog;
 mod editor;
 mod help;
-mod highlight;
-mod input;
-mod search;
-mod terminal;
-mod utils;
-mod view;
 
 use anyhow::Result;
-use buffer::EncodingConfig;
 use editor::Editor;
 use pico_args::Arguments;
 use std::path::PathBuf;
+use wedi_core::buffer::EncodingConfig;
+use wedi_core::debug_log;
+use wedi_core::utils;
+use wedi_core::Terminal;
 
 fn parse_encoding(
     from_encoding: Option<&str>,
@@ -172,7 +164,7 @@ impl Args {
 
     #[cfg(feature = "syntax-highlighting")]
     fn print_themes() {
-        use highlight::HighlightEngine;
+        use wedi_core::highlight::HighlightEngine;
 
         println!("Available syntax highlighting themes:\n");
 
@@ -191,7 +183,7 @@ impl Args {
 
     #[cfg(feature = "syntax-highlighting")]
     fn print_languages() {
-        use highlight::HighlightEngine;
+        use wedi_core::highlight::HighlightEngine;
 
         println!("Available syntax highlighting languages:\n");
 
@@ -261,8 +253,8 @@ fn main() -> Result<()> {
     // 設置 panic hook 以確保終端正常恢復
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
-        let _ = terminal::Terminal::exit_raw_mode();
-        let _ = terminal::Terminal::show_cursor();
+        let _ = Terminal::exit_raw_mode();
+        let _ = Terminal::show_cursor();
         original_hook(panic_info);
     }));
 
