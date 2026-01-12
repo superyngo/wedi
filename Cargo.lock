@@ -910,6 +910,7 @@ dependencies = [
  "syntect",
  "tempfile",
  "unicode-width",
+ "winapi",
 ]
 
 [[package]]
