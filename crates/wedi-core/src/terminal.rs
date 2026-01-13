@@ -5,6 +5,13 @@ use crossterm::{
     execute,
     terminal::{self, ClearType},
 };
+
+#[cfg(feature = "mouse-support")]
+use crossterm::event::{MouseEvent, MouseEventKind};
+
+#[cfg(feature = "mouse-support")]
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+
 use std::io::{self, Write};
 
 pub struct Terminal {
@@ -20,10 +27,14 @@ impl Terminal {
     pub fn enter_raw_mode() -> Result<()> {
         terminal::enable_raw_mode()?;
         execute!(io::stdout(), terminal::EnterAlternateScreen)?;
+        #[cfg(feature = "mouse-support")]
+        execute!(io::stdout(), EnableMouseCapture)?;
         Ok(())
     }
 
     pub fn exit_raw_mode() -> Result<()> {
+        #[cfg(feature = "mouse-support")]
+        execute!(io::stdout(), DisableMouseCapture)?;
         execute!(io::stdout(), terminal::LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
         Ok(())
@@ -73,6 +84,13 @@ impl Terminal {
                     // 實際文本需要從剪貼簿讀取
                     return Ok(KeyEvent::new(KeyCode::F(20), KeyModifiers::NONE));
                 }
+                #[cfg(feature = "mouse-support")]
+                Event::Mouse(mouse_event) => {
+                    // 滑鼠滾輪事件轉換為虛擬按鍵
+                    if let Some(key_event) = handle_mouse_event(mouse_event) {
+                        return Ok(key_event);
+                    }
+                }
                 _ => {
                     // 忽略其他事件（鼠標、調整大小等）
                 }
@@ -95,6 +113,15 @@ impl Terminal {
     pub fn show_cursor() -> Result<()> {
         execute!(io::stdout(), cursor::Show)?;
         Ok(())
+    }
+}
+
+#[cfg(feature = "mouse-support")]
+fn handle_mouse_event(mouse_event: MouseEvent) -> Option<KeyEvent> {
+    match mouse_event.kind {
+        MouseEventKind::ScrollUp => Some(KeyEvent::new(KeyCode::F(22), KeyModifiers::NONE)),
+        MouseEventKind::ScrollDown => Some(KeyEvent::new(KeyCode::F(23), KeyModifiers::NONE)),
+        _ => None,
     }
 }
 

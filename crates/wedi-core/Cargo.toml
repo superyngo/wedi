@@ -30,7 +30,8 @@ ansi_colours = { version = "1.2", optional = true }
 winapi = { version = "0.3", features = ["winuser", "windef", "winbase", "memoryapi", "winnls", "consoleapi", "handleapi", "processenv", "wincon"] }
 
 [features]
-default = []
+default = ["mouse-support"]
+mouse-support = []
 syntax-highlighting = ["dep:syntect", "dep:bincode", "dep:ansi_colours"]
 
 [dev-dependencies]

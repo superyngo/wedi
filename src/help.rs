@@ -28,6 +28,8 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
     lines.push("  Page Up/Down        Scroll page up/down".to_string());
     lines.push("  Ctrl+PageUp/Down    Jump 1/10 of file".to_string());
     lines.push("  Ctrl+G              Go to line number".to_string());
+    #[cfg(feature = "mouse-support")]
+    lines.push("  Mouse Wheel         Scroll up/down (moves cursor)".to_string());
     lines.push(String::new());
 
     lines.push("Selection:".to_string());

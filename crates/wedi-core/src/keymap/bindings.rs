@@ -187,6 +187,11 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // (KeyCode::F(20), KeyModifiers::NONE) => Some(Command::SelectAll),
         // F21 用於視窗大小調整事件
         (KeyCode::F(21), KeyModifiers::NONE) => Some(Command::Resize),
+        // F22/F23 用於滑鼠滾輪事件（當啟用 mouse-support feature）
+        #[cfg(feature = "mouse-support")]
+        (KeyCode::F(22), KeyModifiers::NONE) => Some(Command::MoveUp),
+        #[cfg(feature = "mouse-support")]
+        (KeyCode::F(23), KeyModifiers::NONE) => Some(Command::MoveDown),
 
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),
