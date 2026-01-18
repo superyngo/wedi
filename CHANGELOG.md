@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-01-18
+
 ### Fixed
-- **Multi-line Paste**: Fixed issue where pasting multi-line text from terminal would merge all lines into one (2026-01-18)
+- **Multi-line Paste**: Fixed issue where pasting multi-line text from terminal would merge all lines into one
   - Enabled Bracketed Paste Mode for proper terminal paste detection
   - Added `InputEvent` type and `read_input()` method to distinguish keyboard events from paste events
   - Added `PasteText` command for direct text pasting with proper line break handling
