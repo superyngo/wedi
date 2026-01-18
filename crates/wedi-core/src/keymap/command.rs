@@ -44,9 +44,10 @@ pub enum Command {
     Copy,
     Cut,
     Paste,
-    CopyInternal,  // 使用內部剪貼簿複製
-    CutInternal,   // 使用內部剪貼簿剪切
-    PasteInternal, // 使用內部剪貼簿貼上
+    CopyInternal,      // 使用內部剪貼簿複製
+    CutInternal,       // 使用內部剪貼簿剪切
+    PasteInternal,     // 使用內部剪貼簿貼上
+    PasteText(String), // 直接貼上文字（來自 Bracketed Paste）
 
     // 視窗調整
     Resize,

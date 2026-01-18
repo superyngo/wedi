@@ -144,6 +144,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         }
 
         // 字符輸入
+        (KeyCode::Char('\r'), KeyModifiers::NONE) => Some(Command::Insert('\n')), // \r 正規化為 \n
         (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             Some(Command::Insert(c))
         }

@@ -7,7 +7,7 @@ use wedi_core::{
     cursor::Cursor,
     keymap::{handle_key_event, Command, Direction},
     search::Search,
-    terminal::Terminal,
+    terminal::{InputEvent, Terminal},
     utils::visual_width,
     view::{Selection, View},
 };
@@ -209,10 +209,17 @@ impl Editor {
                 Some(&highlighted_lines),
             )?;
 
-            let key_event = Terminal::read_key()?;
-
-            if let Some(command) = handle_key_event(key_event, self.selection_mode) {
-                self.handle_command(command)?;
+            // 使用 read_input() 支援 Bracketed Paste
+            match Terminal::read_input()? {
+                InputEvent::Key(key_event) => {
+                    if let Some(command) = handle_key_event(key_event, self.selection_mode) {
+                        self.handle_command(command)?;
+                    }
+                }
+                InputEvent::Paste(text) => {
+                    // 直接處理貼上的文字
+                    self.handle_command(Command::PasteText(text))?;
+                }
             }
         }
 
@@ -644,6 +651,15 @@ impl Editor {
 
             Command::PasteInternal => {
                 let text = self.get_clipboard_text(false);
+                self.paste_text(text);
+                self.selection_mode = false; // 貼上後關閉選擇模式
+            }
+
+            // Bracketed Paste 直接貼上文字
+            Command::PasteText(text) => {
+                if self.has_selection() {
+                    self.delete_selection();
+                }
                 self.paste_text(text);
                 self.selection_mode = false; // 貼上後關閉選擇模式
             }

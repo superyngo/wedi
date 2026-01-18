@@ -20,5 +20,5 @@ pub use buffer::RopeBuffer;
 pub use cursor::Cursor;
 pub use keymap::{Command, Direction, Keymap};
 pub use search::Search;
-pub use terminal::Terminal;
+pub use terminal::{InputEvent, Terminal};
 pub use view::{Selection, View};

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Multi-line Paste**: Fixed issue where pasting multi-line text from terminal would merge all lines into one (2026-01-18)
+  - Enabled Bracketed Paste Mode for proper terminal paste detection
+  - Added `InputEvent` type and `read_input()` method to distinguish keyboard events from paste events
+  - Added `PasteText` command for direct text pasting with proper line break handling
+  - Normalized `\r` characters to `\n` in both paste events and keyboard input
+
 ## [0.8.3] - 2026-01-15
 
 ### Fixed
