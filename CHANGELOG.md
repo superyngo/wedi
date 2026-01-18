@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Multi-line Paste (Termius/iOS)**: Fixed paste issue in terminals that send Ctrl+J for newlines (2026-01-18)
+  - Added `Ctrl+J` (LF, ASCII 10) and `Ctrl+M` (CR, ASCII 13) handling as newline input
+  - Terminals like Termius on iOS send newlines as control characters instead of key events
+  - This complements the previous fix for Bracketed Paste Mode
+
+### Changed
+- **Keybinding**: Changed "Toggle Syntax Highlight" shortcut from `Ctrl+J` to `Ctrl+T` (2026-01-18)
+  - `Ctrl+J` is now used for newline input (required for Termius compatibility)
+
 ## [0.8.4] - 2026-01-18
 
 ### Fixed

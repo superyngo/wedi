@@ -143,12 +143,17 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
             Some(Command::ExtendSelection(Direction::TenthDown))
         }
 
-        // 字符輸入
-        (KeyCode::Char('\r'), KeyModifiers::NONE) => Some(Command::Insert('\n')), // \r 正規化為 \n
+        // 字符輸入 - 換行符處理
+        // 明確處理所有可能的換行符形式，確保在各種終端環境下正確識別
+        (KeyCode::Char('\n'), KeyModifiers::NONE) => Some(Command::Insert('\n')), // Unix LF
+        (KeyCode::Char('\r'), KeyModifiers::NONE) => Some(Command::Insert('\n')), // CR 正規化為 LF
+        (KeyCode::Char('j'), KeyModifiers::CONTROL) => Some(Command::Insert('\n')), // Ctrl+J = LF (ASCII 10)
+        (KeyCode::Char('m'), KeyModifiers::CONTROL) => Some(Command::Insert('\n')), // Ctrl+M = CR (ASCII 13)
+        (KeyCode::Enter, _) => Some(Command::Insert('\n')),                         // Enter 鍵
+        // 一般字符輸入
         (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             Some(Command::Insert(c))
         }
-        (KeyCode::Enter, _) => Some(Command::Insert('\n')),
         (KeyCode::Tab, KeyModifiers::NONE) => Some(Command::Indent),
         (KeyCode::BackTab, _) | (KeyCode::Tab, KeyModifiers::SHIFT) => Some(Command::Unindent),
 
@@ -173,9 +178,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('e'), KeyModifiers::CONTROL) => Some(Command::ChangeEncoding),
         // Ctrl+O: 切換顯示模式（單行/多行）
         (KeyCode::Char('o'), KeyModifiers::CONTROL) => Some(Command::ToggleDisplayMode),
-        // Ctrl+J: 切換語法高亮模式
+        // Ctrl+T: 切換語法高亮模式（原 Ctrl+J 現用於換行符輸入）
         #[cfg(feature = "syntax-highlighting")]
-        (KeyCode::Char('j'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
+        (KeyCode::Char('t'), KeyModifiers::CONTROL) => Some(Command::ToggleSyntaxHighlight),
 
         // 剪貼板操作
         (KeyCode::Char('c'), KeyModifiers::CONTROL) => Some(Command::Copy),
