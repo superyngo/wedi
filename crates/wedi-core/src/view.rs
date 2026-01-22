@@ -112,6 +112,7 @@ pub struct View {
 }
 
 impl View {
+    /// 從 Terminal 建立 View（自動取得終端尺寸）
     pub fn new(terminal: &Terminal) -> Self {
         let (cols, rows) = terminal.size();
         let screen_rows = rows.saturating_sub(1) as usize; // 減去狀態欄
@@ -126,6 +127,42 @@ impl View {
             screen_cols: cols as usize,
             line_layout_cache: vec![None; cache_size],
         }
+    }
+
+    /// 使用指定尺寸建立 View（不需要 Terminal）
+    ///
+    /// # Arguments
+    /// * `rows` - 螢幕行數（不含狀態欄）
+    /// * `cols` - 螢幕列數
+    ///
+    /// # Example
+    /// ```
+    /// use wedi_core::View;
+    /// let view = View::new_simple(24, 80);
+    /// ```
+    pub fn new_simple(rows: usize, cols: usize) -> Self {
+        let cache_size = rows.max(1) * CACHE_MULTIPLIER;
+
+        Self {
+            offset_row: 0,
+            offset_col: 0,
+            show_line_numbers: true,
+            wrap_mode: true,
+            screen_rows: rows,
+            screen_cols: cols,
+            line_layout_cache: vec![None; cache_size],
+        }
+    }
+
+    /// 調整視圖尺寸
+    ///
+    /// # Arguments
+    /// * `rows` - 新的螢幕行數
+    /// * `cols` - 新的螢幕列數
+    pub fn resize(&mut self, rows: usize, cols: usize) {
+        self.screen_rows = rows;
+        self.screen_cols = cols;
+        self.invalidate_cache();
     }
 
     /// 完全清空緩存（用於大範圍變更或視窗調整）

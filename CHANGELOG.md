@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **wedi-core**: Added `View::new_simple(rows, cols)` method for creating View without Terminal dependency
+- **wedi-core**: Added `View::resize(rows, cols)` method for runtime size adjustment
+- **wedi-widget**: Re-exported `Search` type from wedi-core for convenience
+- **Documentation**: Added comprehensive rustdoc comments to `EditorConfig`, `ScreenLayout`, and `View` methods
+
+### Changed
+- **wedi-widget**: Cleaned up module structure by removing incomplete/incompatible `state.rs` and `renderer` modules
+- **wedi-widget**: Updated public API exports to include `Search`, `ScreenLayout`, and `LineLayout`
+
+### Fixed
+- **wedi-widget**: Fixed compilation by aligning widget API with current wedi-core implementation
+
 ## [0.8.5] - 2026-01-18
 
 ### Fixed
