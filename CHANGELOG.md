@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-02-26
+
+### Added
+- Status bar now displays full file path (absolute path) aligned to the right
+- Path truncation with ellipsis prefix (…) when path exceeds screen width
+- Added `RopeBuffer::file_display_path()` method for returning absolute file paths
+
 ## [Unreleased]
 
 ## [0.8.6] - 2026-01-23
