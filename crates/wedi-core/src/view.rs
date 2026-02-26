@@ -623,7 +623,7 @@ impl View {
         } else {
             ""
         };
-        let filename = buffer.file_name();
+        let filepath = buffer.file_display_path();
 
         let mode_indicator = if selection_mode {
             " [Selection Mode]"
@@ -632,11 +632,10 @@ impl View {
         };
 
         let status = if let Some(msg) = message {
-            format!(" {}{}{}  - {}", filename, modified, mode_indicator, msg)
+            format!(" {}{}  - {}", modified, mode_indicator, msg)
         } else {
             format!(
-                " {}{}{}  Line {}/{}  Ctrl+W:Save Ctrl+Q:Quit",
-                filename,
+                " {}{}  Line {}/{}  Ctrl+W:Save Ctrl+Q:Quit",
                 modified,
                 mode_indicator,
                 cursor.row + 1,
@@ -644,10 +643,56 @@ impl View {
             )
         };
 
-        // 確保狀態欄填滿整行（使用視覺寬度）
-        let status = if visual_width(&status) < self.screen_cols {
-            format!("{:width$}", status, width = self.screen_cols)
+        // 路徑靠右：在左側內容與路徑之間填充空白
+        let right = format!(" {} ", filepath);
+        let left_width = visual_width(&status);
+        let right_width = visual_width(&right);
+        let total = left_width + right_width;
+
+        let status = if total <= self.screen_cols {
+            // 中間填空白讓路徑靠右
+            let padding = self.screen_cols - total;
+            format!("{}{:padding$}{}", status, "", right, padding = padding)
+        } else if left_width < self.screen_cols {
+            // 空間不足時截斷路徑
+            let available = self.screen_cols - left_width;
+            let mut right_truncated = String::new();
+            let mut w = 0usize;
+            // 從路徑頭部加省略號後截取能放入的部分
+            let truncated_prefix = "…";
+            let prefix_w = visual_width(truncated_prefix);
+            right_truncated.push_str(truncated_prefix);
+            w += prefix_w;
+            let right_chars: Vec<char> = right.chars().collect();
+            // 跳過前面放不下的字元，從後段開始
+            let skip = {
+                let mut skip_idx = 0;
+                let mut total_w = visual_width(&right);
+                while total_w + prefix_w > available && skip_idx < right_chars.len() {
+                    let cw = UnicodeWidthChar::width(right_chars[skip_idx]).unwrap_or(1);
+                    total_w -= cw;
+                    skip_idx += 1;
+                }
+                skip_idx
+            };
+            for ch in right_chars.into_iter().skip(skip) {
+                let cw = UnicodeWidthChar::width(ch).unwrap_or(1);
+                if w + cw > available {
+                    break;
+                }
+                right_truncated.push(ch);
+                w += cw;
+            }
+            let padding = available - w;
+            format!(
+                "{}{:padding$}{}",
+                status,
+                "",
+                right_truncated,
+                padding = padding
+            )
         } else {
+            // 左側本身就超寬，直接截斷
             let mut result = String::new();
             let mut current_width = 0;
             for ch in status.chars() {

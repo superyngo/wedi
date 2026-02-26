@@ -556,6 +556,20 @@ impl RopeBuffer {
             .to_string()
     }
 
+    /// 返回顯示用的完整檔案路徑（絕對路徑）
+    pub fn file_display_path(&self) -> String {
+        match &self.file_path {
+            None => "[No Name]".to_string(),
+            Some(path) => {
+                // 優先使用 canonicalize 取得標準絕對路徑，若失敗則直接用儲存的路徑
+                path.canonicalize()
+                    .unwrap_or_else(|_| path.to_path_buf())
+                    .to_string_lossy()
+                    .into_owned()
+            }
+        }
+    }
+
     pub fn len_chars(&self) -> usize {
         self.rope.len_chars()
     }
