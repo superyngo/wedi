@@ -14,9 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-07
+
 ### Added
-- **wedi-core**: `Alt+W` as a supplementary keybinding for Save, for browser-based SSH terminals (e.g. Cloudflare) where `Ctrl+W` is intercepted to close the browser tab (2026-06-07)
-- **wedi-core**: `Alt+S` as a supplementary keybinding for toggling selection mode, for browser-based SSH terminals where `Ctrl+S` is caught by XOFF flow control (2026-06-07)
+- **wedi-core**: `Alt+W` as a supplementary keybinding for Save, for browser-based SSH terminals (e.g. Cloudflare) where `Ctrl+W` is intercepted to close the browser tab
+- **wedi-core**: `Alt+S` as a supplementary keybinding for toggling selection mode, for browser-based SSH terminals where `Ctrl+S` is caught by XOFF flow control
+
+### Docs
+- Added Wenget install instructions to README
 
 ## [0.8.6] - 2026-01-23
 
