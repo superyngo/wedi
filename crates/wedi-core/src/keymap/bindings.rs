@@ -5,7 +5,10 @@ use super::command::{Command, Direction};
 #[allow(dead_code)]
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
     // Ctrl+S 切換選擇模式（優先處理）
-    if matches!(event.code, KeyCode::Char('s')) && event.modifiers == KeyModifiers::CONTROL {
+    // Alt+S 為補充綁定（瀏覽器 SSH 終端的 XOFF 流量控制會攔截 Ctrl+S）
+    if matches!(event.code, KeyCode::Char('s'))
+        && (event.modifiers == KeyModifiers::CONTROL || event.modifiers == KeyModifiers::ALT)
+    {
         return Some(Command::ToggleSelectionMode);
     }
 
@@ -163,6 +166,8 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
 
         // Ctrl 組合鍵
         (KeyCode::Char('w'), KeyModifiers::CONTROL) => Some(Command::Save),
+        // Alt+W: Save 的補充綁定（瀏覽器 SSH 終端會攔截 Ctrl+W 去關分頁）
+        (KeyCode::Char('w'), KeyModifiers::ALT) => Some(Command::Save),
         (KeyCode::Char('q'), KeyModifiers::CONTROL) => Some(Command::Quit),
         (KeyCode::Char('z'), KeyModifiers::CONTROL) => Some(Command::Undo),
         (KeyCode::Char('y'), KeyModifiers::CONTROL) => Some(Command::Redo),

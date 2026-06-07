@@ -6,7 +6,7 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
     let mut lines = Vec::new();
 
     lines.push("Basic Editing:".to_string());
-    lines.push("  Ctrl+W              Save file".to_string());
+    lines.push("  Ctrl+W / Alt+W      Save file".to_string());
     lines.push("  Ctrl+Q              Quit (press twice if modified)".to_string());
     lines.push("  Ctrl+Z              Undo".to_string());
     lines.push("  Ctrl+Y              Redo".to_string());
@@ -34,7 +34,7 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
 
     lines.push("Selection:".to_string());
     lines.push(
-        "  Ctrl+S              Toggle selection mode (for terminals without Shift support)"
+        "  Ctrl+S / Alt+S      Toggle selection mode (for terminals without Shift support)"
             .to_string(),
     );
     lines.push("  Shift+Arrows        Select text".to_string());

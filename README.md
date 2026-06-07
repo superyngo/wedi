@@ -226,7 +226,7 @@ wedi --list-themes
 
 ### Basic Editing
 
-- **Ctrl+W**: Save file
+- **Ctrl+W** / **Alt+W**: Save file (Alt+W for browser-based SSH terminals where Ctrl+W closes the tab)
 - **Ctrl+Q**: Quit (press twice if modified)
 - **Ctrl+Z**: Undo
 - **Ctrl+Y**: Redo
@@ -248,7 +248,7 @@ wedi --list-themes
 
 ### Selection
 
-- **Ctrl+S**: Toggle selection mode (for terminals without Shift key support)
+- **Ctrl+S** / **Alt+S**: Toggle selection mode (Alt+S for browser-based SSH terminals where Ctrl+S is caught by flow control)
 - **Shift + Arrow Keys**: Select text
 - **Shift + Home / End**: Select to line start/end
 - **Shift + Page Up / Down**: Select page up/down
