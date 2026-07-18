@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (2026-07-18)
+- fix: update cached terminal size on resize so dialogs (search, go-to-line, encoding, help) render at the correct position after the terminal is resized
+- fix: dialog text truncation now uses visual width instead of byte slicing, preventing a panic when CJK input exceeds the screen width; dialog cursor position now accounts for CJK double-width characters
+- fix: help text listed `Ctrl+J` for toggling syntax highlight; the actual binding is `Ctrl+T`
+- fix: clear syntax highlight cache when cutting a whole line (`Ctrl+X`/`Alt+X` without selection), matching `Ctrl+D` behavior and avoiding stale highlight residue
+
+### Changed (2026-07-18)
+- refactor: single shared encoding label table `wedi_core::buffer::parse_encoding_label()`, replacing duplicated copies in `main.rs` and `editor.rs`
+- refactor: `Cut`/`CutInternal` now share one `do_cut()` helper; `JumpTenthUp/Down` and their selection variants share one `jump_tenth()` helper
+- ESC now dismisses one layer per press (message → selection/selection mode → search mode) instead of clearing everything at once; help text updated
+- Syntax highlighting is now preserved on rows outside the selection; only selected rows fall back to plain reverse-video rendering
+- Plain `PageUp`/`PageDown` now always page; search match navigation uses `Ctrl+N`/`Ctrl+P` (help, README, CLAUDE.md updated)
+- Confirm dialog now accepts `Enter` as yes (shown as `(Y/n)`)
+- Help screen title now shows the app version (e.g. `WEDI v0.9.0 HELP`)
+
 ## [0.9.0] - 2026-06-07
 
 ### Added

@@ -43,7 +43,10 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
     lines.push("  Shift+Ctrl+Home/End Quick select to file boundaries".to_string());
     lines.push("  Shift+PgUp/Dn       Select page up/down".to_string());
     lines.push("  Ctrl+A              Select all".to_string());
-    lines.push("  ESC                 Clear selection and messages".to_string());
+    lines.push(
+        "  ESC                 Dismiss one layer: message, then selection, then search mode"
+            .to_string(),
+    );
     lines.push(String::new());
 
     lines.push("Clipboard:".to_string());
@@ -57,8 +60,8 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
 
     lines.push("Search:".to_string());
     lines.push("  Ctrl+F                 Find text (with last search term pre-filled)".to_string());
-    lines.push("  PageDown / Ctrl+N      Find next match (or PageDown if no search)".to_string());
-    lines.push("  PageUp / Ctrl+P        Find previous match (or PageUp if no search)".to_string());
+    lines.push("  Ctrl+N                 Find next match (PageDown if no active search)".to_string());
+    lines.push("  Ctrl+P                 Find previous match (PageUp if no active search)".to_string());
     lines.push(String::new());
 
     lines.push("Code:".to_string());
@@ -66,7 +69,7 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
     lines.push("  Ctrl+L              Toggle line numbers (& display mode)".to_string());
     lines.push("  Ctrl+O              Toggle display mode (wrap/scroll)".to_string());
     #[cfg(feature = "syntax-highlighting")]
-    lines.push("  Ctrl+J              Toggle syntax highlight".to_string());
+    lines.push("  Ctrl+T              Toggle syntax highlight".to_string());
     lines.push(String::new());
 
     lines.push("Other:".to_string());

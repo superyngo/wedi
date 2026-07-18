@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::Path;
 use wedi_core::{
-    buffer::{EncodingConfig, RopeBuffer},
+    buffer::{parse_encoding_label, EncodingConfig, RopeBuffer},
     clipboard::ClipboardManager,
     comment::CommentHandler,
     cursor::Cursor,
@@ -422,33 +422,12 @@ impl Editor {
             }
 
             Command::JumpTenthUp => {
-                let total_lines = self.buffer.line_count();
-                let jump_distance = total_lines.max(10) / 10; // 至少跳 1 行
-                self.cursor.row = self.cursor.row.saturating_sub(jump_distance);
-                self.cursor.set_position(
-                    &self.buffer,
-                    &self.view,
-                    self.cursor.row,
-                    self.cursor.col,
-                );
+                self.jump_tenth(true);
                 self.selection = None;
             }
 
             Command::JumpTenthDown => {
-                let total_lines = self.buffer.line_count();
-                let jump_distance = total_lines.max(10) / 10;
-                let new_row = self
-                    .cursor
-                    .row
-                    .saturating_add(jump_distance)
-                    .min(total_lines.saturating_sub(1));
-                self.cursor.row = new_row;
-                self.cursor.set_position(
-                    &self.buffer,
-                    &self.view,
-                    self.cursor.row,
-                    self.cursor.col,
-                );
+                self.jump_tenth(false);
                 self.selection = None;
             }
 
@@ -484,33 +463,8 @@ impl Editor {
                         self.cursor
                             .move_page_down(&self.buffer, &self.view, effective_rows)
                     }
-                    Direction::TenthUp => {
-                        let total_lines = self.buffer.line_count();
-                        let jump_distance = total_lines.max(10) / 10;
-                        self.cursor.row = self.cursor.row.saturating_sub(jump_distance);
-                        self.cursor.set_position(
-                            &self.buffer,
-                            &self.view,
-                            self.cursor.row,
-                            self.cursor.col,
-                        );
-                    }
-                    Direction::TenthDown => {
-                        let total_lines = self.buffer.line_count();
-                        let jump_distance = total_lines.max(10) / 10;
-                        let new_row = self
-                            .cursor
-                            .row
-                            .saturating_add(jump_distance)
-                            .min(total_lines.saturating_sub(1));
-                        self.cursor.row = new_row;
-                        self.cursor.set_position(
-                            &self.buffer,
-                            &self.view,
-                            self.cursor.row,
-                            self.cursor.col,
-                        );
-                    }
+                    Direction::TenthUp => self.jump_tenth(true),
+                    Direction::TenthDown => self.jump_tenth(false),
                 }
 
                 if let Some(sel) = &mut self.selection {
@@ -540,10 +494,15 @@ impl Editor {
             }
 
             Command::ClearMessage => {
-                self.selection = None;
-                self.selection_mode = false; // ESC 關閉選擇模式但保留選擇範圍
-                self.search_mode = false; // ESC 關閉搜尋模式（保留搜尋結果）
-                self.message = None;
+                // ESC 一次只剝一層：訊息 → 選取/選擇模式 → 搜尋模式
+                if self.message.is_some() {
+                    self.message = None;
+                } else if self.selection.is_some() || self.selection_mode {
+                    self.selection = None;
+                    self.selection_mode = false;
+                } else {
+                    self.search_mode = false; // 關閉搜尋模式（保留搜尋結果）
+                }
             }
 
             // 選擇模式切換
@@ -574,35 +533,7 @@ impl Editor {
             }
 
             Command::Cut => {
-                let text = self.get_copy_text();
-                self.set_clipboard_text(text, true);
-
-                // 剪切後刪除內容
-                if self.has_selection() {
-                    self.delete_selection();
-                } else {
-                    // 記錄是否在最後一行
-                    let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
-
-                    self.buffer.delete_line(self.cursor.row);
-                    self.view.invalidate_cache();
-
-                    // 如果刪除的是最後一行且不是唯一一行，光標上移
-                    if was_last_line && self.cursor.row > 0 {
-                        self.cursor.row -= 1;
-                    }
-
-                    // 確保光標在有效範圍內
-                    if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
-                        self.cursor.row = self.buffer.line_count() - 1;
-                    }
-
-                    self.cursor.col = 0;
-                    self.cursor.desired_visual_col = 0;
-                }
-
-                // 剪切後關閉選擇模式並清除選擇
-                self.selection_mode = false;
+                self.do_cut(true);
             }
 
             Command::Paste => {
@@ -620,33 +551,7 @@ impl Editor {
             }
 
             Command::CutInternal => {
-                let text = self.get_copy_text();
-                self.set_clipboard_text(text, false);
-
-                // 剪切後刪除內容
-                if self.has_selection() {
-                    self.delete_selection();
-                } else {
-                    // 記錄是否在最後一行
-                    let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
-
-                    self.buffer.delete_line(self.cursor.row);
-                    self.view.invalidate_cache();
-
-                    // 如果刪除的是最後一行且不是唯一一行，光標上移
-                    if was_last_line && self.cursor.row > 0 {
-                        self.cursor.row -= 1;
-                    }
-
-                    // 確保光標在有效範圍內
-                    if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
-                        self.cursor.row = self.buffer.line_count() - 1;
-                    }
-
-                    self.cursor.col = 0;
-                    self.cursor.desired_visual_col = 0;
-                }
-                self.selection_mode = false; // 剪切後關閉選擇模式
+                self.do_cut(false);
             }
 
             Command::PasteInternal => {
@@ -693,6 +598,7 @@ impl Editor {
 
             // 視窗調整
             Command::Resize => {
+                self.terminal.update_size()?; // 對話框依賴 terminal.size()，必須同步更新
                 self.view.update_size();
             }
 
@@ -1033,7 +939,7 @@ impl Editor {
                 if let Ok(Some(encoding_str)) =
                     crate::dialog::prompt("Change encoding to:", self.terminal.size())
                 {
-                    if let Some(encoding) = Self::parse_encoding(&encoding_str) {
+                    if let Some(encoding) = parse_encoding_label(&encoding_str) {
                         // 檢查是否有檔案路徑（區分已存在檔案和新建檔案）
                         if self.buffer.has_file_path() {
                             // 已存在的檔案：需要重新載入
@@ -1128,6 +1034,62 @@ impl Editor {
 
     fn has_selection(&self) -> bool {
         self.selection.is_some()
+    }
+
+    /// 跳躍檔案 1/10 的距離（Ctrl+PageUp/PageDown 及其選取版本共用）
+    fn jump_tenth(&mut self, up: bool) {
+        let total_lines = self.buffer.line_count();
+        let jump_distance = total_lines.max(10) / 10; // 至少跳 1 行
+        self.cursor.row = if up {
+            self.cursor.row.saturating_sub(jump_distance)
+        } else {
+            self.cursor
+                .row
+                .saturating_add(jump_distance)
+                .min(total_lines.saturating_sub(1))
+        };
+        self.cursor.set_position(
+            &self.buffer,
+            &self.view,
+            self.cursor.row,
+            self.cursor.col,
+        );
+    }
+
+    /// 剪切：複製選取（或整行）後刪除
+    /// use_system: true 表示使用系統剪貼簿，false 表示僅使用內部剪貼簿
+    fn do_cut(&mut self, use_system: bool) {
+        let text = self.get_copy_text();
+        self.set_clipboard_text(text, use_system);
+
+        // 剪切後刪除內容
+        if self.has_selection() {
+            self.delete_selection();
+        } else {
+            // 記錄是否在最後一行
+            let was_last_line = self.cursor.row == self.buffer.line_count() - 1;
+
+            self.buffer.delete_line(self.cursor.row);
+            self.view.invalidate_cache();
+            #[cfg(feature = "syntax-highlighting")]
+            self.highlight_cache.clear();
+
+            // 如果刪除的是最後一行且不是唯一一行，光標上移
+            if was_last_line && self.cursor.row > 0 {
+                self.cursor.row -= 1;
+            }
+
+            // 確保光標在有效範圍內
+            if self.cursor.row >= self.buffer.line_count() && self.buffer.line_count() > 0 {
+                self.cursor.row = self.buffer.line_count() - 1;
+            }
+
+            self.cursor.col = 0;
+            self.cursor.desired_visual_col = 0;
+        }
+
+        // 剪切後關閉選擇模式
+        self.selection_mode = false;
     }
 
     /// 獲取要複製/剪切的文本
@@ -1476,19 +1438,5 @@ impl Editor {
         use wedi_core::highlight::EditType;
         self.highlight_cache
             .invalidate_from_edit(from_line, EditType::CharInsert);
-    }
-
-    // 解析編碼字串
-    fn parse_encoding(enc_str: &str) -> Option<&'static encoding_rs::Encoding> {
-        match enc_str.to_lowercase().as_str() {
-            "utf-8" | "utf8" => Some(encoding_rs::UTF_8),
-            "utf-16le" | "utf16le" => Some(encoding_rs::UTF_16LE),
-            "utf-16be" | "utf16be" => Some(encoding_rs::UTF_16BE),
-            "gbk" | "cp936" => Some(encoding_rs::GBK),
-            "shift-jis" | "shift_jis" | "sjis" => Some(encoding_rs::SHIFT_JIS),
-            "big5" | "cp950" => encoding_rs::Encoding::for_label(b"big5"),
-            "cp1252" | "windows-1252" => Some(encoding_rs::WINDOWS_1252),
-            _ => encoding_rs::Encoding::for_label(enc_str.as_bytes()),
-        }
     }
 }

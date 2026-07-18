@@ -77,8 +77,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Right, KeyModifiers::NONE) => Some(Command::MoveRight),
         (KeyCode::Home, KeyModifiers::NONE) => Some(Command::MoveHome),
         (KeyCode::End, KeyModifiers::NONE) => Some(Command::MoveEnd),
-        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::FindPrev),
-        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::FindNext),
+        // PageUp/PageDown 恆為翻頁；搜尋跳轉使用 Ctrl+N/P
+        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::PageUp),
+        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::PageDown),
 
         // Ctrl 快速移動
         (KeyCode::Up, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),

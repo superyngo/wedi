@@ -185,7 +185,7 @@ Ctrl+F → 顯示搜尋對話框
   ├─ Search::find_matches()
   │   └─ 遍歷所有行，記錄匹配位置
   ├─ 進入搜尋模式
-  └─ PageUp/PageDown → 跳轉匹配項
+  └─ Ctrl+N/Ctrl+P → 跳轉匹配項
 ```
 
 ### 6. 撤銷/重做流程

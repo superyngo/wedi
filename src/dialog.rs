@@ -9,6 +9,23 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use std::io::{self, Write};
+use wedi_core::utils::visual_width;
+
+/// 依視覺寬度截斷字串，回傳（截斷後字串, 實際視覺寬度）
+/// 以字元為單位處理，避免 byte 切割造成 panic，並正確計算 CJK 雙寬字元
+fn truncate_to_width(s: &str, max_width: usize) -> (String, usize) {
+    let mut result = String::new();
+    let mut width = 0;
+    for ch in s.chars() {
+        let w = visual_width(ch.encode_utf8(&mut [0u8; 4]));
+        if width + w > max_width {
+            break;
+        }
+        result.push(ch);
+        width += w;
+    }
+    (result, width)
+}
 
 /// 顯示幫助對話框
 #[allow(dead_code)]
@@ -16,8 +33,10 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
     let (cols, rows) = terminal_size;
 
     // 從 help 模組獲取幫助內容
-    let mut help_lines =
-        vec!["═══════════════════════ WEDI HELP ════════════════════════".to_string()];
+    let mut help_lines = vec![format!(
+        "═══════════════════ WEDI v{} HELP ════════════════════",
+        env!("CARGO_PKG_VERSION")
+    )];
     help_lines.push(String::new());
     help_lines.extend(crate::help::get_keyboard_shortcuts());
     help_lines.push(String::new());
@@ -166,24 +185,22 @@ pub fn prompt_with_default(
         )?;
 
         let display = format!(" {} {}", prompt_text, input);
-        let display = if display.len() > cols as usize {
-            &display[..cols as usize]
-        } else {
-            &display
-        };
+        let (display, display_width) = truncate_to_width(&display, cols as usize);
 
-        queue!(io::stdout(), style::Print(display))?;
+        queue!(io::stdout(), style::Print(&display))?;
 
         // 填滿剩餘空間
-        let remaining = cols as usize - display.len();
+        let remaining = (cols as usize).saturating_sub(display_width);
         if remaining > 0 {
             queue!(io::stdout(), style::Print(" ".repeat(remaining)))?;
         }
 
         queue!(io::stdout(), style::ResetColor)?;
 
-        // 設置光標位置（基於字符位置，不是字節位置）
-        let cursor_x = (prompt_text.len() + 2 + cursor_pos).min(cols as usize - 1) as u16;
+        // 設置光標位置（以視覺寬度計算，正確處理 CJK 雙寬字元）
+        let input_before_cursor: String = input.chars().take(cursor_pos).collect();
+        let cursor_x = (visual_width(prompt_text) + 2 + visual_width(&input_before_cursor))
+            .min(cols as usize - 1) as u16;
         execute!(io::stdout(), cursor::MoveTo(cursor_x, dialog_row))?;
         execute!(io::stdout(), cursor::Show)?;
 
@@ -284,17 +301,13 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
             cursor::MoveTo(0, dialog_row),
         )?;
 
-        let display = format!(" {} (y/n)", message);
-        let display = if display.len() > cols as usize {
-            &display[..cols as usize]
-        } else {
-            &display
-        };
+        let display = format!(" {} (Y/n)", message);
+        let (display, display_width) = truncate_to_width(&display, cols as usize);
 
-        queue!(io::stdout(), style::Print(display))?;
+        queue!(io::stdout(), style::Print(&display))?;
 
         // 填滿剩餘空間
-        let remaining = cols as usize - display.len();
+        let remaining = (cols as usize).saturating_sub(display_width);
         if remaining > 0 {
             queue!(io::stdout(), style::Print(" ".repeat(remaining)))?;
         }
@@ -311,7 +324,8 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
                 }
 
                 match key_event.code {
-                    KeyCode::Char('y') | KeyCode::Char('Y') => return Ok(true),
+                    // Enter = 確認（預設為 yes，以大寫 Y 標示）
+                    KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => return Ok(true),
                     KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => return Ok(false),
                     _ => {
                         break;
@@ -319,5 +333,33 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_to_width;
+
+    #[test]
+    fn truncate_cjk_at_boundary_does_not_panic() {
+        // 舊實作以 byte 索引切割，在 CJK 字元中間切割會 panic
+        let s = " Search: 中文搜尋關鍵字測試";
+        let (out, w) = truncate_to_width(s, 12);
+        assert!(w <= 12);
+        assert!(s.starts_with(&out));
+    }
+
+    #[test]
+    fn truncate_counts_cjk_double_width() {
+        let (out, w) = truncate_to_width("中文abc", 5);
+        assert_eq!(out, "中文a"); // 2+2+1 = 5
+        assert_eq!(w, 5);
+    }
+
+    #[test]
+    fn truncate_shorter_than_limit_unchanged() {
+        let (out, w) = truncate_to_width("abc", 10);
+        assert_eq!(out, "abc");
+        assert_eq!(w, 3);
     }
 }

@@ -42,30 +42,8 @@ fn parse_encoding(
 }
 
 fn parse_single_encoding(enc_str: &str) -> Result<&'static encoding_rs::Encoding> {
-    match enc_str.to_lowercase().as_str() {
-        "utf-8" | "utf8" => Ok(encoding_rs::UTF_8),
-        "utf-16le" | "utf16le" => Ok(encoding_rs::UTF_16LE),
-        "utf-16be" | "utf16be" => Ok(encoding_rs::UTF_16BE),
-        "gbk" | "cp936" => Ok(encoding_rs::GBK),
-        "shift-jis" | "shift_jis" | "sjis" => Ok(encoding_rs::SHIFT_JIS),
-        "big5" | "cp950" => {
-            // Big5 編碼用於繁體中文
-            if let Some(enc) = encoding_rs::Encoding::for_label(b"big5") {
-                Ok(enc)
-            } else {
-                anyhow::bail!("Big5 encoding not supported");
-            }
-        }
-        "cp1252" | "windows-1252" => Ok(encoding_rs::WINDOWS_1252),
-        _ => {
-            // 嘗試查找其他編碼
-            if let Some(enc) = encoding_rs::Encoding::for_label(enc_str.as_bytes()) {
-                Ok(enc)
-            } else {
-                anyhow::bail!("Unsupported encoding: {}", enc_str);
-            }
-        }
-    }
+    wedi_core::buffer::parse_encoding_label(enc_str)
+        .ok_or_else(|| anyhow::anyhow!("Unsupported encoding: {}", enc_str))
 }
 
 #[derive(Debug)]

@@ -270,7 +270,6 @@ wedi --list-themes
 ### Search
 
 - **Ctrl+F**: Find text (shows search dialog with previous search term)
-- **PageUp/Down**: Smart navigation - jump to previous/next match in search mode, normal paging otherwise
 - **Ctrl+N**: Smart jump down - next search match in search mode, page down otherwise
 - **Ctrl+P**: Smart jump up - previous search match in search mode, page up otherwise
 - **ESC**: Exit search mode (preserves search results)

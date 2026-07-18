@@ -337,70 +337,65 @@ impl View {
                 let visual_line_width = visual_width(visual_line);
 
                 #[cfg(feature = "syntax-highlighting")]
-                let use_syntax_highlight = selection.is_none()
-                    && highlighted_lines.and_then(|h| h.get(&file_row)).is_some();
+                let use_syntax_highlight =
+                    highlighted_lines.and_then(|h| h.get(&file_row)).is_some();
 
                 #[cfg(not(feature = "syntax-highlighting"))]
                 let use_syntax_highlight = false;
 
-                if let Some(((start_row, start_col), (end_row, end_col))) = sel_visual_range {
-                    if file_row >= start_row && file_row <= end_row {
-                        // 這一行有選擇，需要逐字符渲染
-                        let chars: Vec<char> = visual_line.chars().collect();
-                        let mut current_visual_pos = visual_line_start_col;
+                // 僅包含選取的行退化為逐字符反白渲染；其餘行維持語法高亮
+                let row_selection = sel_visual_range.filter(|&((start_row, _), (end_row, _))| {
+                    file_row >= start_row && file_row <= end_row
+                });
 
-                        for &ch in chars.iter() {
-                            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+                if let Some(((start_row, start_col), (end_row, end_col))) = row_selection {
+                    // 這一行有選擇，需要逐字符渲染
+                    let chars: Vec<char> = visual_line.chars().collect();
+                    let mut current_visual_pos = visual_line_start_col;
 
-                            // 單行模式：跳過 offset_col 之前的字符
-                            if !self.wrap_mode && current_visual_pos + ch_width <= self.offset_col {
-                                current_visual_pos += ch_width;
-                                continue;
-                            }
+                    for &ch in chars.iter() {
+                        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
 
-                            // 單行模式：超出可見範圍則停止
-                            if !self.wrap_mode
-                                && current_visual_pos >= self.offset_col + available_width
-                            {
-                                break;
-                            }
-
-                            // 判斷這個字符是否在選擇範圍內
-                            let is_selected = if file_row == start_row && file_row == end_row {
-                                // 選擇在同一行
-                                current_visual_pos >= start_col && current_visual_pos < end_col
-                            } else if file_row == start_row {
-                                // 選擇起始行
-                                current_visual_pos >= start_col
-                            } else if file_row == end_row {
-                                // 選擇結束行
-                                current_visual_pos < end_col
-                            } else {
-                                // 選擇中間的行，全選
-                                true
-                            };
-
-                            if is_selected {
-                                queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
-                            }
-                            queue!(stdout, style::Print(ch))?;
-                            if is_selected {
-                                queue!(stdout, style::SetAttribute(Attribute::NoReverse))?;
-                            }
-
+                        // 單行模式：跳過 offset_col 之前的字符
+                        if !self.wrap_mode && current_visual_pos + ch_width <= self.offset_col {
                             current_visual_pos += ch_width;
+                            continue;
                         }
-                    } else {
-                        // 這一行沒有選擇，直接打印（單行模式需要截取）
-                        let display_text = if self.wrap_mode {
-                            visual_line.clone()
+
+                        // 單行模式：超出可見範圍則停止
+                        if !self.wrap_mode
+                            && current_visual_pos >= self.offset_col + available_width
+                        {
+                            break;
+                        }
+
+                        // 判斷這個字符是否在選擇範圍內
+                        let is_selected = if file_row == start_row && file_row == end_row {
+                            // 選擇在同一行
+                            current_visual_pos >= start_col && current_visual_pos < end_col
+                        } else if file_row == start_row {
+                            // 選擇起始行
+                            current_visual_pos >= start_col
+                        } else if file_row == end_row {
+                            // 選擇結束行
+                            current_visual_pos < end_col
                         } else {
-                            self.slice_visible_text(visual_line, self.offset_col, available_width)
+                            // 選擇中間的行，全選
+                            true
                         };
-                        queue!(stdout, style::Print(display_text))?;
+
+                        if is_selected {
+                            queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
+                        }
+                        queue!(stdout, style::Print(ch))?;
+                        if is_selected {
+                            queue!(stdout, style::SetAttribute(Attribute::NoReverse))?;
+                        }
+
+                        current_visual_pos += ch_width;
                     }
                 } else {
-                    // 沒有選擇
+                    // 這一行沒有被選取（可能其他行有）
                     if use_syntax_highlight {
                         // 使用語法高亮
                         #[cfg(feature = "syntax-highlighting")]
