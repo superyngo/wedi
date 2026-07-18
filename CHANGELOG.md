@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.10.0] - 2026-07-18
+
 ### Added
 - Search matches are now highlighted while search mode is active — all matches get a dark-yellow background, the current match a bright-yellow background (new `wedi_core::SearchHighlight` passed to `View::render`)
 - About page in the help panel (Tab/←/→ switches between Help and About) showing description, version, author, license, GitHub URL, and privacy statement

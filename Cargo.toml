@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/wedi-core", "crates/wedi-widget", "."]
 
 [workspace.package]
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 authors = ["wen"]
 license = "MIT"
@@ -17,8 +17,8 @@ license.workspace = true
 description = "A cross-platform minimalist lightweight CLI text editor"
 
 [dependencies]
-wedi-core = { path = "crates/wedi-core", version = "0.9.0", default-features = false }
-wedi-widget = { path = "crates/wedi-widget", version = "0.9.0", default-features = false, features = ["crossterm"] }
+wedi-core = { path = "crates/wedi-core", version = "0.10.0", default-features = false }
+wedi-widget = { path = "crates/wedi-widget", version = "0.10.0", default-features = false, features = ["crossterm"] }
 crossterm = "0.27"
 pico-args = "0.5"      # CLI 參數解析
 anyhow = "1.0"          # 錯誤處理
