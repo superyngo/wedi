@@ -1,92 +1,171 @@
 // 幫助訊息模組 - 提供統一的幫助文本
 
-/// 獲取鍵盤快捷鍵幫助內容
-#[allow(clippy::vec_init_then_push)]
-pub fn get_keyboard_shortcuts() -> Vec<String> {
-    let mut lines = Vec::new();
+/// 幫助面板的一個區段：(區段標題, [(按鍵, 說明)])
+pub type HelpSection = (&'static str, Vec<(&'static str, &'static str)>);
 
-    lines.push("Basic Editing:".to_string());
-    lines.push("  Ctrl+W / Alt+W      Save file".to_string());
-    lines.push("  Ctrl+Q              Quit (press twice if modified)".to_string());
-    lines.push("  Ctrl+Z              Undo".to_string());
-    lines.push("  Ctrl+Y              Redo".to_string());
-    lines.push("  Backspace           Delete character before cursor or selected text".to_string());
-    lines.push("  Delete              Delete character under cursor or selected text".to_string());
-    lines.push("  Ctrl+D              Delete current line or selected lines".to_string());
-    lines.push(
-        "  Tab                 Indent (insert 4 spaces or indent selected lines)".to_string(),
-    );
-    lines.push("  Shift+Tab           Unindent (remove up to 4 leading spaces)".to_string());
-    lines.push(String::new());
+/// 獲取結構化的鍵盤快捷鍵資料（供 TUI 面板著色與對齊使用）
+pub fn get_help_sections() -> Vec<HelpSection> {
+    let mut sections: Vec<HelpSection> = Vec::new();
 
-    lines.push("Navigation:".to_string());
-    lines.push("  Arrow Keys          Move cursor".to_string());
-    lines.push("  Ctrl+Left/Home      Move to line start".to_string());
-    lines.push("  Ctrl+Right/End      Move to line end".to_string());
-    lines.push("  Ctrl+Up/Ctrl+Home   Move to first line".to_string());
-    lines.push("  Ctrl+Down/Ctrl+End  Move to last line".to_string());
-    lines.push("  Page Up/Down        Scroll page up/down".to_string());
-    lines.push("  Ctrl+PageUp/Down    Jump 1/10 of file".to_string());
-    lines.push("  Ctrl+G              Go to line number".to_string());
+    sections.push((
+        "Basic Editing",
+        vec![
+            ("Ctrl+S / Ctrl+W / Alt+W", "Save file"),
+            ("Ctrl+Q", "Quit (press twice if modified)"),
+            ("Ctrl+Z", "Undo"),
+            ("Ctrl+Y", "Redo"),
+            (
+                "Backspace",
+                "Delete character before cursor or selected text",
+            ),
+            ("Delete", "Delete character under cursor or selected text"),
+            ("Ctrl+D", "Delete current line or selected lines"),
+            ("Tab", "Indent (insert 4 spaces or indent selected lines)"),
+            ("Shift+Tab", "Unindent (remove up to 4 leading spaces)"),
+        ],
+    ));
+
+    let mut navigation = vec![
+        ("Arrow Keys", "Move cursor"),
+        ("Ctrl+Left/Home", "Move to line start"),
+        ("Ctrl+Right/End", "Move to line end"),
+        ("Ctrl+Up/Ctrl+Home", "Move to first line"),
+        ("Ctrl+Down/Ctrl+End", "Move to last line"),
+        ("Page Up/Down", "Scroll page (cycle matches in search mode)"),
+        ("Ctrl+PageUp/Down", "Jump 1/10 of file"),
+        ("Ctrl+G", "Go to line number"),
+    ];
     #[cfg(feature = "mouse-support")]
-    lines.push("  Mouse Wheel         Scroll up/down (moves cursor)".to_string());
-    lines.push(String::new());
+    navigation.push(("Mouse Wheel", "Scroll up/down (moves cursor)"));
+    sections.push(("Navigation", navigation));
 
-    lines.push("Selection:".to_string());
-    lines.push(
-        "  Ctrl+S / Alt+S      Toggle selection mode (for terminals without Shift support)"
-            .to_string(),
-    );
-    lines.push("  Shift+Arrows        Select text".to_string());
-    lines.push("  Shift+Ctrl+Arrows   Quick select to line/file boundaries".to_string());
-    lines.push("  Shift+Home/End      Select to line boundaries".to_string());
-    lines.push("  Shift+Ctrl+Home/End Quick select to file boundaries".to_string());
-    lines.push("  Shift+PgUp/Dn       Select page up/down".to_string());
-    lines.push("  Ctrl+A              Select all".to_string());
-    lines.push(
-        "  ESC                 Dismiss one layer: message, then selection, then search mode"
-            .to_string(),
-    );
-    lines.push(String::new());
+    sections.push((
+        "Selection",
+        vec![
+            (
+                "Alt+S",
+                "Toggle selection mode (for terminals without Shift support)",
+            ),
+            ("Shift+Arrows", "Select text"),
+            ("Shift+Ctrl+Arrows", "Quick select to line/file boundaries"),
+            ("Shift+Home/End", "Select to line boundaries"),
+            ("Shift+Ctrl+Home/End", "Quick select to file boundaries"),
+            ("Shift+PgUp/Dn", "Select page up/down"),
+            ("Ctrl+A", "Select all"),
+            (
+                "ESC",
+                "Dismiss one layer: message, then selection, then search mode",
+            ),
+        ],
+    ));
 
-    lines.push("Clipboard:".to_string());
-    lines.push("  Ctrl+C              Copy (selection or current line)".to_string());
-    lines.push("  Ctrl+X              Cut (selection or current line)".to_string());
-    lines.push("  Ctrl+V              Paste".to_string());
-    lines.push("  Alt+C               Internal Copy (selection or current line)".to_string());
-    lines.push("  Alt+X               Internal Cut (selection or current line)".to_string());
-    lines.push("  Alt+V               Internal Paste".to_string());
-    lines.push(String::new());
+    sections.push((
+        "Clipboard",
+        vec![
+            ("Ctrl+C", "Copy (selection or current line)"),
+            ("Ctrl+X", "Cut (selection or current line)"),
+            ("Ctrl+V", "Paste"),
+            ("Alt+C", "Internal Copy (selection or current line)"),
+            ("Alt+X", "Internal Cut (selection or current line)"),
+            ("Alt+V", "Internal Paste"),
+        ],
+    ));
 
-    lines.push("Search:".to_string());
-    lines.push("  Ctrl+F                 Find text (with last search term pre-filled)".to_string());
-    lines.push("  Ctrl+N                 Find next match (PageDown if no active search)".to_string());
-    lines.push("  Ctrl+P                 Find previous match (PageUp if no active search)".to_string());
-    lines.push(String::new());
+    sections.push((
+        "Search",
+        vec![
+            ("Ctrl+F", "Find text (with last search term pre-filled)"),
+            (
+                "Ctrl+N / F3 / PgDn",
+                "Find next match (PageDown if no active search)",
+            ),
+            (
+                "Ctrl+P / Shift+F3 / PgUp",
+                "Find previous match (PageUp if no active search)",
+            ),
+        ],
+    ));
 
-    lines.push("Code:".to_string());
-    lines.push("  Ctrl+/ \\ K         Toggle line comment".to_string());
-    lines.push("  Ctrl+L              Toggle line numbers (& display mode)".to_string());
-    lines.push("  Ctrl+O              Toggle display mode (wrap/scroll)".to_string());
+    let mut code = vec![
+        ("Ctrl+/ \\ K", "Toggle line comment"),
+        ("Ctrl+L", "Toggle line numbers (& display mode)"),
+        ("Ctrl+O", "Toggle display mode (wrap/scroll)"),
+    ];
     #[cfg(feature = "syntax-highlighting")]
-    lines.push("  Ctrl+T              Toggle syntax highlight".to_string());
-    lines.push(String::new());
+    code.push(("Ctrl+T", "Toggle syntax highlight"));
+    sections.push(("Code", code));
 
-    lines.push("Other:".to_string());
-    lines.push(
-        "  Ctrl+E              Change file encoding (utf-8, gbk, big5, shift-jis, etc.)"
-            .to_string(),
-    );
-    lines.push("  Ctrl+H              Show this help".to_string());
-    lines.push(String::new());
+    sections.push((
+        "Other",
+        vec![
+            (
+                "Ctrl+E",
+                "Change file encoding (utf-8, gbk, big5, shift-jis, etc.)",
+            ),
+            ("Ctrl+H / F1", "Show this help"),
+        ],
+    ));
 
-    lines.push("SUPPORTED COMMENT STYLES:".to_string());
-    lines.push("  //  - Rust, C/C++, Java, JavaScript, TypeScript, Go, C#".to_string());
-    lines.push("  #   - Python, Shell, PowerShell, Ruby, YAML, TOML".to_string());
-    lines.push("  --  - SQL, Lua, Haskell".to_string());
-    lines.push("  REM - Batch, CMD".to_string());
-    lines.push("  \"   - Vim".to_string());
+    sections.push((
+        "Supported Comment Styles",
+        vec![
+            ("//", "Rust, C/C++, Java, JavaScript, TypeScript, Go, C#"),
+            ("#", "Python, Shell, PowerShell, Ruby, YAML, TOML"),
+            ("--", "SQL, Lua, Haskell"),
+            ("REM", "Batch, CMD"),
+            ("\"", "Vim"),
+        ],
+    ));
 
+    sections
+}
+
+/// About 面板的結構化內容：(標籤, 內容)；標籤為空字串表示純文字行
+pub fn get_about_entries() -> Vec<(&'static str, String)> {
+    vec![
+        ("", format!("wedi v{}", env!("CARGO_PKG_VERSION"))),
+        ("", env!("CARGO_PKG_DESCRIPTION").to_string()),
+        ("", String::new()),
+        ("Author", "wen (superyngo)".to_string()),
+        ("License", "MIT".to_string()),
+        ("GitHub", "https://github.com/superyngo/wedi".to_string()),
+        ("", String::new()),
+        ("", "Privacy".to_string()),
+        (
+            "",
+            "  wedi runs entirely on your machine. It does not collect,".to_string(),
+        ),
+        (
+            "",
+            "  store, or transmit any data. The clipboard feature only".to_string(),
+        ),
+        (
+            "",
+            "  accesses your system clipboard when you copy or paste.".to_string(),
+        ),
+    ]
+}
+
+/// 獲取鍵盤快捷鍵幫助內容（純文字，用於 --help 輸出）
+pub fn get_keyboard_shortcuts() -> Vec<String> {
+    let sections = get_help_sections();
+    let key_width = sections
+        .iter()
+        .flat_map(|(_, items)| items.iter())
+        .map(|(key, _)| key.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut lines = Vec::new();
+    for (i, (title, items)) in sections.iter().enumerate() {
+        if i > 0 {
+            lines.push(String::new());
+        }
+        lines.push(format!("{}:", title));
+        for (key, desc) in items {
+            lines.push(format!("  {:<width$}  {}", key, desc, width = key_width));
+        }
+    }
     lines
 }
 

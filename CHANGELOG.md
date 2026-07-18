@@ -5,29 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.7] - 2026-02-26
-
-### Added
-- Status bar now displays full file path (absolute path) aligned to the right
-- Path truncation with ellipsis prefix (…) when path exceeds screen width
-- Added `RopeBuffer::file_display_path()` method for returning absolute file paths
-
 ## [Unreleased]
 
-### Fixed (2026-07-18)
-- fix: update cached terminal size on resize so dialogs (search, go-to-line, encoding, help) render at the correct position after the terminal is resized
-- fix: dialog text truncation now uses visual width instead of byte slicing, preventing a panic when CJK input exceeds the screen width; dialog cursor position now accounts for CJK double-width characters
-- fix: help text listed `Ctrl+J` for toggling syntax highlight; the actual binding is `Ctrl+T`
-- fix: clear syntax highlight cache when cutting a whole line (`Ctrl+X`/`Alt+X` without selection), matching `Ctrl+D` behavior and avoiding stale highlight residue
+### Added
+- Search matches are now highlighted while search mode is active — all matches get a dark-yellow background, the current match a bright-yellow background (new `wedi_core::SearchHighlight` passed to `View::render`)
+- About page in the help panel (Tab/←/→ switches between Help and About) showing description, version, author, license, GitHub URL, and privacy statement
+- Conventional keybindings `F1` (help), `F3`/`Shift+F3` (find next/previous)
 
-### Changed (2026-07-18)
+### Changed
+- **BREAKING**: `Ctrl+S` now saves the file (conventional binding); selection mode is toggled with `Alt+S` only. `Ctrl+W`/`Alt+W` remain as save aliases (help, README updated)
+- ESC now dismisses one layer per press (message → selection/selection mode → search mode) instead of clearing everything at once; help text updated
+- `PageUp`/`PageDown` cycle through matches while search mode is active and page otherwise (same smart-jump behavior as `Ctrl+N`/`Ctrl+P`; help, README, CLAUDE.md updated)
+- Syntax highlighting is now preserved on rows outside the selection; only selected rows fall back to plain reverse-video rendering
+- Confirm dialog now accepts `Enter` as yes (shown as `(Y/n)`)
+- Help screen title now shows the app version (e.g. `WEDI v0.10.0 HELP`)
+- refactor: help content is now structured data (`get_help_sections()`); the help panel renders section headers and key columns with colors and CJK-safe alignment
 - refactor: single shared encoding label table `wedi_core::buffer::parse_encoding_label()`, replacing duplicated copies in `main.rs` and `editor.rs`
 - refactor: `Cut`/`CutInternal` now share one `do_cut()` helper; `JumpTenthUp/Down` and their selection variants share one `jump_tenth()` helper
-- ESC now dismisses one layer per press (message → selection/selection mode → search mode) instead of clearing everything at once; help text updated
-- Syntax highlighting is now preserved on rows outside the selection; only selected rows fall back to plain reverse-video rendering
-- Plain `PageUp`/`PageDown` now always page; search match navigation uses `Ctrl+N`/`Ctrl+P` (help, README, CLAUDE.md updated)
-- Confirm dialog now accepts `Enter` as yes (shown as `(Y/n)`)
-- Help screen title now shows the app version (e.g. `WEDI v0.9.0 HELP`)
+
+### Fixed
+- `Ctrl+F` now jumps to the first match instead of the second (off-by-one in the initial jump); the first `Ctrl+N` after a search reports `Match 2/N` as expected
+- Buffer-modifying commands (typing, delete, cut, paste, undo/redo, comment toggle, indent) now exit search mode, so stale match highlights no longer reappear after an edit or undo
+- `cargo build --no-default-features` now compiles — the root and widget crates no longer hard-enable `wedi-core` default features; `mouse-support`/`syntax-highlighting` are forwarded properly (new `wedi-widget/mouse-support` feature, on by default)
+- Update cached terminal size on resize so dialogs (search, go-to-line, encoding, help) render at the correct position after the terminal is resized
+- Dialog text truncation now uses visual width instead of byte slicing, preventing a panic when CJK input exceeds the screen width; dialog cursor position now accounts for CJK double-width characters
+- Help text and README listed `Ctrl+J` for toggling syntax highlight; the actual binding is `Ctrl+T`
+- Clear syntax highlight cache when cutting a whole line (`Ctrl+X`/`Alt+X` without selection), matching `Ctrl+D` behavior and avoiding stale highlight residue
 
 ## [0.9.0] - 2026-06-07
 
@@ -37,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Docs
 - Added Wenget install instructions to README
+
+## [0.8.7] - 2026-02-26
+
+### Added
+- Status bar now displays full file path (absolute path) aligned to the right
+- Path truncation with ellipsis prefix (…) when path exceeds screen width
+- Added `RopeBuffer::file_display_path()` method for returning absolute file paths
 
 ## [0.8.6] - 2026-01-23
 

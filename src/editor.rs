@@ -196,10 +196,22 @@ impl Editor {
                 }
             };
 
+            // 搜尋模式下傳入匹配位置供渲染高亮
+            let search_highlight = if self.search_mode && self.search.match_count() > 0 {
+                Some(wedi_core::SearchHighlight {
+                    matches: self.search.get_matches(),
+                    query_len: self.search.get_query().len(),
+                    current: self.search.current_index(),
+                })
+            } else {
+                None
+            };
+
             self.view.render(
                 &self.buffer,
                 &self.cursor,
                 self.selection.as_ref(),
+                search_highlight.as_ref(),
                 if self.debug_mode {
                     debug_info.as_deref()
                 } else {
@@ -231,6 +243,29 @@ impl Editor {
         // 任何非 Quit 的命令都重置 quit_times
         if !matches!(command, Command::Quit) {
             self.quit_times = 0;
+        }
+
+        // 修改緩衝區的命令會使搜尋匹配位置失效：先退出搜尋模式（保留查詢字串）
+        if self.search_mode
+            && matches!(
+                command,
+                Command::Insert(_)
+                    | Command::PasteText(_)
+                    | Command::Backspace
+                    | Command::Delete
+                    | Command::DeleteLine
+                    | Command::Indent
+                    | Command::Unindent
+                    | Command::Cut
+                    | Command::CutInternal
+                    | Command::Paste
+                    | Command::PasteInternal
+                    | Command::Undo
+                    | Command::Redo
+                    | Command::ToggleComment
+            )
+        {
+            self.search_mode = false;
         }
 
         match command {
@@ -587,7 +622,7 @@ impl Editor {
                         // 第一次按 Ctrl+Q，顯示警告
                         self.quit_times = 1;
                         self.message = Some(
-                            "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+W to save"
+                            "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+S to save"
                                 .to_string(),
                         );
                     }
@@ -652,7 +687,8 @@ impl Editor {
                         self.search_mode = true; // 開啟搜尋模式
 
                         if self.search.match_count() > 0 {
-                            if let Some((row, col)) = self.search.next_match() {
+                            // 跳到第一個匹配（不推進 current，避免 off-by-one）
+                            if let Some((row, col)) = self.search.first_match() {
                                 self.cursor.row = row;
                                 self.cursor.col = col;
                                 self.cursor.desired_visual_col = col;
@@ -1048,12 +1084,8 @@ impl Editor {
                 .saturating_add(jump_distance)
                 .min(total_lines.saturating_sub(1))
         };
-        self.cursor.set_position(
-            &self.buffer,
-            &self.view,
-            self.cursor.row,
-            self.cursor.col,
-        );
+        self.cursor
+            .set_position(&self.buffer, &self.view, self.cursor.row, self.cursor.col);
     }
 
     /// 剪切：複製選取（或整行）後刪除

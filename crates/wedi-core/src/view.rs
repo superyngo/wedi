@@ -100,6 +100,30 @@ pub struct Selection {
     pub end: (usize, usize),   // (row, col)
 }
 
+/// 搜尋高亮資訊：匹配位置為 (行, 行內 byte 起點)
+#[derive(Debug, Clone, Copy)]
+pub struct SearchHighlight<'a> {
+    pub matches: &'a [(usize, usize)],
+    pub query_len: usize, // 查詢字串的 byte 長度
+    pub current: usize,   // matches 中當前匹配的索引
+}
+
+/// 將行內 byte 位置轉換為視覺列（Tab 展開為 TAB_WIDTH，CJK 計雙寬）
+fn byte_col_to_visual_col(line: &str, byte_col: usize) -> usize {
+    let mut visual_col = 0;
+    for (idx, ch) in line.char_indices() {
+        if idx >= byte_col {
+            break;
+        }
+        if ch == '\t' {
+            visual_col += TAB_WIDTH;
+        } else {
+            visual_col += UnicodeWidthChar::width(ch).unwrap_or(1);
+        }
+    }
+    visual_col
+}
+
 pub struct View {
     pub offset_row: usize, // 視窗頂部顯示的行號（邏輯行）
     pub offset_col: usize, // 水平偏移（單行模式用）
@@ -210,6 +234,7 @@ impl View {
         buffer: &RopeBuffer,
         cursor: &Cursor,
         selection: Option<&Selection>,
+        search: Option<&SearchHighlight>,
         message: Option<&str>,
         #[cfg(feature = "syntax-highlighting")] highlighted_lines: Option<
             &std::collections::HashMap<usize, String>,
@@ -304,6 +329,27 @@ impl View {
                 }
             };
 
+            // 該邏輯行上的搜尋匹配（轉為視覺列區間，is_current 標記當前匹配）
+            let row_matches: Vec<(usize, usize, bool)> = search
+                .map(|s| {
+                    let line = buffer
+                        .line(file_row)
+                        .map(|l| l.to_string())
+                        .unwrap_or_default();
+                    let line = line.trim_end_matches(['\n', '\r']);
+                    s.matches
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &(row, _))| row == file_row)
+                        .map(|(i, &(_, byte_col))| {
+                            let start = byte_col_to_visual_col(line, byte_col);
+                            let end = byte_col_to_visual_col(line, byte_col + s.query_len);
+                            (start, end, i == s.current)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
             for (visual_idx, visual_line) in layout.visual_lines.iter().enumerate() {
                 if screen_row >= self.screen_rows {
                     break;
@@ -348,8 +394,8 @@ impl View {
                     file_row >= start_row && file_row <= end_row
                 });
 
-                if let Some(((start_row, start_col), (end_row, end_col))) = row_selection {
-                    // 這一行有選擇，需要逐字符渲染
+                if row_selection.is_some() || !row_matches.is_empty() {
+                    // 這一行有選擇或搜尋匹配，需要逐字符渲染
                     let chars: Vec<char> = visual_line.chars().collect();
                     let mut current_visual_pos = visual_line_start_col;
 
@@ -370,26 +416,56 @@ impl View {
                         }
 
                         // 判斷這個字符是否在選擇範圍內
-                        let is_selected = if file_row == start_row && file_row == end_row {
-                            // 選擇在同一行
-                            current_visual_pos >= start_col && current_visual_pos < end_col
-                        } else if file_row == start_row {
-                            // 選擇起始行
-                            current_visual_pos >= start_col
-                        } else if file_row == end_row {
-                            // 選擇結束行
-                            current_visual_pos < end_col
+                        let is_selected = match row_selection {
+                            Some(((start_row, start_col), (end_row, end_col))) => {
+                                if file_row == start_row && file_row == end_row {
+                                    // 選擇在同一行
+                                    current_visual_pos >= start_col && current_visual_pos < end_col
+                                } else if file_row == start_row {
+                                    // 選擇起始行
+                                    current_visual_pos >= start_col
+                                } else if file_row == end_row {
+                                    // 選擇結束行
+                                    current_visual_pos < end_col
+                                } else {
+                                    // 選擇中間的行，全選
+                                    true
+                                }
+                            }
+                            None => false,
+                        };
+
+                        // 搜尋匹配高亮（選取樣式優先）：Some(true) 為當前匹配
+                        let match_current = if is_selected {
+                            None
                         } else {
-                            // 選擇中間的行，全選
-                            true
+                            row_matches
+                                .iter()
+                                .find(|&&(start, end, _)| {
+                                    current_visual_pos >= start && current_visual_pos < end
+                                })
+                                .map(|&(_, _, current)| current)
                         };
 
                         if is_selected {
                             queue!(stdout, style::SetAttribute(Attribute::Reverse))?;
+                        } else if let Some(current) = match_current {
+                            let bg = if current {
+                                Color::Yellow
+                            } else {
+                                Color::DarkYellow
+                            };
+                            queue!(
+                                stdout,
+                                style::SetBackgroundColor(bg),
+                                style::SetForegroundColor(Color::Black)
+                            )?;
                         }
                         queue!(stdout, style::Print(ch))?;
                         if is_selected {
                             queue!(stdout, style::SetAttribute(Attribute::NoReverse))?;
+                        } else if match_current.is_some() {
+                            queue!(stdout, style::ResetColor)?;
                         }
 
                         current_visual_pos += ch_width;
@@ -630,7 +706,7 @@ impl View {
             format!(" {}{}  - {}", modified, mode_indicator, msg)
         } else {
             format!(
-                " {}{}  Line {}/{}  Ctrl+W:Save Ctrl+Q:Quit",
+                " {}{}  Line {}/{}  Ctrl+S:Save Ctrl+Q:Quit F1:Help",
                 modified,
                 mode_indicator,
                 cursor.row + 1,

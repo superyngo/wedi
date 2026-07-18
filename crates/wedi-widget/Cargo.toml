@@ -13,14 +13,15 @@ keywords = ["editor", "text-editor", "tui", "terminal", "widget"]
 categories = ["text-editors", "command-line-utilities"]
 
 [dependencies]
-wedi-core = { path = "../wedi-core", version = "0.9.0" }
+wedi-core = { path = "../wedi-core", version = "0.9.0", default-features = false }
 crossterm = { version = "0.27", optional = true }
 ratatui = { version = "0.26", optional = true }
 anyhow = "1.0"
 unicode-width = "0.1"
 
 [features]
-default = ["crossterm"]
+default = ["crossterm", "mouse-support"]
 crossterm = ["dep:crossterm"]
 ratatui = ["dep:ratatui"]
+mouse-support = ["wedi-core/mouse-support"]
 syntax-highlighting = ["wedi-core/syntax-highlighting"]

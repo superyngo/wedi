@@ -235,7 +235,7 @@ Redo (Ctrl+Y):
 ### 5. 靈活的快捷鍵系統
 - 可自訂綁定 (Keymap)
 - 選擇模式覆寫 (bind_selection)
-- Shift/Ctrl+S 雙模式支援（相容不同終端）
+- Shift/Alt+S 雙模式選取支援（相容不同終端）
 
 ## 依賴關係
 

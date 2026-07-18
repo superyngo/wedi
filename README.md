@@ -10,7 +10,7 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ Line numbers display (toggleable)
 - ✅ Clipboard support (copy, cut, paste)
 - ✅ Selection mode with Shift key
-- ✅ **Ctrl+S Selection Mode** (for terminals without Shift key support) 🎉
+- ✅ **Alt+S Selection Mode** (for terminals without Shift key support) 🎉
 - ✅ Smart line operations
 - ✅ **Undo/Redo (Ctrl+Z/Y)** 🎉
 - ✅ **Search functionality (Ctrl+F)** 🎉
@@ -226,7 +226,7 @@ wedi --list-themes
 
 ### Basic Editing
 
-- **Ctrl+W** / **Alt+W**: Save file (Alt+W for browser-based SSH terminals where Ctrl+W closes the tab)
+- **Ctrl+S** / **Ctrl+W** / **Alt+W**: Save file (Alt+W for browser-based SSH terminals where Ctrl+W closes the tab)
 - **Ctrl+Q**: Quit (press twice if modified)
 - **Ctrl+Z**: Undo
 - **Ctrl+Y**: Redo
@@ -243,12 +243,12 @@ wedi --list-themes
 - **Ctrl+Down** / **Ctrl+End**: Move to last line
 - **Home** / **Ctrl+Left**: Move to line start
 - **End** / **Ctrl+Right**: Move to line end
-- **Page Up / Page Down**: Scroll page up/down
+- **Page Up / Page Down**: Scroll page up/down (cycle through matches in search mode)
 - **Ctrl+G**: Go to line number
 
 ### Selection
 
-- **Ctrl+S** / **Alt+S**: Toggle selection mode (Alt+S for browser-based SSH terminals where Ctrl+S is caught by flow control)
+- **Alt+S**: Toggle selection mode (for terminals without Shift key support)
 - **Shift + Arrow Keys**: Select text
 - **Shift + Home / End**: Select to line start/end
 - **Shift + Page Up / Down**: Select page up/down
@@ -256,7 +256,7 @@ wedi --list-themes
 - **Ctrl+A**: Select all
 - **ESC**: Clear selection and messages
 
-> **Note**: In Ctrl+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press Ctrl+S again, ESC, or perform any editing operation to exit selection mode.
+> **Note**: In Alt+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press Alt+S again, ESC, or perform any editing operation to exit selection mode.
 
 ### Clipboard
 
@@ -270,22 +270,22 @@ wedi --list-themes
 ### Search
 
 - **Ctrl+F**: Find text (shows search dialog with previous search term)
-- **Ctrl+N**: Smart jump down - next search match in search mode, page down otherwise
-- **Ctrl+P**: Smart jump up - previous search match in search mode, page up otherwise
+- **Ctrl+N** / **F3** / **Page Down**: Smart jump down - next search match in search mode, page down otherwise
+- **Ctrl+P** / **Shift+F3** / **Page Up**: Smart jump up - previous search match in search mode, page up otherwise
 - **ESC**: Exit search mode (preserves search results)
 
-> **Note**: Search mode is activated when you press Ctrl+F and find matches. Press ESC to exit search mode and return to normal navigation. The search query and results are preserved until you perform a new search.
+> **Note**: Search mode is activated when you press Ctrl+F and find matches. While active, all matches are highlighted in the text (the current match in a brighter color). Press ESC to exit search mode and return to normal navigation. The search query and results are preserved until you perform a new search.
 
 ### Code
 
 - **Ctrl+/** / **Ctrl+\\** / **Ctrl+K**: Toggle line comment
 - **Ctrl+L**: Toggle line numbers (also toggles display mode)
 - **Ctrl+O**: Toggle display mode only (wrap ↔ horizontal scroll)
-- **Ctrl+J**: Toggle syntax highlighting (On/Off)
+- **Ctrl+T**: Toggle syntax highlighting (On/Off)
 
 ### Help
 
-- **Ctrl+H**: Show in-editor help dialog with all keyboard shortcuts
+- **Ctrl+H** / **F1**: Show in-editor help panel with all keyboard shortcuts (Tab switches to the About page)
 
 ## Supported Comment Styles
 

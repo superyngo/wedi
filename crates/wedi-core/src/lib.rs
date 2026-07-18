@@ -21,4 +21,4 @@ pub use cursor::Cursor;
 pub use keymap::{Command, Direction, Keymap};
 pub use search::Search;
 pub use terminal::{InputEvent, Terminal};
-pub use view::{Selection, View};
+pub use view::{SearchHighlight, Selection, View};

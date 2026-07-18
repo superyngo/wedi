@@ -48,6 +48,11 @@ impl Search {
         }
     }
 
+    /// 回傳第一個匹配（不移動 current），供搜尋後的初次跳轉使用
+    pub fn first_match(&self) -> Option<(usize, usize)> {
+        self.matches.first().copied()
+    }
+
     pub fn next_match(&mut self) -> Option<(usize, usize)> {
         if self.matches.is_empty() {
             return None;
@@ -81,6 +86,10 @@ impl Search {
 
     pub fn get_query(&self) -> &str {
         &self.query
+    }
+
+    pub fn get_matches(&self) -> &[(usize, usize)] {
+        &self.matches
     }
 }
 

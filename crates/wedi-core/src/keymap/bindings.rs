@@ -4,11 +4,9 @@ use super::command::{Command, Direction};
 
 #[allow(dead_code)]
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
-    // Ctrl+S 切換選擇模式（優先處理）
-    // Alt+S 為補充綁定（瀏覽器 SSH 終端的 XOFF 流量控制會攔截 Ctrl+S）
-    if matches!(event.code, KeyCode::Char('s'))
-        && (event.modifiers == KeyModifiers::CONTROL || event.modifiers == KeyModifiers::ALT)
-    {
+    // Alt+S 切換選擇模式（優先處理）
+    // Ctrl+S 依慣例綁定為存檔（raw mode 已停用 IXON，多數終端可正常收到）
+    if matches!(event.code, KeyCode::Char('s')) && event.modifiers == KeyModifiers::ALT {
         return Some(Command::ToggleSelectionMode);
     }
 
@@ -77,9 +75,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Right, KeyModifiers::NONE) => Some(Command::MoveRight),
         (KeyCode::Home, KeyModifiers::NONE) => Some(Command::MoveHome),
         (KeyCode::End, KeyModifiers::NONE) => Some(Command::MoveEnd),
-        // PageUp/PageDown 恆為翻頁；搜尋跳轉使用 Ctrl+N/P
-        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::PageUp),
-        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::PageDown),
+        // PageUp/PageDown：搜尋模式下輪跳匹配，否則翻頁（FindPrev/FindNext 內建 fallback）
+        (KeyCode::PageUp, KeyModifiers::NONE) => Some(Command::FindPrev),
+        (KeyCode::PageDown, KeyModifiers::NONE) => Some(Command::FindNext),
 
         // Ctrl 快速移動
         (KeyCode::Up, KeyModifiers::CONTROL) => Some(Command::MoveToFileStart),
@@ -166,6 +164,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Delete, _) => Some(Command::Delete),
 
         // Ctrl 組合鍵
+        (KeyCode::Char('s'), KeyModifiers::CONTROL) => Some(Command::Save),
         (KeyCode::Char('w'), KeyModifiers::CONTROL) => Some(Command::Save),
         // Alt+W: Save 的補充綁定（瀏覽器 SSH 終端會攔截 Ctrl+W 去關分頁）
         (KeyCode::Char('w'), KeyModifiers::ALT) => Some(Command::Save),
@@ -174,6 +173,7 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('y'), KeyModifiers::CONTROL) => Some(Command::Redo),
         (KeyCode::Char('f'), KeyModifiers::CONTROL) => Some(Command::Find),
         (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ShowHelp),
+        (KeyCode::F(1), KeyModifiers::NONE) => Some(Command::ShowHelp),
         (KeyCode::Char('l'), KeyModifiers::CONTROL) => Some(Command::ToggleLineNumbers),
         (KeyCode::Char('g'), KeyModifiers::CONTROL) => Some(Command::GoToLine),
         (KeyCode::Char('a'), KeyModifiers::CONTROL) => Some(Command::SelectAll),
@@ -211,6 +211,9 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // Ctrl+N/P: 智慧跳轉 (一般模式下等同PageDown/PageUp，搜尋模式下等同FindNext/FindPrev)
         (KeyCode::Char('n'), KeyModifiers::CONTROL) => Some(Command::FindNext),
         (KeyCode::Char('p'), KeyModifiers::CONTROL) => Some(Command::FindPrev),
+        // F3/Shift+F3: 慣例的搜尋跳轉綁定
+        (KeyCode::F(3), KeyModifiers::NONE) => Some(Command::FindNext),
+        (KeyCode::F(3), KeyModifiers::SHIFT) => Some(Command::FindPrev),
 
         _ => None,
     }

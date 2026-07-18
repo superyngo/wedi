@@ -27,83 +27,183 @@ fn truncate_to_width(s: &str, max_width: usize) -> (String, usize) {
     (result, width)
 }
 
-/// 顯示幫助對話框
+/// 幫助/關於面板的一行內容
+enum PanelLine {
+    Blank,
+    /// 區段標題（粗體青色）
+    Section(String),
+    /// 按鍵/標籤（黃色）+ 說明（預設色），key 已含對齊用空白
+    Item {
+        key: String,
+        desc: String,
+    },
+    /// 純文字行
+    Text(String),
+}
+
+/// 將結構化幫助資料轉為面板行（key 欄位對齊）
+fn build_help_panel_lines() -> Vec<PanelLine> {
+    let sections = crate::help::get_help_sections();
+    let key_width = sections
+        .iter()
+        .flat_map(|(_, items)| items.iter())
+        .map(|(key, _)| key.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut lines = Vec::new();
+    for (i, (title, items)) in sections.iter().enumerate() {
+        if i > 0 {
+            lines.push(PanelLine::Blank);
+        }
+        lines.push(PanelLine::Section(title.to_string()));
+        for (key, desc) in items {
+            lines.push(PanelLine::Item {
+                key: format!("  {:<width$}  ", key, width = key_width),
+                desc: desc.to_string(),
+            });
+        }
+    }
+    lines
+}
+
+/// 將 About 資料轉為面板行
+fn build_about_panel_lines() -> Vec<PanelLine> {
+    let entries = crate::help::get_about_entries();
+    let label_width = entries
+        .iter()
+        .filter(|(label, _)| !label.is_empty())
+        .map(|(label, _)| label.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut lines = Vec::new();
+    for (i, (label, content)) in entries.iter().enumerate() {
+        if label.is_empty() {
+            if content.is_empty() {
+                lines.push(PanelLine::Blank);
+            } else if i == 0 || *content == "Privacy" {
+                // 首行（名稱+版本）與 Privacy 標題以區段樣式呈現
+                lines.push(PanelLine::Section(content.clone()));
+            } else {
+                lines.push(PanelLine::Text(content.clone()));
+            }
+        } else {
+            lines.push(PanelLine::Item {
+                key: format!("  {:<width$}  ", label, width = label_width),
+                desc: content.clone(),
+            });
+        }
+    }
+    lines
+}
+
+/// 顯示幫助/關於面板（Tab 或 ←/→ 切換頁籤，ESC 關閉）
 #[allow(dead_code)]
 pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
     let (cols, rows) = terminal_size;
-
-    // 從 help 模組獲取幫助內容
-    let mut help_lines = vec![format!(
-        "═══════════════════ WEDI v{} HELP ════════════════════",
-        env!("CARGO_PKG_VERSION")
-    )];
-    help_lines.push(String::new());
-    help_lines.extend(crate::help::get_keyboard_shortcuts());
-    help_lines.push(String::new());
-    help_lines.push("Press ESC to close this help".to_string());
-    help_lines.push("═══════════════════════════════════════════════════════════".to_string());
-
-    let total_lines = help_lines.len();
+    let tabs = ["Help", "About"];
+    let pages = [build_help_panel_lines(), build_about_panel_lines()];
+    let mut active_tab = 0usize;
+    // 頁籤列 + 分隔線 + 底部狀態列
     let max_display_lines = (rows.saturating_sub(3)) as usize;
-    let mut scroll_offset = 0;
+    let mut scroll_offset = 0usize;
 
     loop {
-        // 清除螢幕
+        let lines = &pages[active_tab];
+        let total_lines = lines.len();
+        scroll_offset = scroll_offset.min(total_lines.saturating_sub(max_display_lines));
+
         execute!(io::stdout(), terminal::Clear(ClearType::All))?;
 
-        // 計算可顯示的行數
-        let visible_lines = total_lines.min(max_display_lines);
-        let end_line = (scroll_offset + visible_lines).min(total_lines);
-
-        // 顯示幫助內容
-        for (i, line) in help_lines[scroll_offset..end_line].iter().enumerate() {
-            queue!(
-                io::stdout(),
-                cursor::MoveTo(0, i as u16),
-                style::SetForegroundColor(Color::Cyan),
-            )?;
-
-            // 截斷過長的行
-            let display_line = if line.chars().count() > cols as usize {
-                line.chars().take(cols as usize).collect::<String>()
+        // 頁籤列
+        queue!(io::stdout(), cursor::MoveTo(0, 0))?;
+        for (i, tab) in tabs.iter().enumerate() {
+            if i == active_tab {
+                queue!(
+                    io::stdout(),
+                    style::SetBackgroundColor(Color::Cyan),
+                    style::SetForegroundColor(Color::Black),
+                    style::Print(format!("  {}  ", tab)),
+                    style::ResetColor,
+                )?;
             } else {
-                line.to_string()
-            };
-
-            queue!(io::stdout(), style::Print(display_line))?;
+                queue!(
+                    io::stdout(),
+                    style::SetForegroundColor(Color::DarkGrey),
+                    style::Print(format!("  {}  ", tab)),
+                    style::ResetColor,
+                )?;
+            }
         }
 
-        queue!(io::stdout(), style::ResetColor)?;
+        // 分隔線
+        queue!(
+            io::stdout(),
+            cursor::MoveTo(0, 1),
+            style::SetForegroundColor(Color::DarkGrey),
+            style::Print("─".repeat(cols as usize)),
+            style::ResetColor,
+        )?;
 
-        // 顯示滾動提示
-        if total_lines > max_display_lines {
-            let status_row = rows.saturating_sub(1);
-            queue!(
-                io::stdout(),
-                cursor::MoveTo(0, status_row),
-                style::SetBackgroundColor(Color::DarkBlue),
-                style::SetForegroundColor(Color::White),
-            )?;
+        // 內容
+        let end_line = (scroll_offset + max_display_lines).min(total_lines);
+        for (i, line) in lines[scroll_offset..end_line].iter().enumerate() {
+            queue!(io::stdout(), cursor::MoveTo(0, (i + 2) as u16))?;
+            match line {
+                PanelLine::Blank => {}
+                PanelLine::Section(title) => {
+                    let (text, _) = truncate_to_width(title, cols as usize);
+                    queue!(
+                        io::stdout(),
+                        style::SetForegroundColor(Color::Cyan),
+                        style::SetAttribute(style::Attribute::Bold),
+                        style::Print(text),
+                        style::SetAttribute(style::Attribute::Reset),
+                        style::ResetColor,
+                    )?;
+                }
+                PanelLine::Item { key, desc } => {
+                    let (key_text, key_visual) = truncate_to_width(key, cols as usize);
+                    let (desc_text, _) =
+                        truncate_to_width(desc, (cols as usize).saturating_sub(key_visual));
+                    queue!(
+                        io::stdout(),
+                        style::SetForegroundColor(Color::Yellow),
+                        style::Print(key_text),
+                        style::ResetColor,
+                        style::Print(desc_text),
+                    )?;
+                }
+                PanelLine::Text(text) => {
+                    let (text, _) = truncate_to_width(text, cols as usize);
+                    queue!(io::stdout(), style::Print(text))?;
+                }
+            }
+        }
 
-            let scroll_info = format!(
-                " Lines {}-{}/{} | Use ↑/↓ or PgUp/PgDn to scroll | ESC to close ",
+        // 底部狀態列
+        let status_row = rows.saturating_sub(1);
+        let scroll_info = if total_lines > max_display_lines {
+            format!(
+                " {}-{}/{} | ↑/↓ PgUp/PgDn scroll | Tab/←/→ switch tab | ESC close ",
                 scroll_offset + 1,
                 end_line,
                 total_lines
-            );
-
-            let padded = if scroll_info.len() < cols as usize {
-                format!(
-                    "{}{}",
-                    scroll_info,
-                    " ".repeat(cols as usize - scroll_info.len())
-                )
-            } else {
-                scroll_info.chars().take(cols as usize).collect()
-            };
-
-            queue!(io::stdout(), style::Print(padded), style::ResetColor)?;
-        }
+            )
+        } else {
+            " Tab/←/→ switch tab | ESC close ".to_string()
+        };
+        let (status_text, status_width) = truncate_to_width(&scroll_info, cols as usize);
+        queue!(
+            io::stdout(),
+            cursor::MoveTo(0, status_row),
+            style::SetBackgroundColor(Color::DarkBlue),
+            style::SetForegroundColor(Color::White),
+            style::Print(&status_text),
+            style::Print(" ".repeat((cols as usize).saturating_sub(status_width))),
+            style::ResetColor,
+        )?;
 
         io::stdout().flush()?;
 
@@ -116,6 +216,16 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
 
                 match key_event.code {
                     KeyCode::Esc => return Ok(()),
+                    KeyCode::Tab | KeyCode::Right => {
+                        active_tab = (active_tab + 1) % tabs.len();
+                        scroll_offset = 0;
+                        break;
+                    }
+                    KeyCode::BackTab | KeyCode::Left => {
+                        active_tab = (active_tab + tabs.len() - 1) % tabs.len();
+                        scroll_offset = 0;
+                        break;
+                    }
                     KeyCode::Up => {
                         scroll_offset = scroll_offset.saturating_sub(1);
                         break;
