@@ -35,9 +35,9 @@ You can install wedi using [Wenget](https://github.com/superyngo/Wenget).
 wenget install wedi
 ```
 
-### Using Winget
+### Using WinGet
 
-You can install wedi using Winget (Windows Package Manager).
+You can install wedi using WinGet (Windows Package Manager).
 
 ### Quick Install (One-Line Command)
 

@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Syntax highlighting theme parameter**: Use `--theme <THEME>` to set theme via command line
-- **Installation options**: Added support for Wenget and Winget package managers
+- **Installation options**: Added support for Wenget and WinGet package managers
 
 ### Fixed
 - Resolved cargo fmt and clippy warnings for cleaner codebase
