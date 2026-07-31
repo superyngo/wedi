@@ -29,15 +29,11 @@ A lightweight, easy-to-use console text editor written in Rust.
 
 ### Using Wenget
 
-You can install wedi using [Wenget](https://github.com/superyngo/Wenget).
+You can install wedi using [Wenget](https://github.com/superyngo/wenget).
 
 ```bash
 wenget install wedi
 ```
-
-### Using WinGet
-
-You can install wedi using WinGet (Windows Package Manager).
 
 ### Quick Install (One-Line Command)
 
