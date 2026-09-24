@@ -32,8 +32,7 @@ predicates = "3.0"      # 測試斷言
 tempfile = "3.8"        # 臨時文件測試
 
 [features]
-default = ["syntax-highlighting", "mouse-support"]
-mouse-support = ["wedi-core/mouse-support"]
+default = ["syntax-highlighting"]
 syntax-highlighting = ["wedi-core/syntax-highlighting"]
 
 [profile.release]

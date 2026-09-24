@@ -56,9 +56,6 @@ struct Args {
     theme: Option<String>,
     #[cfg(feature = "syntax-highlighting")]
     language: Option<String>,
-    #[cfg(feature = "syntax-highlighting")]
-    #[allow(dead_code)]
-    list_themes: bool,
 }
 
 impl Args {
@@ -105,8 +102,6 @@ impl Args {
         }
         #[cfg(feature = "syntax-highlighting")]
         let language = pargs.opt_value_from_str(["-l", "--language"])?;
-        #[cfg(feature = "syntax-highlighting")]
-        let list_themes = false; // 已在上面處理
 
         // -e/--encoding 同時設定讀取和保存編碼
         let encoding = pargs.opt_value_from_str(["-e", "--encoding"])?;
@@ -138,8 +133,6 @@ impl Args {
             theme,
             #[cfg(feature = "syntax-highlighting")]
             language,
-            #[cfg(feature = "syntax-highlighting")]
-            list_themes,
         })
     }
 

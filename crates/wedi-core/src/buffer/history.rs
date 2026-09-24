@@ -106,17 +106,6 @@ impl History {
         self.undo_stack.last().map_or(0, |g| g.id)
     }
 
-    #[allow(dead_code)]
-    pub fn can_undo(&self) -> bool {
-        !self.undo_stack.is_empty()
-    }
-
-    #[allow(dead_code)]
-    pub fn can_redo(&self) -> bool {
-        !self.redo_stack.is_empty()
-    }
-
-    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.undo_stack.clear();
         self.redo_stack.clear();

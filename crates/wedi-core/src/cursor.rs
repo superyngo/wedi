@@ -147,7 +147,6 @@ impl Cursor {
         self.update_logical_col_from_visual(buffer, view);
     }
 
-    #[allow(dead_code)]
     pub fn move_to_line(&mut self, buffer: &RopeBuffer, view: &View, line: usize) {
         self.row = line.min(buffer.line_count().saturating_sub(1));
         self.visual_line_index = 0;

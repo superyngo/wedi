@@ -22,9 +22,3 @@ pub fn parse_encoding_label(label: &str) -> Option<&'static encoding_rs::Encodin
         _ => encoding_rs::Encoding::for_label(label.as_bytes()),
     }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct EncodingSpec {
-//     pub encoding: Option<&'static encoding_rs::Encoding>,
-//     pub is_user_specified: bool,
-// }

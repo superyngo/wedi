@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Up,
@@ -15,7 +14,6 @@ pub enum Direction {
     FileEnd,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     // 字符輸入
@@ -78,8 +76,6 @@ pub enum Command {
     // 選擇操作
     SelectAll,
     ExtendSelection(Direction),
-    #[allow(dead_code)]
-    ClearSelection,
 
     // 跳轉
     GoToLine,

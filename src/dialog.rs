@@ -123,7 +123,6 @@ fn build_about_panel_lines() -> Vec<PanelLine> {
 }
 
 /// 顯示幫助/關於面板（Tab 或 ←/→ 切換頁籤，ESC 關閉）
-#[allow(dead_code)]
 pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
     let mut size = terminal_size;
     let tabs = ["Help", "About"];
@@ -289,13 +288,11 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
 }
 
 /// 顯示輸入對話框並獲取用戶輸入
-#[allow(dead_code)]
 pub fn prompt(prompt_text: &str, terminal_size: (u16, u16)) -> Result<Option<String>> {
     prompt_with_default(prompt_text, "", terminal_size)
 }
 
 /// 顯示輸入對話框並獲取用戶輸入，支持預設值
-#[allow(dead_code)]
 pub fn prompt_with_default(
     prompt_text: &str,
     default: &str,
@@ -442,7 +439,6 @@ pub fn prompt_with_default(
 }
 
 /// 顯示確認對話框
-#[allow(dead_code)]
 pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
     let mut size = terminal_size;
 

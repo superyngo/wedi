@@ -206,14 +206,6 @@ impl RopeBuffer {
         }
     }
 
-    // pub fn from_file(path: &Path) -> Result<Self> {
-    //     let encoding_config = EncodingConfig {
-    //         read_encoding: None,
-    //         save_encoding: None,
-    //     };
-    //     Self::from_file_with_encoding(path, &encoding_config)
-    // }
-
     pub fn from_file_with_encoding(path: &Path, encoding_config: &EncodingConfig) -> Result<Self> {
         // 如果文件存在，讀取內容；否則創建空緩衝區
         let (rope, detected_encoding, modified, bom, lossy) = if path.exists() {
@@ -532,7 +524,6 @@ impl RopeBuffer {
         Ok(out)
     }
 
-    #[allow(dead_code)]
     pub fn save_to(&mut self, path: &Path) -> Result<()> {
         let encoded = self.encode_contents()?;
         write_atomic(path, &encoded)?;
@@ -543,23 +534,10 @@ impl RopeBuffer {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn save_as(&mut self, path: &Path) -> Result<()> {
-        let encoded = self.encode_contents()?;
-        write_atomic(path, &encoded)
-            .with_context(|| format!("Failed to write file: {}", path.display()))?;
-        self.file_path = Some(path.to_path_buf());
-        self.display_path = display_path_of(path);
-        self.modified = false;
-        self.saved_id = self.history.top_id();
-        Ok(())
-    }
-
     pub fn is_modified(&self) -> bool {
         self.modified
     }
 
-    #[allow(dead_code)]
     pub fn file_path(&self) -> Option<&Path> {
         self.file_path.as_deref()
     }
@@ -682,16 +660,6 @@ impl RopeBuffer {
         Some(result_pos)
     }
 
-    #[allow(dead_code)]
-    pub fn can_undo(&self) -> bool {
-        self.history.can_undo()
-    }
-
-    #[allow(dead_code)]
-    pub fn can_redo(&self) -> bool {
-        self.history.can_redo()
-    }
-
     // 設置讀取編碼
     pub fn set_read_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
         self.read_encoding = encoding;
@@ -705,7 +673,6 @@ impl RopeBuffer {
     }
 
     // 獲取存檔編碼
-    #[allow(dead_code)]
     pub fn save_encoding(&self) -> &'static encoding_rs::Encoding {
         self.save_encoding
     }

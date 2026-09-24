@@ -10,9 +10,8 @@ Flags: [CLI.md](CLI.md).
 | `wedi` | `src/` | The editor binary: argument parsing, editor loop, dialogs, help panel |
 | `wedi-core` | `crates/wedi-core/` | Reusable editor primitives; no knowledge of the binary |
 
-`wedi-widget` (a separate embedding crate up to v0.10.0) was folded into `wedi-core`: its
-`EditorConfig` and `ScreenLayout` now live in `wedi_core::config` and `wedi_core::screen_layout`.
-Nothing in the editor consumes them yet (backlog B21).
+`wedi-widget` (a separate embedding crate up to v0.10.0) was folded into `wedi-core`, and its
+unused `EditorConfig` and `ScreenLayout` were then removed (backlog B20, B21).
 
 `examples/basic_usage.rs` shows `wedi-core` used standalone.
 
@@ -35,8 +34,6 @@ Nothing in the editor consumes them yet (backlog B21).
 | `keymap` | `Command`, `Keymap`, `handle_key_event` | Key event → **Command**; `Keymap` supports custom `bind` / `bind_selection` for embedders |
 | `search` | `Search` | Query and match list |
 | `comment` | `CommentHandler` | Comment prefix by file type |
-| `config` | `EditorConfig` | Display options for embedders (line numbers, wrap, tab width, theme); not yet read by `View` |
-| `screen_layout` | `ScreenLayout` | Viewport size and scroll offset for embedders; independent of `View` |
 | `clipboard` | `ClipboardManager` | **System clipboard**: Win32 API on Windows, pbcopy/pbpaste on macOS, wl-copy/wl-paste then xclip on Linux |
 | `highlight` | `HighlightEngine`, `HighlightCache`, `LineState` | syntect engine, parser checkpoints and per-line ANSI cache (feature-gated) |
 | `terminal` | `Terminal`, `InputEvent` | crossterm wrapper: raw mode, bracketed paste, size |
@@ -47,7 +44,6 @@ Nothing in the editor consumes them yet (backlog B21).
 | Feature | Crates | Default | Effect |
 |---|---|---|---|
 | `syntax-highlighting` | `wedi`, `wedi-core` | on in `wedi` | syntect + bundled syntax set, Ctrl+T, `--theme`/`--language` flags |
-| `mouse-support` | `wedi`, `wedi-core` | on | Mouse-wheel scrolling |
 
 `cargo build --no-default-features` must compile.
 

@@ -2,7 +2,6 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::command::{Command, Direction};
 
-#[allow(dead_code)]
 pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command> {
     // Alt+S 切換選擇模式（優先處理）
     // Ctrl+S 依慣例綁定為存檔（raw mode 已停用 IXON，多數終端可正常收到）
@@ -199,11 +198,6 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         // (KeyCode::F(20), KeyModifiers::NONE) => Some(Command::SelectAll),
         // F21 用於視窗大小調整事件
         (KeyCode::F(21), KeyModifiers::NONE) => Some(Command::Resize),
-        // F22/F23 用於滑鼠滾輪事件（當啟用 mouse-support feature）
-        #[cfg(feature = "mouse-support")]
-        (KeyCode::F(22), KeyModifiers::NONE) => Some(Command::MoveUp),
-        #[cfg(feature = "mouse-support")]
-        (KeyCode::F(23), KeyModifiers::NONE) => Some(Command::MoveDown),
 
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),

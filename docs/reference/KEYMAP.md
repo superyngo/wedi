@@ -28,7 +28,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 | PageUp / PageDown | **Smart jump** |
 | Ctrl+PageUp / Ctrl+PageDown | Jump 1/10 of the file |
 | Ctrl+G | Go to line |
-| Mouse wheel | Move cursor up/down (feature `mouse-support`) |
+| Mouse wheel | Move cursor up/down (the terminal sends the wheel as arrow keys in the alternate screen; wedi does not capture the mouse, so text selection with the mouse still works) |
 
 ## Selection
 

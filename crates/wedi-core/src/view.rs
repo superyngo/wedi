@@ -84,16 +84,6 @@ fn expand_tabs_and_build_map(line: &str) -> (String, Vec<usize>) {
     (displayed, logical_to_visual)
 }
 
-#[allow(dead_code)]
-fn calculate_hash(line: &str) -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    line.hash(&mut hasher);
-    hasher.finish()
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Selection {
     pub start: (usize, usize), // (row, col)
@@ -208,15 +198,6 @@ impl View {
         }
     }
 
-    /// 部分失效：清除指定範圍的緩存（用於多行編輯）
-    #[allow(dead_code)]
-    pub fn invalidate_lines(&mut self, start_row: usize, end_row: usize) {
-        for row in start_row..=end_row {
-            self.invalidate_line(row);
-        }
-    }
-
-    #[allow(dead_code)]
     pub fn update_size(&mut self) {
         let size = crossterm::terminal::size().unwrap_or((80, 24));
         let new_screen_rows = size.1.saturating_sub(1) as usize;

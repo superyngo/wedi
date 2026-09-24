@@ -164,17 +164,6 @@ impl HighlightEngine {
         None
     }
 
-    /// 從內容檢測語法（shebang）
-    #[allow(dead_code)]
-    pub fn detect_syntax_from_content(&self, content: &str) -> Option<&'static SyntaxReference> {
-        if let Some(first_line) = content.lines().next() {
-            if first_line.starts_with("#!") {
-                return SYNTAX_SET.find_syntax_by_first_line(first_line);
-            }
-        }
-        None
-    }
-
     /// 建立新的高亮器（用於逐行高亮）
     ///
     /// 主題存於全域 THEME_SET，直接借用 'static 參照，不需 clone
@@ -197,19 +186,16 @@ impl HighlightEngine {
     }
 
     /// 是否已啟用語法高亮
-    #[allow(dead_code)]
     pub fn is_enabled(&self) -> bool {
         self.current_syntax.is_some()
     }
 
     /// 取得當前語法名稱
-    #[allow(dead_code)]
     pub fn syntax_name(&self) -> Option<&str> {
         self.current_syntax.map(|s| s.name.as_str())
     }
 
     /// 取得當前主題名稱
-    #[allow(dead_code)]
     pub fn theme_name(&self) -> String {
         self.theme
             .name
@@ -219,13 +205,11 @@ impl HighlightEngine {
     }
 
     /// 取得可用主題清單
-    #[allow(dead_code)]
     pub fn available_themes() -> Vec<String> {
         THEME_SET.themes.keys().cloned().collect()
     }
 
     /// 取得可用語法清單
-    #[allow(dead_code)]
     pub fn available_syntaxes() -> Vec<String> {
         SYNTAX_SET
             .syntaxes()

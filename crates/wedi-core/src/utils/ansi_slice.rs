@@ -142,9 +142,9 @@ fn collect_escape_sequence(
 
 /// 計算帶有 ANSI escape codes 的字串的視覺寬度
 ///
-/// 跳過所有 ANSI escape sequences，只計算可見字符的寬度
-#[allow(dead_code)]
-pub fn ansi_visual_width(text: &str) -> usize {
+/// 跳過所有 ANSI escape sequences，只計算可見字符的寬度（僅供測試驗證切割結果）
+#[cfg(test)]
+fn ansi_visual_width(text: &str) -> usize {
     let mut width = 0;
     let mut chars = text.chars().peekable();
 

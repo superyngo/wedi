@@ -1,9 +1,6 @@
 mod ansi_slice;
-mod line_wrapper;
 
 pub use ansi_slice::slice_ansi_text;
-#[allow(unused_imports)]
-pub use line_wrapper::LineWrapper;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use unicode_width::UnicodeWidthChar;
@@ -12,7 +9,6 @@ use unicode_width::UnicodeWidthChar;
 static DEBUG_MODE: AtomicBool = AtomicBool::new(false);
 
 /// 設置調試模式
-#[allow(dead_code)]
 pub fn set_debug_mode(enabled: bool) {
     DEBUG_MODE.store(enabled, Ordering::Relaxed);
 }
@@ -61,7 +57,6 @@ pub fn visual_width(s: &str) -> usize {
 }
 
 /// 計算單個字符的視覺寬度
-#[allow(dead_code)]
 pub fn char_width(ch: char) -> usize {
     UnicodeWidthChar::width(ch).unwrap_or(1)
 }

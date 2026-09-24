@@ -40,9 +40,6 @@ pub struct Editor {
     #[cfg(feature = "syntax-highlighting")]
     pub(crate) highlight_cache: HighlightCache,
     #[cfg(feature = "syntax-highlighting")]
-    #[allow(dead_code)]
-    highlight_config: HighlightConfig,
-    #[cfg(feature = "syntax-highlighting")]
     highlight_enabled: bool,
 }
 
@@ -135,7 +132,7 @@ impl Editor {
 
         // 語法高亮初始化
         #[cfg(feature = "syntax-highlighting")]
-        let (highlight_engine, highlight_cache, highlight_config) = {
+        let (highlight_engine, highlight_cache) = {
             let mut config = HighlightConfig::default();
 
             // 如果提供了自定義主題，使用它；否則使用默認主題
@@ -166,7 +163,7 @@ impl Editor {
                 }
             }
 
-            (engine, HighlightCache::new(), config)
+            (engine, HighlightCache::new())
         };
 
         // 解碼有無效位元組：開檔即在狀態列警告
@@ -198,8 +195,6 @@ impl Editor {
             highlight_engine,
             #[cfg(feature = "syntax-highlighting")]
             highlight_cache,
-            #[cfg(feature = "syntax-highlighting")]
-            highlight_config,
             #[cfg(feature = "syntax-highlighting")]
             highlight_enabled: true, // 預設啟用語法高亮
         })
@@ -578,10 +573,6 @@ impl Editor {
                 });
                 self.cursor.row = last_line;
                 self.cursor.col = last_col;
-            }
-
-            Command::ClearSelection => {
-                self.selection = None;
             }
 
             Command::ClearMessage => {

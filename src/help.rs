@@ -25,8 +25,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
         ],
     ));
 
-    #[cfg_attr(not(feature = "mouse-support"), allow(unused_mut))]
-    let mut navigation = vec![
+    let navigation = vec![
         ("Arrow Keys", "Move cursor"),
         ("Ctrl+Left/Home", "Move to line start"),
         ("Ctrl+Right/End", "Move to line end"),
@@ -35,9 +34,9 @@ pub fn get_help_sections() -> Vec<HelpSection> {
         ("Page Up/Down", "Scroll page (cycle matches in search mode)"),
         ("Ctrl+PageUp/Down", "Jump 1/10 of file"),
         ("Ctrl+G", "Go to line number"),
+        // 終端在 alternate screen 中把滾輪轉為方向鍵
+        ("Mouse Wheel", "Scroll up/down (moves cursor)"),
     ];
-    #[cfg(feature = "mouse-support")]
-    navigation.push(("Mouse Wheel", "Scroll up/down (moves cursor)"));
     sections.push(("Navigation", navigation));
 
     sections.push((
@@ -172,7 +171,6 @@ pub fn get_keyboard_shortcuts() -> Vec<String> {
 }
 
 /// 打印完整的幫助訊息到標準輸出 (用於 --help)
-#[allow(dead_code)]
 pub fn print_help() {
     println!("wedi - A easy-to-use text editor");
     println!();

@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Stale `Cargo.toml.backup` and unused duplicate root `assets/syntaxes.bin`
 - The `wedi-widget` crate: its `EditorConfig` and `ScreenLayout` moved to `wedi_core::config` and `wedi_core::screen_layout`; the `LineLayout` and other re-exports are available from `wedi_core` directly (B20)
+- Dead code (about 400 lines): the inert `mouse-support` feature (mouse capture was never enabled; the wheel works because terminals send arrow keys), `EditorConfig`, `ScreenLayout`, `LineWrapper`, `Terminal::read_key` / `set_cursor_position` / `hide_cursor` / `flush`, `RopeBuffer::save_as` / `can_undo` / `can_redo`, `HighlightEngine::detect_syntax_from_content`, `View::invalidate_lines`, `Command::ClearSelection`, and blanket `#[allow(dead_code)]` attributes that hid them (B21)
 
 ## [v0.10.0] - 2026-07-18
 
