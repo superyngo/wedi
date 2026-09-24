@@ -8,9 +8,9 @@ mod engine;
 
 // 導出公開 API
 #[cfg(feature = "syntax-highlighting")]
-pub use cache::{CachedLine, EditType, HighlightCache};
+pub use cache::{CachedLine, HighlightCache, CHECKPOINT_INTERVAL};
 #[cfg(feature = "syntax-highlighting")]
-pub use engine::{supports_true_color, HighlightEngine};
+pub use engine::{supports_true_color, HighlightEngine, LineHighlighter, LineState};
 
 /// 語法高亮設定
 #[cfg(feature = "syntax-highlighting")]

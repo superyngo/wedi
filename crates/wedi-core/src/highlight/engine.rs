@@ -12,8 +12,8 @@ use once_cell::sync::Lazy;
 use std::fmt::Write;
 use std::path::Path;
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{Color, Style, Theme, ThemeSet};
-use syntect::parsing::{SyntaxReference, SyntaxSet};
+use syntect::highlighting::{Color, HighlightState, Style, Theme, ThemeSet};
+use syntect::parsing::{ParseState, SyntaxReference, SyntaxSet};
 
 /// 嵌入的語法集（來自 bat 專案）
 ///
@@ -183,6 +183,19 @@ impl HighlightEngine {
             .map(|syntax| LineHighlighter::new(syntax, self.theme, self.true_color))
     }
 
+    /// Resume highlighting from a state saved with [`LineHighlighter::state`].
+    pub fn resume_highlighter(&self, state: &LineState) -> LineHighlighter {
+        LineHighlighter {
+            inner: Some(HighlightLines::from_state(
+                self.theme,
+                state.highlight.clone(),
+                state.parse.clone(),
+            )),
+            theme: self.theme,
+            true_color: self.true_color,
+        }
+    }
+
     /// 是否已啟用語法高亮
     #[allow(dead_code)]
     pub fn is_enabled(&self) -> bool {
@@ -231,16 +244,37 @@ impl HighlightEngine {
 /// - Token 層級過濾換行符（而非輸出層級），確保 ANSI 碼完整性
 /// - 只在顏色變化時輸出色碼，減少輸出大小約 30-50%
 pub struct LineHighlighter {
-    inner: HighlightLines<'static>,
+    // 永遠是 Some；Option 只為了讓 state() 能取出並重建
+    inner: Option<HighlightLines<'static>>,
+    theme: &'static Theme,
     true_color: bool,
+}
+
+/// Parser state at the start of a line, used as a highlighting checkpoint.
+#[derive(Clone)]
+pub struct LineState {
+    highlight: HighlightState,
+    parse: ParseState,
 }
 
 impl LineHighlighter {
     fn new(syntax: &'static SyntaxReference, theme: &'static Theme, true_color: bool) -> Self {
         Self {
-            inner: HighlightLines::new(syntax, theme),
+            inner: Some(HighlightLines::new(syntax, theme)),
+            theme,
             true_color,
         }
+    }
+
+    /// Snapshot the state before the next line, so highlighting can resume there.
+    pub fn state(&mut self) -> LineState {
+        let (highlight, parse) = self.inner.take().expect("highlighter state").state();
+        self.inner = Some(HighlightLines::from_state(
+            self.theme,
+            highlight.clone(),
+            parse.clone(),
+        ));
+        LineState { highlight, parse }
     }
 
     /// 高亮單行，返回 ANSI 色碼字串
@@ -253,7 +287,8 @@ impl LineHighlighter {
     /// - 如果高亮失敗，自動降級為純文字（不崩潰）
     /// - 這確保編輯器在語法錯誤時仍可正常使用
     pub fn highlight_line(&mut self, line: &str) -> String {
-        match self.inner.highlight_line(line, &SYNTAX_SET) {
+        let inner = self.inner.as_mut().expect("highlighter state");
+        match inner.highlight_line(line, &SYNTAX_SET) {
             Ok(ranges) => self.ranges_to_ansi_optimized(&ranges),
             Err(e) => {
                 // 降級為純文字，不影響編輯器運作

@@ -338,14 +338,10 @@ impl Editor {
                 // 優化：僅失效當前行（除非是換行符，需要重建整個緩存）
                 if ch == '\n' {
                     self.view.invalidate_cache(); // 換行影響多行佈局
-                    #[cfg(feature = "syntax-highlighting")]
-                    self.highlight_cache.clear(); // 語法高亮快取也需要清除
                     self.cursor.row += 1;
                     self.cursor.reset_to_line_start();
                 } else {
                     self.view.invalidate_line(self.cursor.row); // 僅失效當前行
-                    #[cfg(feature = "syntax-highlighting")]
-                    self.invalidate_highlight_cache(self.cursor.row); // 語法高亮快取失效
                     self.cursor.set_position(
                         &self.buffer,
                         &self.view,
@@ -368,8 +364,6 @@ impl Editor {
                     let pos = self.buffer.line_to_char(self.cursor.row) + new_col;
                     self.buffer.delete_char(pos);
                     self.view.invalidate_line(self.cursor.row); // 僅失效當前行
-                    #[cfg(feature = "syntax-highlighting")]
-                    self.invalidate_highlight_cache(self.cursor.row);
                     self.cursor
                         .set_position(&self.buffer, &self.view, self.cursor.row, new_col);
                 } else if self.cursor.row > 0 {
@@ -387,8 +381,6 @@ impl Editor {
                     let end = self.buffer.line_to_char(self.cursor.row);
                     self.buffer.delete_range(pos, end);
                     self.view.invalidate_cache(); // 行合併影響多行
-                    #[cfg(feature = "syntax-highlighting")]
-                    self.highlight_cache.clear();
 
                     self.cursor
                         .set_position(&self.buffer, &self.view, new_row, prev_line_len);
@@ -420,12 +412,8 @@ impl Editor {
                     // 優化：如果在行尾刪除（會合併下一行），需要完全失效；否則僅失效當前行
                     if at_line_end {
                         self.view.invalidate_cache(); // 行合併影響多行
-                        #[cfg(feature = "syntax-highlighting")]
-                        self.highlight_cache.clear();
                     } else {
                         self.view.invalidate_line(self.cursor.row); // 僅失效當前行
-                        #[cfg(feature = "syntax-highlighting")]
-                        self.invalidate_highlight_cache(self.cursor.row);
                     }
                 }
                 self.selection_mode = false; // 刪除後關閉選擇模式
@@ -446,8 +434,6 @@ impl Editor {
                         }
 
                         self.view.invalidate_cache();
-                        #[cfg(feature = "syntax-highlighting")]
-                        self.highlight_cache.clear();
 
                         // 確保光標在有效範圍內
                         self.cursor.row = start_row.min(self.buffer.line_count().saturating_sub(1));
@@ -460,8 +446,6 @@ impl Editor {
 
                     self.buffer.delete_line(self.cursor.row);
                     self.view.invalidate_cache();
-                    #[cfg(feature = "syntax-highlighting")]
-                    self.highlight_cache.clear();
 
                     // 如果刪除的是最後一行且不是唯一一行，光標上移
                     if was_last_line && self.cursor.row > 0 {
@@ -1179,8 +1163,6 @@ impl Editor {
 
             self.buffer.delete_line(self.cursor.row);
             self.view.invalidate_cache();
-            #[cfg(feature = "syntax-highlighting")]
-            self.highlight_cache.clear();
 
             // 如果刪除的是最後一行且不是唯一一行，光標上移
             if was_last_line && self.cursor.row > 0 {
@@ -1493,105 +1475,28 @@ impl Editor {
         )
     }
 
-    /// 獲取語法高亮後的行
-    ///
-    /// 使用增量處理策略：智慧選擇起始行，維護語法狀態的正確性和效能平衡
+    /// 獲取語法高亮後的行：先依緩衝區的修改記錄讓快取失效，再從最近的檢查點解析
     #[cfg(feature = "syntax-highlighting")]
     pub fn get_highlighted_lines(
         &mut self,
         start_row: usize,
         end_row: usize,
     ) -> std::collections::HashMap<usize, String> {
-        use wedi_core::highlight::CachedLine;
-
-        let mut result = std::collections::HashMap::new();
-
-        // 檢查是否有語法高亮引擎
-        let Some(ref engine) = self.highlight_engine else {
-            return result;
-        };
-
-        // 建立高亮器
-        let Some(mut highlighter) = engine.create_highlighter() else {
-            return result;
-        };
-
-        // 增量處理策略：智慧選擇起始行
-        // 1. 小檔案或接近檔案開頭：從第 0 行開始（保證正確性）
-        // 2. 大檔案：從 start_row - BUFFER 開始，平衡效能和正確性
-        const BUFFER_LINES: usize = 100; // 緩衝範圍
-        const SMALL_FILE_THRESHOLD: usize = 500; // 小檔案閾值
-
-        let total_lines = self.buffer.line_count();
-        let is_small_file = total_lines <= SMALL_FILE_THRESHOLD;
-        let is_near_start = start_row < BUFFER_LINES;
-
-        // 決定處理起始行
-        let process_start = if is_small_file || is_near_start {
-            0 // 小檔案或接近開頭，從第 0 行開始確保正確性
-        } else {
-            start_row.saturating_sub(BUFFER_LINES) // 大檔案，從緩衝區開始
-        };
-
-        // 循序處理（維護跨行狀態）
-        for row in process_start..=end_row.min(total_lines.saturating_sub(1)) {
-            let line_text = match self.buffer.line(row) {
-                Some(line) => {
-                    // ⚠️ 重要：保留換行符！syntect 需要換行符才能正確解析語法狀態
-                    // 參考：與 cate 專案相同的修復
-                    let mut text = line.to_string();
-                    // 確保有換行符（syntect 需要）
-                    if !text.ends_with('\n') && !text.ends_with("\r\n") {
-                        text.push('\n');
-                    }
-                    text
-                }
-                None => continue,
-            };
-
-            // 檢查快取
-            if self.highlight_cache.is_valid(row, &line_text) {
-                if row >= start_row {
-                    // 在可見區域內，使用快取
-                    if let Some(cached) = self.highlight_cache.get(row) {
-                        result.insert(row, cached.highlighted.clone());
-                    }
-                }
-                // 即使不在可見區域，也要處理這一行以維護狀態
-                let _ = highlighter.highlight_line(&line_text);
-            } else {
-                // 快取失效，重新高亮
-                let mut highlighted = highlighter.highlight_line(&line_text);
-
-                // ⚠️ 修復：去除末尾的換行符，避免在 Linux 終端產生殘影
-                // syntect 需要換行符來解析語法狀態，但渲染時不應輸出換行符
-                highlighted = highlighted.trim_end_matches(&['\n', '\r'][..]).to_string();
-
-                // 更新快取
-                self.highlight_cache.insert(
-                    row,
-                    CachedLine {
-                        text: line_text,
-                        highlighted: highlighted.clone(),
-                    },
-                );
-
-                // 如果在可見區域，加入結果
-                if row >= start_row {
-                    result.insert(row, highlighted);
-                }
-            }
+        // 單一失效入口：涵蓋輸入、貼上、撤銷、重新載入等所有修改
+        if let Some(row) = self.buffer.take_changed_from() {
+            self.highlight_cache.invalidate_from(row);
         }
-
-        result
-    }
-
-    /// 使語法高亮快取失效（編輯操作後調用）
-    #[cfg(feature = "syntax-highlighting")]
-    pub fn invalidate_highlight_cache(&mut self, from_line: usize) {
-        use wedi_core::highlight::EditType;
-        self.highlight_cache
-            .invalidate_from_edit(from_line, EditType::CharInsert);
+        let Some(ref engine) = self.highlight_engine else {
+            return std::collections::HashMap::new();
+        };
+        let buffer = &self.buffer;
+        self.highlight_cache.highlight_rows(
+            engine,
+            buffer.line_count(),
+            start_row,
+            end_row,
+            |row| buffer.line(row).map(|line| line.to_string()),
+        )
     }
 }
 
@@ -1805,5 +1710,24 @@ mod tests {
         assert!(!editor.buffer.is_modified());
         run(&mut editor, vec![Command::Redo]);
         assert!(editor.buffer.is_modified());
+    }
+
+    #[cfg(feature = "syntax-highlighting")]
+    #[test]
+    fn test_highlight_follows_undo() {
+        // 稽核 F17：撤銷後高亮快取也要失效（先前只有部分編輯路徑清除快取）
+        let dir = TempDir::new().unwrap();
+        let body = "int a = 1;\nint b = 2;\nint c = 3;\n";
+        let mut editor = editor_with(&dir, "a.c", body.as_bytes());
+        let code = editor.get_highlighted_lines(0, 2);
+        run(
+            &mut editor,
+            vec![Command::Insert('/'), Command::Insert('*')],
+        );
+        let commented = editor.get_highlighted_lines(0, 2);
+        assert_ne!(commented[&2], code[&2]);
+        run(&mut editor, vec![Command::Undo]);
+        assert_eq!(text(&editor), body);
+        assert_eq!(editor.get_highlighted_lines(0, 2), code);
     }
 }

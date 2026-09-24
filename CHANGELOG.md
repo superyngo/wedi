@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pasting into the search, go-to-line and encoding prompts did nothing, and resizing the window while a prompt, confirmation or the help panel was open left it drawn at the old size; prompts now accept paste (first line) and dialogs redraw at the new size (B13)
 - Over SSH on Linux (no Wayland/X display) copy silently failed and paste inserted nothing; failing clipboard commands are now detected and copy/paste fall back to the internal clipboard with a status message. Windows clipboard API failures are detected too, and AltGr characters (reported as Ctrl+Alt on Windows, e.g. `@ { [ ] €`) are typed instead of dropped (B18)
 - Undo removed one character at a time and needed several steps for one multi-line indent or comment toggle, and undoing back to the last save still showed the file as modified; undo now goes one word or one command at a time and clears the modified flag at the save point (B15)
+- Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)

@@ -12,11 +12,12 @@ pub struct RopeBuffer {
     file_path: Option<PathBuf>,
     modified: bool,
     history: History,
-    saved_id: u64, // 存檔時最新的歷史群組 id（用於判斷是否回到存檔點）
+    saved_id: u64,               // 存檔時最新的歷史群組 id（用於判斷是否回到存檔點）
+    changed_from: Option<usize>, // 上次取用後最早被修改的行（供語法高亮快取失效）
     read_encoding: &'static encoding_rs::Encoding, // 讀取編碼
     save_encoding: &'static encoding_rs::Encoding, // 存檔編碼
-    bom: bool,     // 原檔是否帶 BOM（存檔時保留）
-    lossy: bool,   // 讀檔解碼時有無效位元組被替換為 U+FFFD
+    bom: bool,                   // 原檔是否帶 BOM（存檔時保留）
+    lossy: bool,                 // 讀檔解碼時有無效位元組被替換為 U+FFFD
 }
 
 impl RopeBuffer {
@@ -37,6 +38,7 @@ impl RopeBuffer {
             modified: false,
             history: History::default(),
             saved_id: 0,
+            changed_from: None,
             read_encoding: system_enc,
             save_encoding: system_enc,
             bom: false,
@@ -358,6 +360,7 @@ impl RopeBuffer {
             modified,
             history: History::default(),
             saved_id: 0,
+            changed_from: None,
             read_encoding: detected_encoding,
             save_encoding,
             bom,
@@ -393,6 +396,8 @@ impl RopeBuffer {
             self.saved_id,
         );
 
+        self.mark_changed(pos);
+
         self.rope.insert_char(pos, ch);
         self.modified = true;
     }
@@ -408,6 +413,8 @@ impl RopeBuffer {
             },
             self.saved_id,
         );
+
+        self.mark_changed(pos);
 
         self.rope.insert(pos, text);
         self.modified = true;
@@ -426,6 +433,8 @@ impl RopeBuffer {
                 },
                 self.saved_id,
             );
+
+            self.mark_changed(pos);
 
             self.rope.remove(pos..pos + 1);
             self.modified = true;
@@ -448,6 +457,8 @@ impl RopeBuffer {
                 },
                 self.saved_id,
             );
+
+            self.mark_changed(start);
 
             self.rope.remove(start..end);
             self.modified = true;
@@ -475,6 +486,8 @@ impl RopeBuffer {
                 },
                 self.saved_id,
             );
+
+            self.mark_changed(start);
 
             self.rope.remove(start..end);
             self.modified = true;
@@ -646,6 +659,19 @@ impl RopeBuffer {
         self.rope.slice(line_start..line_end).to_string()
     }
 
+    /// First row changed since the previous call, if any; resets the marker.
+    ///
+    /// Caches keyed by row (syntax highlighting) invalidate from this row.
+    pub fn take_changed_from(&mut self) -> Option<usize> {
+        self.changed_from.take()
+    }
+
+    // 記錄最早被修改的行（在修改 rope 之前呼叫）
+    fn mark_changed(&mut self, pos: usize) {
+        let row = self.rope.char_to_line(pos.min(self.rope.len_chars()));
+        self.changed_from = Some(self.changed_from.map_or(row, |r| r.min(row)));
+    }
+
     /// Start an undo group: edits until `end_group` undo and redo as one step.
     pub fn begin_group(&mut self) {
         self.history.begin_group();
@@ -664,15 +690,18 @@ impl RopeBuffer {
             let pos = match action {
                 // 撤銷插入 = 刪除
                 Action::Insert { pos, text } => {
+                    self.mark_changed(pos);
                     self.rope.remove(pos..pos + text.chars().count());
                     pos
                 }
                 // 撤銷刪除 = 插入
                 Action::Delete { pos, text } => {
+                    self.mark_changed(pos);
                     self.rope.insert(pos, &text);
                     pos
                 }
                 Action::DeleteRange { start, text, .. } => {
+                    self.mark_changed(start);
                     self.rope.insert(start, &text);
                     start
                 }
@@ -691,14 +720,17 @@ impl RopeBuffer {
         for action in group.actions {
             result_pos = match action {
                 Action::Insert { pos, text } => {
+                    self.mark_changed(pos);
                     self.rope.insert(pos, &text);
                     pos + text.chars().count()
                 }
                 Action::Delete { pos, text } => {
+                    self.mark_changed(pos);
                     self.rope.remove(pos..pos + text.chars().count());
                     pos
                 }
                 Action::DeleteRange { start, end, .. } => {
+                    self.mark_changed(start);
                     self.rope.remove(start..end);
                     start
                 }
@@ -752,6 +784,7 @@ impl RopeBuffer {
 
             // 重置內容但保留檔案路徑
             self.rope = new_buffer.rope;
+            self.changed_from = Some(0);
             self.read_encoding = new_buffer.read_encoding;
             self.save_encoding = new_buffer.save_encoding;
             self.bom = new_buffer.bom;

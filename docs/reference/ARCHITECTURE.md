@@ -38,7 +38,7 @@ Nothing in the editor consumes them yet (backlog B21).
 | `config` | `EditorConfig` | Display options for embedders (line numbers, wrap, tab width, theme); not yet read by `View` |
 | `screen_layout` | `ScreenLayout` | Viewport size and scroll offset for embedders; independent of `View` |
 | `clipboard` | `ClipboardManager` | **System clipboard**: Win32 API on Windows, pbcopy/pbpaste on macOS, wl-copy/wl-paste then xclip on Linux |
-| `highlight` | `HighlightEngine`, `HighlightCache` | syntect engine and per-line ANSI cache (feature-gated) |
+| `highlight` | `HighlightEngine`, `HighlightCache`, `LineState` | syntect engine, parser checkpoints and per-line ANSI cache (feature-gated) |
 | `terminal` | `Terminal`, `InputEvent` | crossterm wrapper: raw mode, bracketed paste, size |
 | `utils` | `ansi_slice`, `line_wrapper` | Width-aware slicing of ANSI-coloured text, wrapping |
 
@@ -68,10 +68,12 @@ affected layout and highlight caches.
 previous group until a new word starts. Each group has an id; the save point records the top id, and
 Undo/Redo clear `[modified]` when they return to it. A new edit clears the redo stack.
 
-**Syntax highlighting.** Scheduled from `editor.rs`: files up to `SMALL_FILE_THRESHOLD` (500) lines
-are highlighted from the top; larger files start `BUFFER_LINES` (100) above the viewport. Results
-are cached per line as ANSI strings in `HighlightCache`; character edits invalidate from the edited
-line on (`invalidate_from_edit`), line-structure edits clear the whole cache.
+**Syntax highlighting.** `HighlightCache::highlight_rows` saves the syntect parser state
+(`LineState`) every `CHECKPOINT_INTERVAL` (64) lines and resumes from the nearest checkpoint above
+the viewport, so multi-line comments and strings are right at any scroll position. Highlighted lines
+are cached as ANSI strings near the viewport. Every `RopeBuffer` edit (including Undo/Redo and
+reload) records the first changed row; `Editor::get_highlighted_lines` takes it
+(`take_changed_from`) before each render and calls `invalidate_from`, the only invalidation path.
 
 **Save.** `RopeBuffer` encodes the rope with the save encoding (`encoding_rs`) and writes the file.
 
