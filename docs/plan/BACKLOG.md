@@ -21,7 +21,6 @@ Landed, but the check needs a platform or pipeline not available locally.
 
 | Item | Closed by | Verifies when | Fallback |
 |---|---|---|---|
-| B1 re-enable CI | `ci: re-enable fmt, clippy and tests on push to main` (2026-09-24) | The first push to `main` after it shows all four jobs green on GitHub Actions | Fix whatever the Ubuntu/Windows runners flag, then re-check |
 | B18 clipboard fallback and AltGr (audit F19, F20). `pipe_to`/`read_from` treat a non-zero exit as failure; Windows checks `OpenClipboard`/`SetClipboardData`; Editor falls back to the internal clipboard with a message; `CONTROL\|ALT` + non-letter char inserts. Verified on macOS (normal and with no clipboard tools on `PATH`) | `fix: fall back to the internal clipboard when the system one fails` (2026-09-24) | Copy/paste over SSH on Linux falls back internally; AltGr+Q types `@` on a German Windows layout | Unit tests in `clipboard.rs` and `bindings.rs` (Linux runs them in CI) |
 
 ## Awaiting external
@@ -62,3 +61,4 @@ Known, deliberately not scheduled.
 | B13 | Dialog loops read only key events, so bracketed paste and resize were dropped. `prompt_with_default` inserts the first line of a paste; the prompt, confirm and help loops redraw at the new size on resize; `dialog::take_resized` makes the editor run `Resize` after the dialog. R7 shows `beta`; verified on the real binary (no unit test, see B17) | `fix: dialogs accept bracketed paste and follow resizes` (2026-09-24) |
 | B15 | Undo was one step per char and per line of multi-line commands; `[modified]` stuck after undoing to the save point. `History` stores groups; each command is a group, typing merges per word; group ids track the save point | `fix: undo by word and by command, clear modified at the save point` (2026-09-24) |
 | B20 | `wedi-widget` was a re-export shell. Folded into `wedi-core`: `EditorConfig` → `wedi_core::config`, `ScreenLayout` → `wedi_core::screen_layout` (history kept via `git mv`); the crate, its `ratatui`/`crossterm` features and the dependency are gone; AGENTS.md and ARCHITECTURE.md no longer describe it as the config path | `refactor: fold wedi-widget into wedi-core` (2026-09-24) |
+| B1 | CI was disabled. `.github/workflows/ci.yml` runs fmt, clippy (with and without default features) and tests on Ubuntu, Windows and macOS; first run on `main` (run 35978593443) green on all four jobs | `ci: re-enable fmt, clippy and tests on push to main` (2026-09-24) |
