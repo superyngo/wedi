@@ -215,6 +215,29 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::F(3), KeyModifiers::NONE) => Some(Command::FindNext),
         (KeyCode::F(3), KeyModifiers::SHIFT) => Some(Command::FindPrev),
 
+        // AltGr 在 Windows 回報為 Ctrl+Alt（如德文鍵盤的 @ { [ ]），視為一般字符輸入
+        (KeyCode::Char(c), m)
+            if m.contains(KeyModifiers::CONTROL | KeyModifiers::ALT)
+                && !c.is_ascii_alphabetic() =>
+        {
+            Some(Command::Insert(c))
+        }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_altgr_chars_insert() {
+        // 稽核 F20：Windows 的 AltGr 回報為 Ctrl+Alt，字符曾被丟棄
+        let altgr = KeyModifiers::CONTROL | KeyModifiers::ALT;
+        let key = |c| handle_key_event(KeyEvent::new(KeyCode::Char(c), altgr), false);
+        assert_eq!(key('@'), Some(Command::Insert('@')));
+        assert_eq!(key('€'), Some(Command::Insert('€')));
+        // Ctrl+Alt+字母仍保留給快捷鍵
+        assert_eq!(key('q'), None);
     }
 }

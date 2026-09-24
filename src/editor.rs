@@ -1214,8 +1214,8 @@ impl Editor {
     fn set_clipboard_text(&mut self, text: String, use_system: bool) {
         if use_system {
             // 嘗試系統剪貼簿，失敗則回退到內部剪貼簿
-            if self.clipboard.set_text(&text).is_err() && !self.clipboard.is_available() {
-                self.message = Some("Copied (internal clipboard)".to_string());
+            if self.clipboard.set_text(&text).is_err() {
+                self.message = Some("System clipboard unavailable; copied internally".to_string());
             }
             self.internal_clipboard = text; // 同步到內部剪貼簿
         } else {
@@ -1232,9 +1232,8 @@ impl Editor {
             // 嘗試從系統剪貼簿獲取，失敗則使用內部剪貼簿
             self.clipboard.get_text().unwrap_or_else(|_| {
                 if self.internal_clipboard.is_empty() {
-                    if !self.clipboard.is_available() {
-                        self.message = Some("Nothing to paste (internal clipboard)".to_string());
-                    }
+                    self.message =
+                        Some("Nothing to paste (system clipboard unavailable)".to_string());
                     String::new()
                 } else {
                     self.internal_clipboard.clone()

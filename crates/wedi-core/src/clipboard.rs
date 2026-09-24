@@ -23,7 +23,9 @@ impl ClipboardManager {
             use winapi::um::winuser::*;
 
             unsafe {
-                OpenClipboard(ptr::null_mut());
+                if OpenClipboard(ptr::null_mut()) == 0 {
+                    return Err(anyhow!("OpenClipboard failed"));
+                }
                 EmptyClipboard();
 
                 // Convert UTF-8 string to UTF-16LE for Windows clipboard
@@ -49,7 +51,12 @@ impl ClipboardManager {
 
                 GlobalUnlock(h_mem);
 
-                SetClipboardData(CF_UNICODETEXT, h_mem);
+                // 成功時記憶體歸系統所有；失敗時需自行釋放
+                if SetClipboardData(CF_UNICODETEXT, h_mem).is_null() {
+                    GlobalFree(h_mem);
+                    CloseClipboard();
+                    return Err(anyhow!("SetClipboardData failed"));
+                }
                 CloseClipboard();
             }
             Ok(())
@@ -57,45 +64,14 @@ impl ClipboardManager {
 
         #[cfg(target_os = "macos")]
         {
-            let mut child = std::process::Command::new("pbcopy")
-                .stdin(std::process::Stdio::piped())
-                .spawn()?;
-
-            if let Some(stdin) = child.stdin.as_mut() {
-                std::io::Write::write_all(stdin, text.as_bytes())?;
-            }
-
-            child.wait()?;
-            Ok(())
+            pipe_to("pbcopy", &[], text)
         }
 
         #[cfg(all(unix, not(target_os = "macos")))]
         {
-            // Try wl-copy first, then xclip
-            let result = std::process::Command::new("wl-copy")
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .and_then(|mut child| {
-                    if let Some(stdin) = child.stdin.as_mut() {
-                        std::io::Write::write_all(stdin, text.as_bytes())?;
-                    }
-                    child.wait()
-                });
-
-            if result.is_err() {
-                // Fallback to xclip
-                let mut child = std::process::Command::new("xclip")
-                    .args(["-selection", "clipboard"])
-                    .stdin(std::process::Stdio::piped())
-                    .spawn()?;
-
-                if let Some(stdin) = child.stdin.as_mut() {
-                    std::io::Write::write_all(stdin, text.as_bytes())?;
-                }
-
-                child.wait()?;
-            }
-            Ok(())
+            // 先試 wl-copy，再試 xclip；兩者都失敗（如 SSH 無顯示伺服器）時回傳錯誤
+            pipe_to("wl-copy", &[], text)
+                .or_else(|_| pipe_to("xclip", &["-selection", "clipboard"], text))
         }
     }
 
@@ -107,7 +83,9 @@ impl ClipboardManager {
             use winapi::um::winuser::*;
 
             unsafe {
-                OpenClipboard(ptr::null_mut());
+                if OpenClipboard(ptr::null_mut()) == 0 {
+                    return Err(anyhow!("OpenClipboard failed"));
+                }
                 let handle = GetClipboardData(CF_UNICODETEXT);
 
                 if handle.is_null() {
@@ -143,25 +121,14 @@ impl ClipboardManager {
 
         #[cfg(target_os = "macos")]
         {
-            let output = std::process::Command::new("pbpaste").output()?;
-            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            read_from("pbpaste", &[])
         }
 
         #[cfg(all(unix, not(target_os = "macos")))]
         {
-            // Try wl-paste first, then xclip
-            let result = std::process::Command::new("wl-paste").output();
-
-            match result {
-                Ok(output) => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
-                Err(_) => {
-                    // Fallback to xclip
-                    let output = std::process::Command::new("xclip")
-                        .args(["-selection", "clipboard", "-o"])
-                        .output()?;
-                    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                }
-            }
+            // 先試 wl-paste，再試 xclip；結束碼非 0 視為失敗
+            read_from("wl-paste", &["--no-newline"])
+                .or_else(|_| read_from("xclip", &["-selection", "clipboard", "-o"]))
         }
     }
 
@@ -170,8 +137,58 @@ impl ClipboardManager {
     }
 }
 
+/// 將文字寫入外部剪貼簿程式的 stdin；程式不存在或結束碼非 0 時回傳錯誤
+#[cfg(unix)]
+fn pipe_to(program: &str, args: &[&str], text: &str) -> Result<()> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let mut child = Command::new(program)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(text.as_bytes())?;
+    } // stdin 在此關閉，程式才會結束
+    let status = child.wait()?;
+    anyhow::ensure!(status.success(), "{program} exited with {status}");
+    Ok(())
+}
+
+/// 讀取外部剪貼簿程式的輸出；程式不存在或結束碼非 0 時回傳錯誤
+#[cfg(unix)]
+fn read_from(program: &str, args: &[&str]) -> Result<String> {
+    let output = std::process::Command::new(program)
+        .args(args)
+        .stderr(std::process::Stdio::null())
+        .output()?;
+    anyhow::ensure!(
+        output.status.success(),
+        "{program} exited with {}",
+        output.status
+    );
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 impl Default for ClipboardManager {
     fn default() -> Self {
         Self::new().expect("Failed to initialize clipboard manager")
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clipboard_command_failures_are_errors() {
+        // 稽核 F19：結束碼非 0（如 SSH 下 xclip 無 DISPLAY）曾被當成成功、貼上空字串
+        assert!(pipe_to("false", &[], "x").is_err());
+        assert!(read_from("false", &[]).is_err());
+        assert!(pipe_to("wedi-no-such-program", &[], "x").is_err());
+        assert!(pipe_to("cat", &[], "x").is_ok());
+        assert_eq!(read_from("printf", &["ab"]).unwrap(), "ab");
     }
 }
