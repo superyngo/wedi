@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
 - Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)
+- Debug output no longer writes over the editor screen: `debug_log!` appends to `wedi-debug.log` in the system temp directory and only with `--debug` (debug builds no longer log by default); an unknown `-l` language now shows its warning in the status bar instead of flashing on stderr (B19)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)

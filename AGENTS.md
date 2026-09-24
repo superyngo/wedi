@@ -97,16 +97,14 @@ fn load_file(path: &Path) -> Result<String> {
 
 ### Conditional Compilation
 - Use `#[cfg(feature = "...")]` for optional features
-- Use `cfg!(debug_assertions)` for debug-only code
+- Use `cfg!(debug_assertions)` for debug-only code; never write to stdout/stderr while the TUI is up — log with `debug_log!` (writes to `wedi-debug.log` in the temp dir with `--debug`) or set a status-bar message
 - Platform-specific code uses `#[cfg(target_os = "...")]`
 
 ```rust
 #[cfg(feature = "syntax-highlighting")]
 pub mod highlight;
 
-if cfg!(debug_assertions) {
-    eprintln!("[DEBUG] Loading file: {:?}", path);
-}
+debug_log!("Loading file: {:?}", path);
 ```
 
 ### Type Patterns
@@ -182,11 +180,11 @@ debug_log!("Starting wedi with file: {:?}", args.file);
 ```
 
 ### Cache Invalidation
-When modifying the buffer, invalidate relevant caches:
+When modifying the buffer, invalidate the layout cache. The syntax cache needs nothing: every
+`RopeBuffer` edit records its first changed row, and `Editor::get_highlighted_lines` invalidates
+from it before rendering.
 ```rust
 self.view.invalidate_cache();       // Layout cache
-#[cfg(feature = "syntax-highlighting")]
-self.highlight_cache.clear();       // Syntax cache
 ```
 
 ### Selection Handling

@@ -292,9 +292,7 @@ impl LineHighlighter {
             Ok(ranges) => self.ranges_to_ansi_optimized(&ranges),
             Err(e) => {
                 // 降級為純文字，不影響編輯器運作
-                if cfg!(debug_assertions) {
-                    eprintln!("[WARN] Syntax highlighting failed: {}", e);
-                }
+                crate::debug_log!("warning: Syntax highlighting failed: {}", e);
                 // 過濾換行符，Tab 展開與 View 一致
                 expand_tabs(&strip_line_endings(line)).into_owned()
             }

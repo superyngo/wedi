@@ -182,7 +182,9 @@ pub fn print_help() {
     println!("OPTIONS:");
     println!("    -h, --help                         Show this help message");
     println!("    -v, --version                      Show version information");
-    println!("    --debug                            Enable debug mode");
+    println!(
+        "    --debug                            Debug mode; logs to wedi-debug.log in the temp dir"
+    );
     println!("    -e, --encoding <ENCODING>          Encoding for both reading and saving");
     println!("                                       (utf-8, utf-16le, utf-16be, gbk, shift-jis, big5, cp1252, etc.)");
     println!("    -f, --from-encoding <ENCODING>     Encoding for reading files (overrides -e)");

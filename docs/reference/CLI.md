@@ -12,7 +12,7 @@ wedi [OPTIONS] [FILE]
 |---|---|
 | `-h`, `--help` | Print help and key bindings, exit |
 | `-v`, `--version` | Print version, exit |
-| `--debug` | Debug logging |
+| `--debug` | Debug mode: status-bar debug info and a log in `wedi-debug.log` under the system temp directory (never on screen) |
 | `-e`, `--encoding <ENC>` | Read and save encoding |
 | `-f`, `--from-encoding <ENC>` | Read encoding (overrides `-e`) |
 | `-t`, `--to-encoding <ENC>` | Save encoding (overrides `-e`) |

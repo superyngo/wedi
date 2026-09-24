@@ -92,37 +92,31 @@ impl Editor {
             let mut buffer = RopeBuffer::new();
             // 如果指定了讀取編碼，設置編碼
             if let Some(enc) = encoding_config.read_encoding {
-                if cfg!(debug_assertions) {
-                    eprintln!(
-                        "[DEBUG] Editor::new() - Setting read_encoding from config: {}",
-                        enc.name()
-                    );
-                }
+                wedi_core::debug_log!(
+                    "Editor::new() - Setting read_encoding from config: {}",
+                    enc.name()
+                );
                 buffer.set_read_encoding(enc);
             }
             // 如果指定了存檔編碼，設置存檔編碼
             if let Some(enc) = encoding_config.save_encoding {
-                if cfg!(debug_assertions) {
-                    eprintln!(
-                        "[DEBUG] Editor::new() - Setting save_encoding from config: {}",
-                        enc.name()
-                    );
-                }
+                wedi_core::debug_log!(
+                    "Editor::new() - Setting save_encoding from config: {}",
+                    enc.name()
+                );
                 buffer.set_save_encoding(enc);
             }
 
-            if cfg!(debug_assertions) {
-                eprintln!(
-                    "[DEBUG] Editor::new() - Final buffer save_encoding: {}",
-                    if let Some(enc) = encoding_config.save_encoding {
-                        enc.name()
-                    } else if let Some(enc) = encoding_config.read_encoding {
-                        enc.name()
-                    } else {
-                        "system default"
-                    }
-                );
-            }
+            wedi_core::debug_log!(
+                "Editor::new() - Final buffer save_encoding: {}",
+                if let Some(enc) = encoding_config.save_encoding {
+                    enc.name()
+                } else if let Some(enc) = encoding_config.read_encoding {
+                    enc.name()
+                } else {
+                    "system default"
+                }
+            );
 
             buffer
         };
@@ -134,6 +128,10 @@ impl Editor {
         if let Some(path) = file_path {
             comment_handler.detect_from_path(path);
         }
+
+        // 啟動時的警告改顯示在狀態列（stderr 會被 TUI 蓋掉）
+        #[allow(unused_mut)]
+        let mut startup_warning: Option<String> = None;
 
         // 語法高亮初始化
         #[cfg(feature = "syntax-highlighting")]
@@ -156,7 +154,7 @@ impl Editor {
                 if let Some(lang) = language {
                     // 使用者指定了語言，嘗試設定
                     if let Err(e) = eng.set_syntax_by_name(lang) {
-                        eprintln!("Warning: {}", e);
+                        startup_warning = Some(format!("Warning: {}", e));
                         // 失敗時回退到自動檢測
                         if let Some(path) = file_path {
                             eng.set_file(Some(path));
@@ -172,7 +170,10 @@ impl Editor {
         };
 
         // 解碼有無效位元組：開檔即在狀態列警告
-        let message = buffer.is_lossy().then(|| lossy_warning(&buffer));
+        let message = buffer
+            .is_lossy()
+            .then(|| lossy_warning(&buffer))
+            .or(startup_warning);
 
         Ok(Self {
             buffer,
