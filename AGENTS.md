@@ -205,6 +205,7 @@ if self.has_selection() {
 
 ## CI/CD Notes
 
-- CI is currently **disabled** (`.github/workflows/ci.yml.disabled`; tracked as B1 in the backlog).
-  Run `cargo fmt -- --check`, `cargo clippy -- -D warnings`, and `cargo test` locally before committing.
-- Only `release.yml` is active; it runs on `v*.*.*` tags.
+- CI (`.github/workflows/ci.yml`) runs on pushes and PRs to `main`: `cargo fmt -- --check` on Ubuntu, then on
+  Ubuntu, Windows and macOS `cargo clippy --workspace --all-targets -- -D warnings` (with and without
+  `--no-default-features`) and `cargo test --workspace`. Run the same commands locally before committing.
+- `release.yml` runs on `v*.*.*` tags.
