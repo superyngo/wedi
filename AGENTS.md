@@ -2,14 +2,16 @@
 
 This document provides guidelines for AI coding agents working on the **wedi** codebase - a cross-platform minimalist lightweight CLI text editor written in Rust.
 
-## Project Overview
+## Documentation
 
-- **Language**: Rust (2021 Edition)
-- **Type**: CLI text editor with syntax highlighting (219+ languages)
-- **Architecture**: Workspace with 3 crates:
-  - `wedi` (main binary)
-  - `wedi-core` (core editor primitives)
-  - `wedi-widget` (TUI widget for embedding)
+Start at [`CONTEXT.md`](CONTEXT.md) — the documentation index. Architecture, crates, features,
+key bindings, and CLI flags live in [`docs/reference/`](docs/reference/README.md); this file holds
+conduct only and does not restate them. Open work is tracked in
+[`docs/plan/BACKLOG.md`](docs/plan/BACKLOG.md).
+
+- A change to a key binding updates `src/help.rs`, `docs/reference/KEYMAP.md`, and the README list together.
+- A change to a CLI flag updates `docs/reference/CLI.md` and the README Usage section together.
+- New terms go into `docs/reference/glossary.md` in the same commit.
 
 ## Build & Development Commands
 
@@ -156,42 +158,19 @@ mod tests {
 - Use `assert!` for boolean conditions
 - Include descriptive messages for complex assertions
 
-## Project Structure
+## Adding a Feature
 
-```
-wedi/
-├── src/
-│   ├── main.rs          # CLI entry point, argument parsing
-│   ├── editor.rs        # Main editor loop and state
-│   ├── dialog.rs        # Dialog components
-│   └── help.rs          # Help system
-├── crates/
-│   ├── wedi-core/       # Core primitives
-│   │   └── src/
-│   │       ├── buffer/  # Text buffer (rope_buffer, history)
-│   │       ├── cursor.rs
-│   │       ├── keymap/  # Key bindings
-│   │       ├── highlight/ # Syntax highlighting
-│   │       └── utils/   # Utilities (ansi_slice, line_wrapper)
-│   └── wedi-widget/     # Embeddable TUI widget
-└── assets/
-    └── syntaxes.bin     # Precompiled syntax definitions
-```
+1. Core behavior → `wedi-core`
+2. Config options → `EditorConfig` and CLI flags
+3. Key bindings → `Command` enum and `handle_key_event`
+4. UI wiring → command execution in `src/editor.rs`
+5. Docs → `CHANGELOG.md` `[Unreleased]`, README, and the affected `docs/reference/` file
 
-## Key Dependencies
+## Releasing
 
-| Crate | Purpose |
-|-------|---------|
-| `ropey` | Efficient rope-based text buffer |
-| `crossterm` | Cross-platform terminal control |
-| `syntect` | Syntax highlighting engine |
-| `anyhow` | Error handling |
-| `encoding_rs` | Multi-encoding support |
-| `arboard` | Cross-platform clipboard |
-
-## Feature Flags
-
-- `syntax-highlighting` (default): Enable syntax highlighting via syntect
+1. Bump `[workspace.package] version` and the `wedi-core` / `wedi-widget` dependency versions in the root `Cargo.toml` and `crates/wedi-widget/Cargo.toml`.
+2. Rename `## [Unreleased]` in `CHANGELOG.md` to `## [vX.Y.Z] - YYYY-MM-DD` and add a fresh `## [Unreleased]`.
+3. Commit, tag `vX.Y.Z`, push; `.github/workflows/release.yml` builds and publishes the GitHub Release.
 
 ## Common Patterns
 
@@ -226,7 +205,6 @@ if self.has_selection() {
 
 ## CI/CD Notes
 
-- CI runs on Ubuntu, Windows, and macOS
-- Clippy warnings are treated as errors
-- Format checks are enforced
-- Tests run with `cargo test --verbose`
+- CI is currently **disabled** (`.github/workflows/ci.yml.disabled`; tracked as B1 in the backlog).
+  Run `cargo fmt -- --check`, `cargo clippy -- -D warnings`, and `cargo test` locally before committing.
+- Only `release.yml` is active; it runs on `v*.*.*` tags.

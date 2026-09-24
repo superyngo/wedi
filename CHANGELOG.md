@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 2026-09-24
+
+### Docs
+- docs: reorganize into `docs/` layout (`CONTEXT.md` index, `docs/reference/` glossary, architecture, keymap, CLI; `docs/plan/BACKLOG.md`; documentation audit record)
+- `CLAUDE.md` is now a pointer; its architecture overview moved to `docs/reference/ARCHITECTURE.md` with corrections (pico-args not clap, native clipboard not arboard, undo/redo stacks)
+- `AGENTS.md` holds conduct only; CI notes corrected (CI is disabled)
+- README: syntax-highlight toggle is Ctrl+T (was listed as Ctrl+J); added Ctrl+E, Ctrl+PageUp/Down, mouse wheel, `-e`, `-l/--language`, `--list-languages`; corrected ESC behavior and technical stack
+- Fixed v0.2.0 release date
+
+### Removed
+- Stale `Cargo.toml.backup` and unused duplicate root `assets/syntaxes.bin`
+
 ## [v0.10.0] - 2026-07-18
 
 ### Added
@@ -243,7 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Improved theme selection and display clarity
 
-## [0.2.0] - 2024-XX-XX
+## [0.2.0] - 2025-11-27
 
 ### Added
 - Syntax highlighting support for 219+ programming languages

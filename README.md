@@ -10,20 +10,20 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ Line numbers display (toggleable)
 - ✅ Clipboard support (copy, cut, paste)
 - ✅ Selection mode with Shift key
-- ✅ **Alt+S Selection Mode** (for terminals without Shift key support) 🎉
+- ✅ **Alt+S Selection Mode** (for terminals without Shift key support)
 - ✅ Smart line operations
-- ✅ **Undo/Redo (Ctrl+Z/Y)** 🎉
-- ✅ **Search functionality (Ctrl+F)** 🎉
-- ✅ **Comment toggling (Ctrl+K/\\//)** 🎉
-- ✅ **Go to line (Ctrl+G)** 🎉
-- ✅ **Tab/Shift+Tab indentation** 🎉
-- ✅ **Fast navigation (Ctrl+Arrows/Home/End)** 🎉
-- ✅ **In-editor help (Ctrl+H)** 🎉
-- ✅ **Chinese character support** 🎉
-- ✅ **Syntax highlighting (219+ languages)** 🎉
-- ✅ **Smart incremental syntax highlighting with cache optimization** 🎉
-- ✅ **Customizable syntax themes (7 built-in themes)** 🎉
-- ✅ **Single-line/Multi-line display mode toggle (Ctrl+L/Ctrl+O)** 🎉
+- ✅ **Undo/Redo (Ctrl+Z/Y)**
+- ✅ **Search functionality (Ctrl+F)**
+- ✅ **Comment toggling (Ctrl+/, Ctrl+\\, Ctrl+K)**
+- ✅ **Go to line (Ctrl+G)**
+- ✅ **Tab/Shift+Tab indentation**
+- ✅ **Fast navigation (Ctrl+Arrows/Home/End)**
+- ✅ **In-editor help (Ctrl+H)**
+- ✅ **Chinese character support**
+- ✅ **Syntax highlighting (219+ languages)**
+- ✅ **Smart incremental syntax highlighting with cache optimization**
+- ✅ **Customizable syntax themes (7 built-in themes)**
+- ✅ **Single-line/Multi-line display mode toggle (Ctrl+L/Ctrl+O)**
 
 ## Installation
 
@@ -71,8 +71,6 @@ The installation script will:
 - Windows (x86_64, ARM64)
 - Linux (x86_64, aarch64)
 - macOS (x86_64, Apple Silicon)
-
-> **Note:** Replace `superyngo` with the actual GitHub superyngo in the URLs above.
 
 ### Manual Installation
 
@@ -138,7 +136,13 @@ wedi --version
 
 # Enable debug mode
 wedi --debug <filename>
+
+# Force a syntax / list syntaxes
+wedi -l rust <filename>
+wedi --list-languages
 ```
+
+The full flag reference is [docs/reference/CLI.md](docs/reference/CLI.md).
 
 ### Encoding Options
 
@@ -157,6 +161,9 @@ wedi <filename> -t <encoding>
 
 # Specify both source and target encoding
 wedi <filename> -f <encoding> -t <encoding>
+
+# One encoding for both reading and saving
+wedi <filename> -e <encoding>
 ```
 
 **Supported Encodings:**
@@ -169,7 +176,7 @@ wedi <filename> -f <encoding> -t <encoding>
 - And many more...
 
 **Encoding Priority for Saving:**
-When saving files, the encoding priority is: `--to-encoding` > `--from-encoding` > detected encoding from file.
+When saving files, the encoding priority is: `--to-encoding` > `--encoding` > `--from-encoding` > detected encoding from file. Press **Ctrl+E** in the editor to change the encoding.
 
 **Examples:**
 ```bash
@@ -220,6 +227,8 @@ wedi --list-themes
 
 ## Keyboard Shortcuts
 
+The canonical table is [docs/reference/KEYMAP.md](docs/reference/KEYMAP.md).
+
 ### Basic Editing
 
 - **Ctrl+S** / **Ctrl+W** / **Alt+W**: Save file (Alt+W for browser-based SSH terminals where Ctrl+W closes the tab)
@@ -240,7 +249,9 @@ wedi --list-themes
 - **Home** / **Ctrl+Left**: Move to line start
 - **End** / **Ctrl+Right**: Move to line end
 - **Page Up / Page Down**: Scroll page up/down (cycle through matches in search mode)
+- **Ctrl+Page Up / Page Down**: Jump 1/10 of the file
 - **Ctrl+G**: Go to line number
+- **Mouse Wheel**: Scroll up/down (moves cursor)
 
 ### Selection
 
@@ -250,7 +261,7 @@ wedi --list-themes
 - **Shift + Page Up / Down**: Select page up/down
 - **Shift + Ctrl + Arrows**: Quick select to line/file start/end
 - **Ctrl+A**: Select all
-- **ESC**: Clear selection and messages
+- **ESC**: Dismiss one layer per press: message, then selection / selection mode, then search mode
 
 > **Note**: In Alt+S selection mode, all movement keys (arrows, Home/End, Page Up/Down, Ctrl+arrows) will extend selection. Press Alt+S again, ESC, or perform any editing operation to exit selection mode.
 
@@ -278,6 +289,7 @@ wedi --list-themes
 - **Ctrl+L**: Toggle line numbers (also toggles display mode)
 - **Ctrl+O**: Toggle display mode only (wrap ↔ horizontal scroll)
 - **Ctrl+T**: Toggle syntax highlighting (On/Off)
+- **Ctrl+E**: Change file encoding
 
 ### Help
 
@@ -305,7 +317,7 @@ wedi includes comprehensive syntax highlighting powered by [bat](https://github.
 - **Database**: SQL, GraphQL, etc.
 - **Configuration**: Dockerfile, Makefile, Nginx, Git Config, INI, etc.
 
-### Syntax Highlighting
+### Performance
 
 wedi provides intelligent syntax highlighting with automatic performance optimization:
 
@@ -315,15 +327,16 @@ wedi provides intelligent syntax highlighting with automatic performance optimiz
 - **Cache Optimization**: Maintains highlighting cache for instant re-rendering
 - **Accurate Multi-line Syntax**: Correctly handles multi-line constructs (comments, strings, heredocs)
 
-Use **Ctrl+J** to toggle syntax highlighting on/off. The intelligent processing ensures both accuracy and performance automatically.
+Use **Ctrl+T** to toggle syntax highlighting on/off. The intelligent processing ensures both accuracy and performance automatically.
 
 ## Technical Stack
 
 - **Language**: Rust 2021 Edition
 - **Terminal Library**: crossterm (terminal control and event handling)
-- **Text Buffer**: ropey (efficient text buffer with undo/redo)
-- **Clipboard**: arboard (cross-platform clipboard)
-- **CLI Parsing**: clap (command-line argument parsing)
+- **Text Buffer**: ropey (rope-based text buffer)
+- **Clipboard**: native — Win32 API on Windows, pbcopy/pbpaste on macOS, wl-clipboard or xclip on Linux
+- **CLI Parsing**: pico-args
+- **Encodings**: encoding_rs
 - **Unicode Support**: unicode-width (proper CJK character handling)
 - **Syntax Highlighting**: syntect (syntax highlighting engine)
 - **Syntax Definitions**: bat project's syntaxes.bin (219+ language definitions)
@@ -345,8 +358,10 @@ cargo run -- <filename>
 ### Test
 
 ```bash
-cargo test
+cargo test --workspace
 ```
+
+Architecture and contributor docs start at [CONTEXT.md](CONTEXT.md).
 
 ### Release Build
 
@@ -363,7 +378,7 @@ MIT
 wedi uses syntax definitions from the [bat](https://github.com/sharkdp/bat) project:
 
 - **Source**: https://github.com/sharkdp/bat
-- **File**: `assets/syntaxes.bin` (219+ language definitions)
+- **File**: `crates/wedi-core/assets/syntaxes.bin` (219+ language definitions)
 - **License**: MIT License / Apache License 2.0 (dual licensed)
 - **Original Syntax Sources**: Sublime Text Packages (MIT License)
 
