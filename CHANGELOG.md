@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dialog key handling is unit-tested: `src/dialog.rs` splits the prompt, confirm and help-panel state out of the event loops (`LineInput`, `confirm_answer`, `HelpPanelState`), with tests for CJK editing and cursor width, bounds, paste, confirm keys and help-panel scroll limits (B17)
 
 ### Docs
+
+- docs: code audit (`docs/audit/2026-09-24-code-audit.md`) resolved — B1–B21 closed, B18 awaits verification on Linux over SSH and a German Windows layout
 - docs: reorganize into `docs/` layout (`CONTEXT.md` index, `docs/reference/` glossary, architecture, keymap, CLI; `docs/plan/BACKLOG.md`; documentation audit record)
 - `CLAUDE.md` is now a pointer; its architecture overview moved to `docs/reference/ARCHITECTURE.md` with corrections (pico-args not clap, native clipboard not arboard, undo/redo stacks)
 - `AGENTS.md` holds conduct only; CI notes corrected (CI is disabled)

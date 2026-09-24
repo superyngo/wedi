@@ -1,5 +1,5 @@
 # Code audit
-Status: In progress
+Status: Resolved (2026-09-24) — B18 awaits verification on Linux/Windows
 
 Whole-codebase sweep for bugs, better implementations, performance, simplicity, and clarity, at
 commit `4a76499` (v0.10.0 + docs). Evidence is file + symbol, never a line number. Findings are

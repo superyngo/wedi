@@ -5,12 +5,11 @@ written, never rewritten. Current behavior lives in [`../reference/`](../referen
 
 ## In progress
 
-| Date | Document | Status |
-|---|---|---|
-| 2026-09-24 | [2026-09-24-code-audit.md](2026-09-24-code-audit.md) | In progress — findings scheduled as BACKLOG B3–B21 |
+None.
 
 ## Landed
 
 | Date | Document | Status |
 |---|---|---|
+| 2026-09-24 | [2026-09-24-code-audit.md](2026-09-24-code-audit.md) | Resolved (2026-09-24); B18 in Pending verification |
 | 2026-09-24 | [2026-09-24-documentation-audit.md](2026-09-24-documentation-audit.md) | Resolved (2026-09-24) |
