@@ -58,7 +58,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 
 | Key | Command |
 |---|---|
-| Ctrl+/ / Ctrl+\\ / Ctrl+K | Toggle line comment (style by file type) |
+| Ctrl+/ / Ctrl+\\ / Ctrl+K | Toggle line comment (style by file type: `//`, `#`, `--`, `REM`, `"`; `#` for files without an extension; unknown extensions such as `.json`, `.html`, `.css`, `.md` show "No comment style") |
 | Ctrl+L | Toggle line numbers; sets **Display mode** to wrap when on, scroll when off |
 | Ctrl+O | Toggle **Display mode** only |
 | Ctrl+T | Toggle **Syntax highlighting** (feature `syntax-highlighting`) |

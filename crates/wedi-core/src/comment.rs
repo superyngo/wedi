@@ -28,14 +28,15 @@ impl CommentHandler {
             // C-style comments: //
             Some("rs") | Some("c") | Some("cpp") | Some("cc") | Some("cxx") | Some("h")
             | Some("hpp") | Some("java") | Some("js") | Some("ts") | Some("jsx") | Some("tsx")
-            | Some("go") | Some("cs") | Some("php") | Some("swift") | Some("kt") => {
-                Some(CommentStyle::Line("//".to_string()))
-            }
+            | Some("go") | Some("cs") | Some("php") | Some("swift") | Some("kt")
+            | Some("scala") | Some("dart") | Some("zig") | Some("proto") | Some("scss")
+            | Some("less") => Some(CommentStyle::Line("//".to_string())),
             // Hash/Pound comments: #
-            Some("py") | Some("sh") | Some("bash") | Some("rb") | Some("pl") | Some("yaml")
-            | Some("yml") | Some("toml") | Some("ps1") | Some("r") => {
-                Some(CommentStyle::Line("#".to_string()))
-            }
+            Some("py") | Some("sh") | Some("bash") | Some("zsh") | Some("fish") | Some("rb")
+            | Some("pl") | Some("yaml") | Some("yml") | Some("toml") | Some("ps1") | Some("r")
+            | Some("conf") | Some("cfg") | Some("env") | Some("mk") | Some("cmake")
+            | Some("dockerfile") | Some("nix") | Some("tf") | Some("ex") | Some("exs")
+            | Some("jl") => Some(CommentStyle::Line("#".to_string())),
             // SQL-style comments: --
             Some("sql") | Some("lua") | Some("hs") | Some("elm") => {
                 Some(CommentStyle::Line("--".to_string()))
@@ -44,8 +45,10 @@ impl CommentHandler {
             Some("bat") | Some("cmd") => Some(CommentStyle::Line("REM".to_string())),
             // Vim comments: "
             Some("vim") | Some("vimrc") => Some(CommentStyle::Line("\"".to_string())),
-            // 默認使用 # 註解（適用於大多數腳本語言和配置文件）
-            _ => Some(CommentStyle::Line("#".to_string())),
+            // 無副檔名（Makefile、Dockerfile、.bashrc 等）多為 # 註解
+            None => Some(CommentStyle::Line("#".to_string())),
+            // 未知副檔名（JSON、HTML、CSS、Markdown…）不猜測，避免插入錯誤的註解符號
+            _ => None,
         };
     }
 
@@ -68,8 +71,7 @@ impl CommentHandler {
                     if uncommented.is_empty() {
                         Some(String::new())
                     } else {
-                        let leading_spaces = line.len() - line.trim_start().len();
-                        Some(format!("{}{}", " ".repeat(leading_spaces), uncommented))
+                        Some(format!("{}{}", leading_ws(line), uncommented))
                     }
                 } else {
                     // 添加註解：一律使用 "prefix "
@@ -77,13 +79,7 @@ impl CommentHandler {
                     if trimmed.is_empty() {
                         Some(format!("{} ", prefix))
                     } else {
-                        let leading_spaces = line.len() - line.trim_start().len();
-                        Some(format!(
-                            "{}{} {}",
-                            " ".repeat(leading_spaces),
-                            prefix,
-                            trimmed
-                        ))
+                        Some(format!("{}{} {}", leading_ws(line), prefix, trimmed))
                     }
                 }
             }
@@ -112,13 +108,7 @@ impl CommentHandler {
                 if trimmed.is_empty() {
                     Some(format!("{} ", prefix))
                 } else {
-                    let leading_spaces = line.len() - line.trim_start().len();
-                    Some(format!(
-                        "{}{} {}",
-                        " ".repeat(leading_spaces),
-                        prefix,
-                        trimmed
-                    ))
+                    Some(format!("{}{} {}", leading_ws(line), prefix, trimmed))
                 }
             }
             _ => None,
@@ -143,8 +133,7 @@ impl CommentHandler {
                     if uncommented.is_empty() {
                         Some(String::new())
                     } else {
-                        let leading_spaces = line.len() - line.trim_start().len();
-                        Some(format!("{}{}", " ".repeat(leading_spaces), uncommented))
+                        Some(format!("{}{}", leading_ws(line), uncommented))
                     }
                 } else {
                     Some(line.to_string())
@@ -163,4 +152,9 @@ impl Default for CommentHandler {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// 行首空白（原樣保留 Tab 與空格）
+fn leading_ws(line: &str) -> &str {
+    &line[..line.len() - line.trim_start().len()]
 }

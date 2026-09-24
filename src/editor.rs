@@ -1735,4 +1735,24 @@ mod tests {
         run(&mut editor, vec![Command::ToggleComment]);
         assert_eq!(text(&editor), "abx\r\n// ycd\r\n");
     }
+
+    #[test]
+    fn test_comment_toggle_keeps_tabs_and_skips_unknown_types() {
+        // 稽核 F12：Tab 縮排被改成空格；F13：未知類型誤用 #
+        let dir = TempDir::new().unwrap();
+        let src = b"all:\n\tcc -o a a.c\n";
+        let mut editor = editor_with(&dir, "Makefile", src);
+        run(&mut editor, vec![Command::MoveDown, Command::ToggleComment]);
+        assert_eq!(text(&editor), "all:\n\t# cc -o a a.c\n");
+        run(&mut editor, vec![Command::ToggleComment]);
+        assert_eq!(text(&editor).as_bytes(), src);
+
+        let mut editor = editor_with(&dir, "a.json", b"{}\n");
+        run(&mut editor, vec![Command::ToggleComment]);
+        assert_eq!(text(&editor), "{}\n");
+        assert_eq!(
+            editor.message.as_deref(),
+            Some("No comment style for this file type")
+        );
+    }
 }
