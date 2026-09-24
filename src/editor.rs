@@ -279,7 +279,15 @@ impl Editor {
         Ok(())
     }
 
+    /// 執行一個命令；命令內的所有編輯構成一個撤銷群組
     fn handle_command(&mut self, command: Command) -> Result<()> {
+        self.buffer.begin_group();
+        let result = self.dispatch_command(command);
+        self.buffer.end_group();
+        result
+    }
+
+    fn dispatch_command(&mut self, command: Command) -> Result<()> {
         // 任何非 Quit 的命令都重置 quit_times
         if !matches!(command, Command::Quit) {
             self.quit_times = 0;
@@ -1758,5 +1766,44 @@ mod tests {
             editor.message.as_deref(),
             Some("No comment style for this file type")
         );
+    }
+
+    #[test]
+    fn test_undo_groups_words_and_commands_and_tracks_save_point() {
+        // 稽核 F17：每個字元一次撤銷；多行命令需 N–2N 次；回到存檔點不清除 [modified]
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "u.txt", b"a\nb\nc\n");
+        let typing: Vec<Command> = "hi yo".chars().map(Command::Insert).collect();
+        run(&mut editor, typing);
+        assert_eq!(text(&editor), "hi yoa\nb\nc\n");
+        run(&mut editor, vec![Command::Undo]);
+        assert_eq!(text(&editor), "hi a\nb\nc\n");
+        run(&mut editor, vec![Command::Undo]);
+        assert_eq!(text(&editor), "a\nb\nc\n");
+        assert!(!editor.buffer.is_modified());
+
+        // 三行縮排：一次撤銷
+        run(
+            &mut editor,
+            vec![
+                Command::ExtendSelection(Direction::Down),
+                Command::ExtendSelection(Direction::Down),
+                Command::Indent,
+            ],
+        );
+        assert_ne!(text(&editor), "a\nb\nc\n");
+        run(&mut editor, vec![Command::Undo]);
+        assert_eq!(text(&editor), "a\nb\nc\n");
+
+        // 存檔後輸入再撤銷：回到存檔點清除 [modified]；重做則再次標記
+        run(&mut editor, vec![Command::Insert('x'), Command::Save]);
+        assert!(!editor.buffer.is_modified());
+        run(&mut editor, vec![Command::Insert('y')]);
+        assert!(editor.buffer.is_modified());
+        run(&mut editor, vec![Command::Undo]);
+        assert_eq!(text(&editor), "xa\nb\nc\n");
+        assert!(!editor.buffer.is_modified());
+        run(&mut editor, vec![Command::Redo]);
+        assert!(editor.buffer.is_modified());
     }
 }

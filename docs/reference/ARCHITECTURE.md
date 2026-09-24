@@ -59,9 +59,11 @@ detected unless given) → `HighlightEngine` picks syntax by extension, special 
 keep the cursor visible. Any buffer-modifying command exits **Search mode** and invalidates the
 affected layout and highlight caches.
 
-**Undo.** `History` keeps an `undo_stack` and `redo_stack` of `Action::Insert` / `Action::Delete`
-(position + text), capped at `max_size`. Undo pops and applies the inverse, pushing onto the redo
-stack; a new edit clears the redo stack.
+**Undo.** `History` keeps undo and redo stacks of groups of `Action`s (position + text), capped at
+`max_size` groups. `Editor::handle_command` wraps each **Command** in `RopeBuffer::begin_group` /
+`end_group`, so one command undoes in one step; consecutive single-character inserts merge into the
+previous group until a new word starts. Each group has an id; the save point records the top id, and
+Undo/Redo clear `[modified]` when they return to it. A new edit clears the redo stack.
 
 **Syntax highlighting.** Scheduled from `editor.rs`: files up to `SMALL_FILE_THRESHOLD` (500) lines
 are highlighted from the top; larger files start `BUFFER_LINES` (100) above the viewport. Results

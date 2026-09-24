@@ -12,11 +12,11 @@ pub struct RopeBuffer {
     file_path: Option<PathBuf>,
     modified: bool,
     history: History,
-    in_undo_redo: bool,                            // 防止在撤銷/重做時記錄歷史
+    saved_id: u64, // 存檔時最新的歷史群組 id（用於判斷是否回到存檔點）
     read_encoding: &'static encoding_rs::Encoding, // 讀取編碼
     save_encoding: &'static encoding_rs::Encoding, // 存檔編碼
-    bom: bool,                                     // 原檔是否帶 BOM（存檔時保留）
-    lossy: bool,                                   // 讀檔解碼時有無效位元組被替換為 U+FFFD
+    bom: bool,     // 原檔是否帶 BOM（存檔時保留）
+    lossy: bool,   // 讀檔解碼時有無效位元組被替換為 U+FFFD
 }
 
 impl RopeBuffer {
@@ -36,7 +36,7 @@ impl RopeBuffer {
             file_path: None,
             modified: false,
             history: History::default(),
-            in_undo_redo: false,
+            saved_id: 0,
             read_encoding: system_enc,
             save_encoding: system_enc,
             bom: false,
@@ -357,7 +357,7 @@ impl RopeBuffer {
             file_path: Some(path.to_path_buf()),
             modified,
             history: History::default(),
-            in_undo_redo: false,
+            saved_id: 0,
             read_encoding: detected_encoding,
             save_encoding,
             bom,
@@ -385,12 +385,13 @@ impl RopeBuffer {
         let pos = pos.min(self.rope.len_chars());
 
         // 記錄到歷史
-        if !self.in_undo_redo {
-            self.history.push(Action::Insert {
+        self.history.push(
+            Action::Insert {
                 pos,
                 text: ch.to_string(),
-            });
-        }
+            },
+            self.saved_id,
+        );
 
         self.rope.insert_char(pos, ch);
         self.modified = true;
@@ -400,12 +401,13 @@ impl RopeBuffer {
         let pos = pos.min(self.rope.len_chars());
 
         // 記錄到歷史
-        if !self.in_undo_redo {
-            self.history.push(Action::Insert {
+        self.history.push(
+            Action::Insert {
                 pos,
                 text: text.to_string(),
-            });
-        }
+            },
+            self.saved_id,
+        );
 
         self.rope.insert(pos, text);
         self.modified = true;
@@ -417,12 +419,13 @@ impl RopeBuffer {
             let deleted_char = self.rope.char(pos).to_string();
 
             // 記錄到歷史
-            if !self.in_undo_redo {
-                self.history.push(Action::Delete {
+            self.history.push(
+                Action::Delete {
                     pos,
                     text: deleted_char,
-                });
-            }
+                },
+                self.saved_id,
+            );
 
             self.rope.remove(pos..pos + 1);
             self.modified = true;
@@ -437,13 +440,14 @@ impl RopeBuffer {
             let deleted_text = self.rope.slice(start..end).to_string();
 
             // 記錄到歷史
-            if !self.in_undo_redo {
-                self.history.push(Action::DeleteRange {
+            self.history.push(
+                Action::DeleteRange {
                     start,
                     end,
                     text: deleted_text,
-                });
-            }
+                },
+                self.saved_id,
+            );
 
             self.rope.remove(start..end);
             self.modified = true;
@@ -463,13 +467,14 @@ impl RopeBuffer {
             let deleted_line = self.rope.slice(start..end).to_string();
 
             // 記錄到歷史
-            if !self.in_undo_redo {
-                self.history.push(Action::DeleteRange {
+            self.history.push(
+                Action::DeleteRange {
                     start,
                     end,
                     text: deleted_line,
-                });
-            }
+                },
+                self.saved_id,
+            );
 
             self.rope.remove(start..end);
             self.modified = true;
@@ -506,6 +511,7 @@ impl RopeBuffer {
             let encoded = self.encode_contents()?;
             write_atomic(path, &encoded)?;
             self.modified = false;
+            self.saved_id = self.history.top_id();
             self.lossy = false; // 檔案已改寫，不再與原位元組不一致
 
             if cfg!(debug_assertions) {
@@ -569,6 +575,7 @@ impl RopeBuffer {
         let encoded = self.encode_contents()?;
         write_atomic(path, &encoded)?;
         self.modified = false;
+        self.saved_id = self.history.top_id();
         self.file_path = Some(path.to_path_buf());
         Ok(())
     }
@@ -580,6 +587,7 @@ impl RopeBuffer {
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
         self.file_path = Some(path.to_path_buf());
         self.modified = false;
+        self.saved_id = self.history.top_id();
         Ok(())
     }
 
@@ -638,71 +646,66 @@ impl RopeBuffer {
         self.rope.slice(line_start..line_end).to_string()
     }
 
-    // 撤銷/重做方法
-    pub fn undo(&mut self) -> Option<usize> {
-        if let Some(action) = self.history.undo() {
-            self.in_undo_redo = true;
+    /// Start an undo group: edits until `end_group` undo and redo as one step.
+    pub fn begin_group(&mut self) {
+        self.history.begin_group();
+    }
 
-            let result_pos = match action {
+    pub fn end_group(&mut self) {
+        self.history.end_group();
+    }
+
+    // 撤銷/重做方法：一次處理整個群組，回傳游標應在的位置
+    pub fn undo(&mut self) -> Option<usize> {
+        let group = self.history.undo()?;
+        let mut first_pos = usize::MAX;
+        // 反向還原群組內的動作
+        for action in group.actions.into_iter().rev() {
+            let pos = match action {
+                // 撤銷插入 = 刪除
                 Action::Insert { pos, text } => {
-                    // 撤銷插入 = 刪除
-                    let char_count = text.chars().count();
-                    self.rope.remove(pos..pos + char_count);
-                    self.modified = true;
-                    Some(pos)
+                    self.rope.remove(pos..pos + text.chars().count());
+                    pos
                 }
+                // 撤銷刪除 = 插入
                 Action::Delete { pos, text } => {
-                    // 撤銷刪除 = 插入
                     self.rope.insert(pos, &text);
-                    self.modified = true;
-                    Some(pos)
+                    pos
                 }
                 Action::DeleteRange { start, text, .. } => {
-                    // 撤銷範圍刪除 = 插入
                     self.rope.insert(start, &text);
-                    self.modified = true;
-                    Some(start)
+                    start
                 }
             };
-
-            self.in_undo_redo = false;
-            result_pos
-        } else {
-            None
+            first_pos = first_pos.min(pos);
         }
+        // 回到存檔點時清除 [modified]
+        self.modified = self.history.top_id() != self.saved_id;
+        // 游標移到群組中最前面的變更位置（多行命令可能由下往上編輯）
+        Some(first_pos)
     }
 
     pub fn redo(&mut self) -> Option<usize> {
-        if let Some(action) = self.history.redo() {
-            self.in_undo_redo = true;
-
-            let result_pos = match action {
+        let group = self.history.redo()?;
+        let mut result_pos = 0;
+        for action in group.actions {
+            result_pos = match action {
                 Action::Insert { pos, text } => {
-                    // 重做插入
                     self.rope.insert(pos, &text);
-                    self.modified = true;
-                    Some(pos + text.chars().count())
+                    pos + text.chars().count()
                 }
                 Action::Delete { pos, text } => {
-                    // 重做刪除
-                    let char_count = text.chars().count();
-                    self.rope.remove(pos..pos + char_count);
-                    self.modified = true;
-                    Some(pos)
+                    self.rope.remove(pos..pos + text.chars().count());
+                    pos
                 }
                 Action::DeleteRange { start, end, .. } => {
-                    // 重做範圍刪除
                     self.rope.remove(start..end);
-                    self.modified = true;
-                    Some(start)
+                    start
                 }
             };
-
-            self.in_undo_redo = false;
-            result_pos
-        } else {
-            None
         }
+        self.modified = self.history.top_id() != self.saved_id;
+        Some(result_pos)
     }
 
     #[allow(dead_code)]
@@ -755,6 +758,7 @@ impl RopeBuffer {
             self.lossy = new_buffer.lossy;
             self.modified = false;
             self.history.clear(); // 清除 undo/redo 歷史
+            self.saved_id = 0;
 
             Ok(())
         } else {

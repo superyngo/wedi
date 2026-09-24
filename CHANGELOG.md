@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toggling a comment turned tab indentation into spaces (breaking Makefiles), and unknown file types such as JSON, HTML, CSS and Markdown got `#` comments; indentation is now kept as-is and those types show "No comment style" (B11)
 - Pasting into the search, go-to-line and encoding prompts did nothing, and resizing the window while a prompt, confirmation or the help panel was open left it drawn at the old size; prompts now accept paste (first line) and dialogs redraw at the new size (B13)
 - Over SSH on Linux (no Wayland/X display) copy silently failed and paste inserted nothing; failing clipboard commands are now detected and copy/paste fall back to the internal clipboard with a status message. Windows clipboard API failures are detected too, and AltGr characters (reported as Ctrl+Alt on Windows, e.g. `@ { [ ] €`) are typed instead of dropped (B18)
+- Undo removed one character at a time and needed several steps for one multi-line indent or comment toggle, and undoing back to the last save still showed the file as modified; undo now goes one word or one command at a time and clears the modified flag at the save point (B15)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
