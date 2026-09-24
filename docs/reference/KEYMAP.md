@@ -11,7 +11,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 | Ctrl+S / Ctrl+W / Alt+W | Save (Alt+W for browser SSH terminals where Ctrl+W closes the tab) |
 | Ctrl+Q | Quit (press twice if modified) |
 | Ctrl+Z / Ctrl+Y | Undo / Redo (one typed word, or one whole command such as a multi-line indent, per step) |
-| Backspace / Delete | Delete before / under cursor, or the **Selection** |
+| Backspace (or Ctrl+H) / Delete | Delete before / under cursor, or the **Selection**. Ctrl+H is Backspace because many terminals send `^H` for it |
 | Ctrl+D | Delete current line, or every line touched by the **Selection** |
 | Tab / Shift+Tab | Indent (4 spaces) / unindent (up to 4 leading spaces); applies to selected lines |
 | Enter, Ctrl+J, Ctrl+M | Insert newline (Ctrl+J/Ctrl+M cover terminals that paste newlines as control characters) |
@@ -63,7 +63,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 | Ctrl+O | Toggle **Display mode** only |
 | Ctrl+T | Toggle **Syntax highlighting** (feature `syntax-highlighting`) |
 | Ctrl+E | Change file encoding (labels as in [CLI.md](CLI.md#encodings)) |
-| Ctrl+H / F1 | Open the **Help panel** |
+| F1 | Open the **Help panel** |
 
 ## Comment styles
 

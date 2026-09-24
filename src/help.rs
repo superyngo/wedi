@@ -15,7 +15,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
             ("Ctrl+Z", "Undo"),
             ("Ctrl+Y", "Redo"),
             (
-                "Backspace",
+                "Backspace / Ctrl+H",
                 "Delete character before cursor or selected text",
             ),
             ("Delete", "Delete character under cursor or selected text"),
@@ -103,7 +103,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
                 "Ctrl+E",
                 "Change file encoding (utf-8, gbk, big5, shift-jis, etc.)",
             ),
-            ("Ctrl+H / F1", "Show this help"),
+            ("F1", "Show this help"),
         ],
     ));
 

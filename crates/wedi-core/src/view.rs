@@ -657,15 +657,18 @@ impl View {
         let line = line.trim_end_matches(['\n', '\r']);
         let cursor_visual_col = self.logical_col_to_visual_col(line, cursor.col);
 
+        // 極窄視窗時縮小邊界，避免 available_width - MARGIN 下溢
+        let margin = HORIZONTAL_SCROLL_MARGIN.min(available_width / 2);
+        let right_edge = available_width.saturating_sub(margin).max(1);
+
         // 游標超出右邊界
-        if cursor_visual_col >= self.offset_col + available_width - HORIZONTAL_SCROLL_MARGIN {
-            self.offset_col =
-                cursor_visual_col.saturating_sub(available_width - HORIZONTAL_SCROLL_MARGIN - 1);
+        if cursor_visual_col >= self.offset_col + right_edge {
+            self.offset_col = cursor_visual_col.saturating_sub(right_edge - 1);
         }
 
         // 游標超出左邊界
-        if cursor_visual_col < self.offset_col + HORIZONTAL_SCROLL_MARGIN {
-            self.offset_col = cursor_visual_col.saturating_sub(HORIZONTAL_SCROLL_MARGIN);
+        if cursor_visual_col < self.offset_col + margin {
+            self.offset_col = cursor_visual_col.saturating_sub(margin);
         }
     }
 
@@ -1103,4 +1106,24 @@ fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_horizontal_scroll_survives_tiny_widths() {
+        // 稽核 F32：available_width - MARGIN 在 5 欄以下曾下溢（debug build panic）
+        let mut buffer = RopeBuffer::new();
+        buffer.insert(0, "0123456789abcdefghij");
+        let mut cursor = Cursor::new();
+        cursor.col = 15;
+        for cols in 0..12 {
+            let mut view = View::new_simple(5, cols);
+            view.wrap_mode = false;
+            view.scroll_horizontal_if_needed(&cursor, &buffer);
+            assert!(view.offset_col <= cursor.col);
+        }
+    }
 }

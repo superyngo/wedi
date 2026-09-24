@@ -283,7 +283,8 @@ impl RopeBuffer {
                 );
             }
 
-            (Rope::new(), encoding_to_use, true, false, false)
+            // 尚未存在的新檔：未編輯前不算修改，直接退出不需確認
+            (Rope::new(), encoding_to_use, false, false, false)
         };
 
         // 確定存檔編碼：優先級 --en > --dec > 實際讀取編碼
@@ -411,12 +412,19 @@ impl RopeBuffer {
 
     pub fn delete_line(&mut self, row: usize) {
         if row < self.line_count() {
-            let start = self.rope.line_to_char(row);
+            let mut start = self.rope.line_to_char(row);
             let end = if row + 1 < self.line_count() {
                 self.rope.line_to_char(row + 1)
             } else {
                 self.rope.len_chars()
             };
+            // 最後一行沒有換行符時，連同前一行的換行符一起刪除，否則會留下空行
+            if row + 1 == self.line_count() && start < end && start > 0 {
+                start -= 1;
+                if start > 0 && self.rope.char(start - 1) == '\r' {
+                    start -= 1;
+                }
+            }
 
             // 獲取要刪除的行
             let deleted_line = self.rope.slice(start..end).to_string();
@@ -1039,5 +1047,32 @@ mod tests {
         buffer.save().unwrap();
         let canonical = path.canonicalize().unwrap();
         assert_eq!(buffer.file_display_path(), canonical.to_string_lossy());
+    }
+
+    #[test]
+    fn test_delete_last_line_without_newline_leaves_no_empty_line() {
+        // 稽核 F32：刪除沒有換行符的最後一行曾留下空行
+        for (text, expected) in [("a\nb\nc", "a\nb"), ("a\r\nb\r\nc", "a\r\nb"), ("c", "")] {
+            let mut buffer = RopeBuffer::new();
+            buffer.insert(0, text);
+            let last = buffer.line_count() - 1;
+            buffer.delete_line(last);
+            assert_eq!(buffer.rope.to_string(), expected);
+            buffer.undo();
+            assert_eq!(buffer.rope.to_string(), text);
+        }
+    }
+
+    #[test]
+    fn test_new_file_opens_unmodified() {
+        // 稽核 F32：尚未存在的檔案開啟時不應標為已修改
+        let temp_dir = TempDir::new().unwrap();
+        let config = EncodingConfig {
+            read_encoding: None,
+            save_encoding: None,
+        };
+        let buffer =
+            RopeBuffer::from_file_with_encoding(&temp_dir.path().join("new.txt"), &config).unwrap();
+        assert!(!buffer.is_modified());
     }
 }

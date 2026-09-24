@@ -18,7 +18,7 @@ A lightweight, easy-to-use console text editor written in Rust.
 - ✅ **Go to line (Ctrl+G)**
 - ✅ **Tab/Shift+Tab indentation**
 - ✅ **Fast navigation (Ctrl+Arrows/Home/End)**
-- ✅ **In-editor help (Ctrl+H)**
+- ✅ **In-editor help (F1)**
 - ✅ **Chinese character support**
 - ✅ **Syntax highlighting (219+ languages)**
 - ✅ **Smart incremental syntax highlighting with cache optimization**
@@ -235,7 +235,7 @@ The canonical table is [docs/reference/KEYMAP.md](docs/reference/KEYMAP.md).
 - **Ctrl+Q**: Quit (press twice if modified)
 - **Ctrl+Z**: Undo
 - **Ctrl+Y**: Redo
-- **Backspace**: Delete character before cursor or selected text
+- **Backspace** / **Ctrl+H**: Delete character before cursor or selected text
 - **Delete**: Delete character under cursor or selected text
 - **Ctrl+D**: Delete current line or selected lines
 - **Tab**: Indent (insert 4 spaces or indent selected lines)
@@ -293,7 +293,7 @@ The canonical table is [docs/reference/KEYMAP.md](docs/reference/KEYMAP.md).
 
 ### Help
 
-- **Ctrl+H** / **F1**: Show in-editor help panel with all keyboard shortcuts (Tab switches to the About page)
+- **F1**: Show in-editor help panel with all keyboard shortcuts (Tab switches to the About page)
 
 ## Supported Comment Styles
 

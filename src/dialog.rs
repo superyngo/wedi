@@ -336,7 +336,7 @@ pub fn prompt_with_default(
         // 設置光標位置（以視覺寬度計算，正確處理 CJK 雙寬字元）
         let input_before_cursor: String = input.chars().take(cursor_pos).collect();
         let cursor_x = (visual_width(prompt_text) + 2 + visual_width(&input_before_cursor))
-            .min(cols as usize - 1) as u16;
+            .min((cols as usize).saturating_sub(1)) as u16;
         execute!(io::stdout(), cursor::MoveTo(cursor_x, dialog_row))?;
         execute!(io::stdout(), cursor::Show)?;
 

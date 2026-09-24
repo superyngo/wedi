@@ -71,5 +71,5 @@ A single-line prompt over the status bar (search, go-to-line, change encoding, c
 _Avoid_: Popup, modal.
 
 **Help panel**:
-The full-screen overlay opened by Ctrl+H/F1, with a Help page and an About page switched by Tab/←/→.
+The full-screen overlay opened by F1, with a Help page and an About page switched by Tab/←/→.
 _Avoid_: Help dialog.

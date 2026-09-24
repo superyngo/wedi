@@ -171,7 +171,8 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('z'), KeyModifiers::CONTROL) => Some(Command::Undo),
         (KeyCode::Char('y'), KeyModifiers::CONTROL) => Some(Command::Redo),
         (KeyCode::Char('f'), KeyModifiers::CONTROL) => Some(Command::Find),
-        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::ShowHelp),
+        // 許多終端把 Backspace / Ctrl+Backspace 送成 ^H：視為退格，說明只用 F1
+        (KeyCode::Char('h'), KeyModifiers::CONTROL) => Some(Command::Backspace),
         (KeyCode::F(1), KeyModifiers::NONE) => Some(Command::ShowHelp),
         (KeyCode::Char('l'), KeyModifiers::CONTROL) => Some(Command::ToggleLineNumbers),
         (KeyCode::Char('g'), KeyModifiers::CONTROL) => Some(Command::GoToLine),
@@ -238,5 +239,12 @@ mod tests {
         // 稽核 F30：Resize 改走 InputEvent::Resize，真正的 F21 鍵不再觸發
         let f21 = KeyEvent::new(KeyCode::F(21), KeyModifiers::NONE);
         assert_eq!(handle_key_event(f21, false), None);
+    }
+
+    #[test]
+    fn test_ctrl_h_is_backspace() {
+        // 稽核 F32：許多終端把 Backspace 送成 ^H
+        let ctrl_h = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL);
+        assert_eq!(handle_key_event(ctrl_h, false), Some(Command::Backspace));
     }
 }
