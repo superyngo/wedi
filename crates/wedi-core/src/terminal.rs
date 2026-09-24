@@ -33,6 +33,12 @@ impl Terminal {
         Ok(Self { size })
     }
 
+    /// Create a terminal handle with a fixed size, without querying the tty
+    /// (for headless use such as tests).
+    pub fn with_size(size: (u16, u16)) -> Self {
+        Self { size }
+    }
+
     pub fn enter_raw_mode() -> Result<()> {
         terminal::enable_raw_mode()?;
         execute!(

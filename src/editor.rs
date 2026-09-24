@@ -52,6 +52,29 @@ impl Editor {
         #[cfg(feature = "syntax-highlighting")] theme: Option<&str>,
         #[cfg(feature = "syntax-highlighting")] language: Option<&str>,
     ) -> Result<Self> {
+        let terminal = Terminal::new()?;
+        #[cfg(feature = "syntax-highlighting")]
+        return Self::with_terminal(
+            terminal,
+            file_path,
+            debug_mode,
+            encoding_config,
+            theme,
+            language,
+        );
+        #[cfg(not(feature = "syntax-highlighting"))]
+        Self::with_terminal(terminal, file_path, debug_mode, encoding_config)
+    }
+
+    /// 以指定的 Terminal 建立編輯器（測試時可傳入固定尺寸的 Terminal）
+    fn with_terminal(
+        terminal: Terminal,
+        file_path: Option<&Path>,
+        debug_mode: bool,
+        encoding_config: &EncodingConfig,
+        #[cfg(feature = "syntax-highlighting")] theme: Option<&str>,
+        #[cfg(feature = "syntax-highlighting")] language: Option<&str>,
+    ) -> Result<Self> {
         let buffer = if let Some(path) = file_path {
             // 使用新的方法，支持指定編碼
             RopeBuffer::from_file_with_encoding(path, encoding_config)?
@@ -94,7 +117,6 @@ impl Editor {
             buffer
         };
 
-        let terminal = Terminal::new()?;
         let view = View::new(&terminal);
         let clipboard = ClipboardManager::new()?;
 
@@ -648,6 +670,7 @@ impl Editor {
 
                     self.cursor.row = row;
                     self.cursor.col = col;
+                    self.selection = None;
                     self.cursor.desired_visual_col = col;
                     self.message = Some("Undo".to_string());
                 } else {
@@ -665,6 +688,7 @@ impl Editor {
 
                     self.cursor.row = row;
                     self.cursor.col = col;
+                    self.selection = None;
                     self.cursor.desired_visual_col = col;
                     self.message = Some("Redo".to_string());
                 } else {
@@ -820,7 +844,8 @@ impl Editor {
 
                         self.view.invalidate_cache();
 
-                        // 保留選擇狀態（不清除選取）
+                        // 保留選擇狀態，但改為整行範圍（舊欄位在改寫後已失效）
+                        self.select_whole_lines(start_row, end_row);
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
                         self.cursor.desired_visual_col = 0;
@@ -880,7 +905,8 @@ impl Editor {
 
                         self.view.invalidate_cache();
 
-                        // 保留選擇狀態
+                        // 保留選擇狀態，但改為整行範圍（舊欄位在改寫後已失效）
+                        self.select_whole_lines(start_row, end_row);
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
                         self.cursor.desired_visual_col = 0;
@@ -921,7 +947,8 @@ impl Editor {
 
                         self.view.invalidate_cache();
 
-                        // 保留選擇狀態
+                        // 保留選擇狀態，但改為整行範圍（舊欄位在改寫後已失效）
+                        self.select_whole_lines(start_row, end_row);
                         self.cursor.row = start_row;
                         self.cursor.col = 0;
                         self.cursor.desired_visual_col = 0;
@@ -1227,11 +1254,37 @@ impl Editor {
         }
     }
 
-    fn get_selected_text(&self) -> String {
-        if let Some(sel) = self.selection {
-            let (start_row, start_col) = sel.start.min(sel.end);
-            let (end_row, end_col) = sel.start.max(sel.end);
+    /// 將選取範圍設為 start_row..=end_row 的整行
+    fn select_whole_lines(&mut self, start_row: usize, end_row: usize) {
+        self.selection = Some(Selection {
+            start: (start_row, 0),
+            end: (end_row, self.line_len(end_row)),
+        });
+    }
 
+    /// 行的字元數（不含換行符）
+    fn line_len(&self, row: usize) -> usize {
+        self.buffer
+            .get_line_content(row)
+            .trim_end_matches(['\n', '\r'])
+            .chars()
+            .count()
+    }
+
+    /// 已排序且夾限在緩衝區範圍內的選取端點
+    fn selection_bounds(&self) -> Option<((usize, usize), (usize, usize))> {
+        let sel = self.selection?;
+        let last_row = self.buffer.line_count().saturating_sub(1);
+        let clamp = |(row, col): (usize, usize)| {
+            let row = row.min(last_row);
+            (row, col.min(self.line_len(row)))
+        };
+        let (a, b) = (clamp(sel.start), clamp(sel.end));
+        Some((a.min(b), a.max(b)))
+    }
+
+    fn get_selected_text(&self) -> String {
+        if let Some(((start_row, start_col), (end_row, end_col))) = self.selection_bounds() {
             let mut text = String::new();
 
             for row in start_row..=end_row {
@@ -1269,10 +1322,7 @@ impl Editor {
     }
 
     fn delete_selection(&mut self) {
-        if let Some(sel) = self.selection {
-            let (start_row, start_col) = sel.start.min(sel.end);
-            let (end_row, end_col) = sel.start.max(sel.end);
-
+        if let Some(((start_row, start_col), (end_row, end_col))) = self.selection_bounds() {
             let start_pos = self.buffer.line_to_char(start_row) + start_col;
             let end_pos = self.buffer.line_to_char(end_row) + end_col;
 
@@ -1470,5 +1520,90 @@ impl Editor {
         use wedi_core::highlight::EditType;
         self.highlight_cache
             .invalidate_from_edit(from_line, EditType::CharInsert);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use wedi_core::keymap::Direction;
+
+    /// 以固定尺寸的 Terminal 建立無頭編輯器，內容寫入暫存檔
+    fn editor_with(dir: &TempDir, name: &str, bytes: &[u8]) -> Editor {
+        let path = dir.path().join(name);
+        std::fs::write(&path, bytes).unwrap();
+        let config = EncodingConfig {
+            read_encoding: None,
+            save_encoding: None,
+        };
+        #[cfg(feature = "syntax-highlighting")]
+        let editor = Editor::with_terminal(
+            Terminal::with_size((80, 24)),
+            Some(&path),
+            false,
+            &config,
+            None,
+            None,
+        );
+        #[cfg(not(feature = "syntax-highlighting"))]
+        let editor =
+            Editor::with_terminal(Terminal::with_size((80, 24)), Some(&path), false, &config);
+        editor.unwrap()
+    }
+
+    fn run(editor: &mut Editor, commands: Vec<Command>) {
+        for command in commands {
+            editor.handle_command(command).unwrap();
+        }
+    }
+
+    fn text(editor: &Editor) -> String {
+        (0..editor.buffer.line_count())
+            .map(|i| editor.buffer.get_line_content(i))
+            .collect()
+    }
+
+    #[test]
+    fn test_headless_typing() {
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "a.txt", b"bc\n");
+        run(&mut editor, vec![Command::Insert('a')]);
+        assert_eq!(text(&editor), "abc\n");
+        assert_eq!((editor.cursor.row, editor.cursor.col), (0, 1));
+    }
+
+    #[test]
+    fn test_copy_after_unindent_does_not_panic() {
+        // 稽核 R1：選取範圍在 Unindent 改寫行後仍保留舊欄位
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "sel.txt", b"    ab\nline2\n");
+        run(
+            &mut editor,
+            vec![
+                Command::MoveEnd,
+                Command::ExtendSelection(Direction::Down),
+                Command::Unindent,
+                Command::CopyInternal,
+            ],
+        );
+        assert_eq!(editor.internal_clipboard, "ab\nline2");
+    }
+
+    #[test]
+    fn test_undo_clears_selection() {
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "u.txt", b"abcdef\n");
+        run(
+            &mut editor,
+            vec![
+                Command::MoveEnd,
+                Command::Insert('g'),
+                Command::ExtendSelection(Direction::Left),
+                Command::Undo,
+            ],
+        );
+        assert!(editor.selection.is_none());
+        run(&mut editor, vec![Command::CopyInternal]);
     }
 }
