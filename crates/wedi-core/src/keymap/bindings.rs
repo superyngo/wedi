@@ -196,8 +196,6 @@ pub fn handle_key_event(event: KeyEvent, selection_mode: bool) -> Option<Command
         (KeyCode::Char('v'), KeyModifiers::ALT) => Some(Command::PasteInternal),
         // F20 是 Paste 事件的標記（Windows Terminal 的 Ctrl+V）
         // (KeyCode::F(20), KeyModifiers::NONE) => Some(Command::SelectAll),
-        // F21 用於視窗大小調整事件
-        (KeyCode::F(21), KeyModifiers::NONE) => Some(Command::Resize),
 
         // ESC 清除選擇和訊息
         (KeyCode::Esc, _) => Some(Command::ClearMessage),
@@ -233,5 +231,12 @@ mod tests {
         assert_eq!(key('€'), Some(Command::Insert('€')));
         // Ctrl+Alt+字母仍保留給快捷鍵
         assert_eq!(key('q'), None);
+    }
+
+    #[test]
+    fn test_f21_is_not_resize() {
+        // 稽核 F30：Resize 改走 InputEvent::Resize，真正的 F21 鍵不再觸發
+        let f21 = KeyEvent::new(KeyCode::F(21), KeyModifiers::NONE);
+        assert_eq!(handle_key_event(f21, false), None);
     }
 }

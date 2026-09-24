@@ -1,10 +1,7 @@
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{
-        self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
-        KeyModifiers,
-    },
+    event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyEvent, KeyEventKind},
     execute,
     terminal::{self, ClearType},
 };
@@ -18,6 +15,8 @@ pub enum InputEvent {
     Key(KeyEvent),
     /// 貼上事件（包含已正規化的文字）
     Paste(String),
+    /// 終端視窗大小改變
+    Resize,
 }
 
 pub struct Terminal {
@@ -86,13 +85,7 @@ impl Terminal {
                         return Ok(InputEvent::Key(key_event));
                     }
                 }
-                Event::Resize(_cols, _rows) => {
-                    // 視窗大小改變,返回特殊標記
-                    return Ok(InputEvent::Key(KeyEvent::new(
-                        KeyCode::F(21),
-                        KeyModifiers::NONE,
-                    )));
-                }
+                Event::Resize(_cols, _rows) => return Ok(InputEvent::Resize),
                 Event::Paste(text) => {
                     // Bracketed Paste 事件
                     // 正規化行尾符號：\r\n 和 \r 都轉換為 \n

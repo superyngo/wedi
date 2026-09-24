@@ -265,6 +265,7 @@ impl Editor {
                     // 直接處理貼上的文字
                     self.handle_command(Command::PasteText(text))?;
                 }
+                InputEvent::Resize => self.handle_command(Command::Resize)?,
             }
 
             // 對話框取走了 Resize 事件：同步編輯器尺寸
