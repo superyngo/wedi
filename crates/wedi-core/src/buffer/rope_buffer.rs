@@ -364,6 +364,17 @@ impl RopeBuffer {
         })
     }
 
+    /// Line ending used by this buffer: `"\r\n"` if the first line ends with CRLF, else `"\n"`.
+    pub fn line_ending(&self) -> &'static str {
+        let first = self.rope.line(0);
+        let n = first.len_chars();
+        if n >= 2 && first.char(n - 2) == '\r' && first.char(n - 1) == '\n' {
+            "\r\n"
+        } else {
+            "\n"
+        }
+    }
+
     pub fn insert_char(&mut self, pos: usize, ch: char) {
         let pos = pos.min(self.rope.len_chars());
 

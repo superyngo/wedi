@@ -298,7 +298,13 @@ impl Editor {
                 }
 
                 let pos = self.cursor.char_position(&self.buffer);
-                self.buffer.insert_char(pos, ch);
+                if ch == '\n' {
+                    // 沿用檔案的行尾符號（CRLF 檔案插入 \r\n）
+                    let eol = self.buffer.line_ending();
+                    self.buffer.insert(pos, eol);
+                } else {
+                    self.buffer.insert_char(pos, ch);
+                }
 
                 // 優化：僅失效當前行（除非是換行符，需要重建整個緩存）
                 if ch == '\n' {
@@ -347,8 +353,10 @@ impl Editor {
                         .chars()
                         .count();
 
+                    // 一次刪除整個換行符（\n 或 \r\n）
                     let pos = self.buffer.line_to_char(new_row) + prev_line_len;
-                    self.buffer.delete_char(pos);
+                    let end = self.buffer.line_to_char(self.cursor.row);
+                    self.buffer.delete_range(pos, end);
                     self.view.invalidate_cache(); // 行合併影響多行
                     #[cfg(feature = "syntax-highlighting")]
                     self.highlight_cache.clear();
@@ -368,7 +376,17 @@ impl Editor {
                     let at_line_end = self.cursor.col
                         >= line_content.trim_end_matches(['\n', '\r']).chars().count();
 
-                    self.buffer.delete_char(pos);
+                    if at_line_end {
+                        // 一次刪除整個換行符（\n 或 \r\n）
+                        let end = if self.cursor.row + 1 < self.buffer.line_count() {
+                            self.buffer.line_to_char(self.cursor.row + 1)
+                        } else {
+                            self.buffer.len_chars()
+                        };
+                        self.buffer.delete_range(pos, end);
+                    } else {
+                        self.buffer.delete_char(pos);
+                    }
 
                     // 優化：如果在行尾刪除（會合併下一行），需要完全失效；否則僅失效當前行
                     if at_line_end {
@@ -823,14 +841,11 @@ impl Editor {
                                 // 刪除舊行（包括換行符）
                                 self.buffer.delete_range(line_start, line_end);
 
-                                // 插入新行（保留換行符）
-                                let new_line_with_newline = if line_content.ends_with('\n')
-                                    || line_content.ends_with("\r\n")
-                                {
-                                    format!("{}\n", new_line.trim_end_matches(['\n', '\r']))
-                                } else {
-                                    new_line.trim_end_matches(['\n', '\r']).to_string()
-                                };
+                                // 插入新行（保留原行尾符號）
+                                let body = line_content.trim_end_matches(['\n', '\r']);
+                                let eol = &line_content[body.len()..];
+                                let new_line_with_newline =
+                                    format!("{}{}", new_line.trim_end_matches(['\n', '\r']), eol);
                                 self.buffer.insert(line_start, &new_line_with_newline);
                             }
                         }
@@ -866,13 +881,11 @@ impl Editor {
                         // 刪除舊行（包括換行符）
                         self.buffer.delete_range(line_start, line_end);
 
-                        // 插入新行（保留換行符）
+                        // 插入新行（保留原行尾符號）
+                        let body = line_content.trim_end_matches(['\n', '\r']);
+                        let eol = &line_content[body.len()..];
                         let new_line_with_newline =
-                            if line_content.ends_with('\n') || line_content.ends_with("\r\n") {
-                                format!("{}\n", new_line.trim_end_matches(['\n', '\r']))
-                            } else {
-                                new_line.trim_end_matches(['\n', '\r']).to_string()
-                            };
+                            format!("{}{}", new_line.trim_end_matches(['\n', '\r']), eol);
                         self.buffer.insert(line_start, &new_line_with_newline);
 
                         self.view.invalidate_cache();
@@ -1212,6 +1225,14 @@ impl Editor {
         if self.has_selection() {
             self.delete_selection();
         }
+        // 統一為 \n 計算游標，插入時轉為檔案的行尾符號
+        let text = text.replace("\r\n", "\n");
+        let eol = self.buffer.line_ending();
+        let insert_text = if eol == "\n" {
+            text.clone()
+        } else {
+            text.replace('\n', eol)
+        };
 
         // 檢查是否為整行貼上（文字以換行結尾）
         let is_whole_line = text.ends_with('\n');
@@ -1219,7 +1240,7 @@ impl Editor {
         if is_whole_line {
             // 整行貼上：在光標所在行的開始處插入
             let line_start = self.buffer.line_to_char(self.cursor.row);
-            self.buffer.insert(line_start, &text);
+            self.buffer.insert(line_start, &insert_text);
             self.view.invalidate_cache();
 
             // 計算插入了多少行
@@ -1232,7 +1253,7 @@ impl Editor {
         } else {
             // 普通貼上：在光標位置插入
             let pos = self.cursor.char_position(&self.buffer);
-            self.buffer.insert(pos, &text);
+            self.buffer.insert(pos, &insert_text);
             self.view.invalidate_cache();
             // 移動到貼上內容末尾
             for ch in text.chars() {
@@ -1639,5 +1660,26 @@ mod tests {
         run(&mut editor, vec![Command::ToggleDisplayMode]);
         assert!(!editor.view.wrap_mode);
         assert_eq!(editor.cursor.visual_line_index, 0);
+    }
+
+    #[test]
+    fn test_crlf_join_and_edit_keep_crlf() {
+        // 稽核 R3：CRLF 檔案 Backspace/Delete 一次合併；Enter、貼上、註解保留 CRLF
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "c.rs", b"ab\r\ncd\r\n");
+        run(&mut editor, vec![Command::MoveDown, Command::Backspace]);
+        assert_eq!(text(&editor), "abcd\r\n");
+        assert_eq!((editor.cursor.row, editor.cursor.col), (0, 2));
+        run(&mut editor, vec![Command::Insert('\n')]);
+        assert_eq!(text(&editor), "ab\r\ncd\r\n");
+        run(
+            &mut editor,
+            vec![Command::MoveUp, Command::MoveEnd, Command::Delete],
+        );
+        assert_eq!(text(&editor), "abcd\r\n");
+        run(&mut editor, vec![Command::PasteText("x\ny".to_string())]);
+        assert_eq!(text(&editor), "abx\r\nycd\r\n");
+        run(&mut editor, vec![Command::ToggleComment]);
+        assert_eq!(text(&editor), "abx\r\n// ycd\r\n");
     }
 }

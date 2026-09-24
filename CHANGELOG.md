@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Search on a line with multi-byte text (e.g. CJK) put the cursor at the match's byte offset, so typing landed on the wrong column or line; the cursor now lands on the match (B8)
 - Cursor drawn on the wrong row after toggling wrap mode (Ctrl+O), line numbers (Ctrl+L), resizing, or Undo/Redo; moving up into a wrapped line above the viewport landed on its first visual line instead of its last (B9)
 - With syntax highlighting on, tab-indented lines were drawn with 8-column tabs while the cursor assumed 4, so the cursor sat inside the text; highlighted lines now expand tabs to 4 spaces like plain rendering (B10)
+- In CRLF files, Backspace/Delete at a line break took two presses to join lines, and Enter, paste and comment toggling inserted LF; lines now join in one press and edits keep CRLF (B7)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
