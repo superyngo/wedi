@@ -16,6 +16,7 @@ pub struct RopeBuffer {
     read_encoding: &'static encoding_rs::Encoding, // 讀取編碼
     save_encoding: &'static encoding_rs::Encoding, // 存檔編碼
     bom: bool,                                     // 原檔是否帶 BOM（存檔時保留）
+    lossy: bool,                                   // 讀檔解碼時有無效位元組被替換為 U+FFFD
 }
 
 impl RopeBuffer {
@@ -39,6 +40,7 @@ impl RopeBuffer {
             read_encoding: system_enc,
             save_encoding: system_enc,
             bom: false,
+            lossy: false,
         }
     }
 
@@ -259,7 +261,7 @@ impl RopeBuffer {
 
     pub fn from_file_with_encoding(path: &Path, encoding_config: &EncodingConfig) -> Result<Self> {
         // 如果文件存在，讀取內容；否則創建空緩衝區
-        let (rope, detected_encoding, modified, bom) = if path.exists() {
+        let (rope, detected_encoding, modified, bom, lossy) = if path.exists() {
             let bytes = fs::read(path)
                 .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
@@ -304,10 +306,7 @@ impl RopeBuffer {
             // 解碼為 UTF-8
             let (decoded, _, had_errors) = read_encoding.decode(&bytes[bom_length..]);
             if had_errors {
-                eprintln!(
-                    "[WARN] Encoding errors detected in file: {}",
-                    path.display()
-                );
+                debug_log!("  Encoding errors detected in file: {}", path.display());
             }
 
             (
@@ -315,6 +314,7 @@ impl RopeBuffer {
                 read_encoding,
                 false,
                 bom_length > 0,
+                had_errors,
             )
         } else {
             // 文件不存在，創建空緩衝區
@@ -338,7 +338,7 @@ impl RopeBuffer {
                 }
             }
 
-            (Rope::new(), encoding_to_use, true, false)
+            (Rope::new(), encoding_to_use, true, false, false)
         };
 
         // 確定存檔編碼：優先級 --en > --dec > 實際讀取編碼
@@ -361,7 +361,13 @@ impl RopeBuffer {
             read_encoding: detected_encoding,
             save_encoding,
             bom,
+            lossy,
         })
+    }
+
+    /// Whether decoding the file replaced invalid bytes with U+FFFD; saving would not restore them.
+    pub fn is_lossy(&self) -> bool {
+        self.lossy
     }
 
     /// Line ending used by this buffer: `"\r\n"` if the first line ends with CRLF, else `"\n"`.
@@ -500,6 +506,7 @@ impl RopeBuffer {
             let encoded = self.encode_contents()?;
             std::fs::write(path, encoded)?;
             self.modified = false;
+            self.lossy = false; // 檔案已改寫，不再與原位元組不一致
 
             if cfg!(debug_assertions) {
                 eprintln!(
@@ -726,6 +733,11 @@ impl RopeBuffer {
         self.save_encoding
     }
 
+    /// Encoding the file was decoded with.
+    pub fn read_encoding(&self) -> &'static encoding_rs::Encoding {
+        self.read_encoding
+    }
+
     /// 使用指定編碼重新載入檔案
     pub fn reload_with_encoding(&mut self, encoding: &'static encoding_rs::Encoding) -> Result<()> {
         if let Some(path) = &self.file_path.clone() {
@@ -740,6 +752,7 @@ impl RopeBuffer {
             self.read_encoding = new_buffer.read_encoding;
             self.save_encoding = new_buffer.save_encoding;
             self.bom = new_buffer.bom;
+            self.lossy = new_buffer.lossy;
             self.modified = false;
             self.history.clear(); // 清除 undo/redo 歷史
 

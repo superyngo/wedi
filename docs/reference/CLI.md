@@ -30,6 +30,9 @@ Read encoding: `--from-encoding` > `--encoding` > auto-detected. Save encoding: 
 A UTF-8 or UTF-16 byte-order mark is kept on save while the save encoding is unchanged. A character the
 save encoding can't represent makes the save fail with `Save failed: '<char>' (U+XXXX) can't be saved as <ENC>`;
 the file on disk is left untouched.
+If the file has bytes that are invalid in the read encoding, they show as `�` and the status bar warns on open;
+the first Ctrl+S only repeats the warning, and a second Ctrl+S in a row saves (the invalid bytes are lost).
+Use Ctrl+E or `-f` to reopen the file in the right encoding instead.
 Labels (`wedi_core::buffer::parse_encoding_label`, shared with Ctrl+E), case-insensitive:
 
 | Label | Encoding |

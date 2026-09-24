@@ -29,7 +29,8 @@ pub struct Editor {
     selection: Option<Selection>,
     selection_mode: bool, // F1 選擇模式開關
     message: Option<String>,
-    quit_times: u8, // 追蹤連續按 Ctrl+Q 的次數
+    quit_times: u8,         // 追蹤連續按 Ctrl+Q 的次數
+    lossy_save_armed: bool, // 解碼有損的檔案：第一次 Ctrl+S 僅警告，再按一次才存檔
     debug_mode: bool,
 
     // 語法高亮（可選功能）
@@ -42,6 +43,14 @@ pub struct Editor {
     highlight_config: HighlightConfig,
     #[cfg(feature = "syntax-highlighting")]
     highlight_enabled: bool,
+}
+
+/// 解碼有損時的狀態列警告
+fn lossy_warning(buffer: &RopeBuffer) -> String {
+    format!(
+        "Invalid {} bytes shown as \u{FFFD}; saving loses them (Ctrl+E: encoding).",
+        buffer.read_encoding().name()
+    )
 }
 
 impl Editor {
@@ -161,6 +170,9 @@ impl Editor {
             (engine, HighlightCache::new(), config)
         };
 
+        // 解碼有無效位元組：開檔即在狀態列警告
+        let message = buffer.is_lossy().then(|| lossy_warning(&buffer));
+
         Ok(Self {
             buffer,
             cursor: Cursor::new(),
@@ -174,8 +186,9 @@ impl Editor {
             should_quit: false,
             selection: None,
             selection_mode: false, // 預設關閉選擇模式
-            message: None,
+            message,
             quit_times: 0,
+            lossy_save_armed: false,
             debug_mode,
 
             #[cfg(feature = "syntax-highlighting")]
@@ -265,6 +278,9 @@ impl Editor {
         // 任何非 Quit 的命令都重置 quit_times
         if !matches!(command, Command::Quit) {
             self.quit_times = 0;
+        }
+        if !matches!(command, Command::Save) {
+            self.lossy_save_armed = false;
         }
 
         // 修改緩衝區的命令會使搜尋匹配位置失效：先退出搜尋模式（保留查詢字串）
@@ -646,7 +662,13 @@ impl Editor {
 
             // 文件操作
             Command::Save => {
-                if let Err(e) = self.buffer.save() {
+                if self.buffer.is_lossy() && !self.lossy_save_armed {
+                    self.lossy_save_armed = true;
+                    self.message = Some(format!(
+                        "{} Ctrl+S again: save anyway",
+                        lossy_warning(&self.buffer)
+                    ));
+                } else if let Err(e) = self.buffer.save() {
                     self.message = Some(format!("Save failed: {}", e));
                 } else {
                     self.message = Some("File saved".to_string());
@@ -1027,10 +1049,14 @@ impl Editor {
                                                 self.cursor.desired_visual_col = 0;
                                                 self.cursor.visual_line_index = 0;
                                                 self.view.invalidate_cache();
-                                                self.message = Some(format!(
-                                                    "Encoding changed to {} (file reloaded)",
-                                                    encoding.name()
-                                                ));
+                                                self.message = Some(if self.buffer.is_lossy() {
+                                                    lossy_warning(&self.buffer)
+                                                } else {
+                                                    format!(
+                                                        "Encoding changed to {} (file reloaded)",
+                                                        encoding.name()
+                                                    )
+                                                });
                                             }
                                             Err(e) => {
                                                 self.message =
@@ -1048,10 +1074,14 @@ impl Editor {
                                         self.cursor.desired_visual_col = 0;
                                         self.cursor.visual_line_index = 0;
                                         self.view.invalidate_cache();
-                                        self.message = Some(format!(
-                                            "Encoding changed to {} (file reloaded)",
-                                            encoding.name()
-                                        ));
+                                        self.message = Some(if self.buffer.is_lossy() {
+                                            lossy_warning(&self.buffer)
+                                        } else {
+                                            format!(
+                                                "Encoding changed to {} (file reloaded)",
+                                                encoding.name()
+                                            )
+                                        });
                                     }
                                     Err(e) => {
                                         self.message =
@@ -1601,6 +1631,29 @@ mod tests {
         run(&mut editor, vec![Command::Insert('a')]);
         assert_eq!(text(&editor), "abc\n");
         assert_eq!((editor.cursor.row, editor.cursor.col), (0, 1));
+    }
+
+    #[test]
+    fn test_lossy_file_warns_and_needs_second_save() {
+        // 稽核 F5：無效位元組被替換為 U+FFFD，開檔要警告，存檔需再確認一次
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "bad.txt", b"a\xff\n");
+        let path = dir.path().join("bad.txt");
+        assert!(editor.message.as_deref().unwrap().contains('\u{FFFD}'));
+        run(&mut editor, vec![Command::Save]);
+        assert_eq!(std::fs::read(&path).unwrap(), b"a\xff\n");
+        run(&mut editor, vec![Command::Save]);
+        assert_eq!(editor.message.as_deref(), Some("File saved"));
+        // 中間夾其他命令則重新要求確認
+        let mut editor = editor_with(&dir, "bad2.txt", b"a\xff\n");
+        run(
+            &mut editor,
+            vec![Command::Save, Command::MoveEnd, Command::Save],
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("bad2.txt")).unwrap(),
+            b"a\xff\n"
+        );
     }
 
     #[test]
