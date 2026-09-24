@@ -117,9 +117,16 @@ pub struct View {
     pub screen_cols: usize,
     // 行快取：從 offset_row 起往下的數行
     line_layout_cache: Vec<Option<LineLayout>>,
+    // 除錯模式：頂端顯示欄位尺規
+    debug_ruler: bool,
 }
 
 impl View {
+    /// Show the column ruler above the text (debug mode).
+    pub fn set_debug_ruler(&mut self, on: bool) {
+        self.debug_ruler = on;
+    }
+
     /// 從 Terminal 建立 View（自動取得終端尺寸）
     pub fn new(terminal: &Terminal) -> Self {
         let (cols, rows) = terminal.size();
@@ -134,6 +141,7 @@ impl View {
             screen_rows,
             screen_cols: cols as usize,
             line_layout_cache: vec![None; cache_size],
+            debug_ruler: false,
         }
     }
 
@@ -159,6 +167,7 @@ impl View {
             screen_rows: rows,
             screen_cols: cols,
             line_layout_cache: vec![None; cache_size],
+            debug_ruler: false,
         }
     }
 
@@ -215,9 +224,8 @@ impl View {
             &std::collections::HashMap<usize, String>,
         >,
     ) -> Result<()> {
-        let has_debug_ruler = message.is_some_and(|m| m.starts_with("DEBUG"));
-
-        self.scroll_if_needed(cursor, buffer, has_debug_ruler);
+        // 捲動由呼叫端在計算高亮前先以 scroll_if_needed 完成，這裡不重複
+        let has_debug_ruler = self.debug_ruler;
 
         // 整個畫面寫入同一個緩衝區，每幀只 flush 一次（減少系統呼叫與閃爍）
         let out = io::stdout();
@@ -665,7 +673,7 @@ impl View {
         &self,
         stdout: &mut impl Write,
         buffer: &RopeBuffer,
-        selection_mode: bool,
+        has_selection: bool,
         message: Option<&str>,
         cursor: &Cursor,
     ) -> Result<()> {
@@ -681,7 +689,7 @@ impl View {
         };
         let filepath = buffer.file_display_path();
 
-        let mode_indicator = if selection_mode {
+        let mode_indicator = if has_selection {
             " [Selection Mode]"
         } else {
             ""

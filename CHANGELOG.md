@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Undo removed one character at a time and needed several steps for one multi-line indent or comment toggle, and undoing back to the last save still showed the file as modified; undo now goes one word or one command at a time and clears the modified flag at the save point (B15)
 - The status-bar width of a line containing tabs now matches the layout: all width calculations share `utils::display_width`, which counts a tab as 4 columns (B21)
 - Pressing F21 (Shift+F9 on some terminals) no longer triggers a window resize: resizes arrive as `InputEvent::Resize` instead of a fake F21 key (B21)
+- A status message starting with "DEBUG" no longer turns on the debug column ruler; only `--debug` does. Each frame scrolls once instead of twice (B21)
 - Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
 - Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)

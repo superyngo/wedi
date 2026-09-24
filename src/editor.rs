@@ -30,7 +30,7 @@ pub struct Editor {
     selection: Option<Selection>,
     selection_mode: bool, // F1 選擇模式開關
     message: Option<String>,
-    quit_times: u8,         // 追蹤連續按 Ctrl+Q 的次數
+    quit_pending: bool,     // 有未存修改時已按過一次 Ctrl+Q
     lossy_save_armed: bool, // 解碼有損的檔案：第一次 Ctrl+S 僅警告，再按一次才存檔
     debug_mode: bool,
 
@@ -118,7 +118,8 @@ impl Editor {
             buffer
         };
 
-        let view = View::new(&terminal);
+        let mut view = View::new(&terminal);
+        view.set_debug_ruler(debug_mode);
         let clipboard = ClipboardManager::new()?;
 
         let mut comment_handler = CommentHandler::new();
@@ -187,7 +188,7 @@ impl Editor {
             selection: None,
             selection_mode: false, // 預設關閉選擇模式
             message,
-            quit_times: 0,
+            quit_pending: false,
             lossy_save_armed: false,
             debug_mode,
 
@@ -287,9 +288,9 @@ impl Editor {
     }
 
     fn dispatch_command(&mut self, command: Command) -> Result<()> {
-        // 任何非 Quit 的命令都重置 quit_times
+        // 任何非 Quit 的命令都取消待確認的退出
         if !matches!(command, Command::Quit) {
-            self.quit_times = 0;
+            self.quit_pending = false;
         }
         if !matches!(command, Command::Save) {
             self.lossy_save_armed = false;
@@ -669,12 +670,12 @@ impl Editor {
 
             Command::Quit => {
                 if self.buffer.is_modified() {
-                    if self.quit_times > 0 {
+                    if self.quit_pending {
                         // 第二次按 Ctrl+Q，強制退出
                         self.should_quit = true;
                     } else {
                         // 第一次按 Ctrl+Q，顯示警告
-                        self.quit_times = 1;
+                        self.quit_pending = true;
                         self.message = Some(
                             "Unsaved changes! Press Ctrl+Q again to force quit, or Ctrl+S to save"
                                 .to_string(),
@@ -1749,5 +1750,18 @@ mod tests {
             vec![Command::MoveRight, Command::PasteInternal],
         );
         assert_eq!(text(&editor), "one\none\ntwo\n");
+    }
+
+    #[test]
+    fn test_quit_with_unsaved_changes_needs_two_presses() {
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "a.txt", b"x\n");
+        run(&mut editor, vec![Command::Insert('a'), Command::Quit]);
+        assert!(!editor.should_quit);
+        // 中間夾其他命令就要重新確認
+        run(&mut editor, vec![Command::MoveEnd, Command::Quit]);
+        assert!(!editor.should_quit);
+        run(&mut editor, vec![Command::Quit]);
+        assert!(editor.should_quit);
     }
 }
