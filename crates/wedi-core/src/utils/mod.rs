@@ -48,15 +48,34 @@ macro_rules! debug_log {
     };
 }
 
-/// 計算字符串的視覺寬度（考慮寬字元）
-/// 中文字元等寬字元會正確計算為 2，ASCII 字元計算為 1
-pub fn visual_width(s: &str) -> usize {
-    s.chars()
-        .map(|ch| UnicodeWidthChar::width(ch).unwrap_or(1))
-        .sum()
+/// Terminal columns taken by one character: 2 for wide (CJK) characters,
+/// the editor's tab width (4) for a tab, 1 for anything without a defined width.
+///
+/// The one width rule for layout, cursor, rendering, and dialogs.
+pub fn display_width(ch: char) -> usize {
+    if ch == '\t' {
+        crate::view::TAB_WIDTH
+    } else {
+        UnicodeWidthChar::width(ch).unwrap_or(1)
+    }
 }
 
-/// 計算單個字符的視覺寬度
-pub fn char_width(ch: char) -> usize {
-    UnicodeWidthChar::width(ch).unwrap_or(1)
+/// Sum of [`display_width`] over a string.
+pub fn visual_width(s: &str) -> usize {
+    s.chars().map(display_width).sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display_width_is_one_rule() {
+        // 稽核 F29：寬度規則集中在一處；Tab 與版面一致計 4 欄
+        assert_eq!(display_width('a'), 1);
+        assert_eq!(display_width('中'), 2);
+        assert_eq!(display_width('\t'), 4);
+        assert_eq!(display_width('\u{7}'), 1);
+        assert_eq!(visual_width("a\t中"), 7);
+    }
 }

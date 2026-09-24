@@ -3,14 +3,13 @@ use crate::cursor::Cursor;
 use crate::terminal::Terminal;
 #[cfg(feature = "syntax-highlighting")]
 use crate::utils::slice_ansi_text;
-use crate::utils::visual_width;
+use crate::utils::{display_width, visual_width};
 use anyhow::Result;
 use crossterm::{
     cursor, queue,
     style::{self, Attribute, Color},
 };
 use std::io::{self, Write};
-use unicode_width::UnicodeWidthChar;
 
 // 視圖配置常量
 pub(crate) const TAB_WIDTH: usize = 4; // Tab 寬度（空格數）
@@ -72,9 +71,8 @@ fn expand_tabs_and_build_map(line: &str) -> (String, Vec<usize>) {
             }
             visual_col += TAB_WIDTH;
         } else {
-            let w = UnicodeWidthChar::width(ch).unwrap_or(1);
             displayed.push(ch);
-            visual_col += w;
+            visual_col += display_width(ch);
         }
     }
 
@@ -105,11 +103,7 @@ fn byte_col_to_visual_col(line: &str, byte_col: usize) -> usize {
         if idx >= byte_col {
             break;
         }
-        if ch == '\t' {
-            visual_col += TAB_WIDTH;
-        } else {
-            visual_col += UnicodeWidthChar::width(ch).unwrap_or(1);
-        }
+        visual_col += display_width(ch);
     }
     visual_col
 }
@@ -391,7 +385,7 @@ impl View {
                     let mut current_visual_pos = visual_line_start_col;
 
                     for &ch in chars.iter() {
-                        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+                        let ch_width = display_width(ch);
 
                         // 單行模式：跳過 offset_col 之前的字符
                         if !self.wrap_mode && current_visual_pos + ch_width <= self.offset_col {
@@ -731,14 +725,14 @@ impl View {
                 let mut skip_idx = 0;
                 let mut total_w = visual_width(&right);
                 while total_w + prefix_w > available && skip_idx < right_chars.len() {
-                    let cw = UnicodeWidthChar::width(right_chars[skip_idx]).unwrap_or(1);
+                    let cw = display_width(right_chars[skip_idx]);
                     total_w -= cw;
                     skip_idx += 1;
                 }
                 skip_idx
             };
             for ch in right_chars.into_iter().skip(skip) {
-                let cw = UnicodeWidthChar::width(ch).unwrap_or(1);
+                let cw = display_width(ch);
                 if w + cw > available {
                     break;
                 }
@@ -758,7 +752,7 @@ impl View {
             let mut result = String::new();
             let mut current_width = 0;
             for ch in status.chars() {
-                let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+                let ch_width = display_width(ch);
                 if current_width + ch_width > self.screen_cols {
                     break;
                 }
@@ -803,7 +797,7 @@ impl View {
         let mut current_col = 0;
 
         for ch in text.chars() {
-            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+            let ch_width = display_width(ch);
 
             // 跳過 offset 之前的字符
             if current_col + ch_width <= start_col {
@@ -881,11 +875,7 @@ impl View {
             if idx >= logical_col {
                 break;
             }
-            if ch == '\t' {
-                visual_col += TAB_WIDTH;
-            } else {
-                visual_col += UnicodeWidthChar::width(ch).unwrap_or(1);
-            }
+            visual_col += display_width(ch);
         }
         visual_col
     }
@@ -956,11 +946,7 @@ impl View {
                     break;
                 }
 
-                if ch == '\t' {
-                    current_visual += TAB_WIDTH;
-                } else {
-                    current_visual += UnicodeWidthChar::width(ch).unwrap_or(1);
-                }
+                current_visual += display_width(ch);
 
                 logical_col += 1;
             }
@@ -1088,7 +1074,7 @@ fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
     let mut current_width = 0;
 
     for ch in line.chars() {
-        let char_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        let char_width = display_width(ch);
 
         if current_width + char_width > max_width && !current_line.is_empty() {
             result.push(current_line);

@@ -13,7 +13,7 @@
 //! - 基本色: \x1b[30-37m, \x1b[40-47m
 //! - 重置: \x1b[0m
 
-use unicode_width::UnicodeWidthChar;
+use super::display_width;
 
 /// 切割帶有 ANSI escape codes 的文字
 ///
@@ -68,7 +68,7 @@ pub fn slice_ansi_text(text: &str, start_col: usize, width: usize) -> String {
         }
 
         // 計算字符寬度
-        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        let ch_width = display_width(ch);
 
         // 檢查是否在可見範圍內
         if current_col + ch_width > start_col && current_col < start_col + width {
@@ -153,7 +153,7 @@ fn ansi_visual_width(text: &str) -> usize {
             // 跳過整個 escape sequence
             collect_escape_sequence(ch, &mut chars);
         } else {
-            width += UnicodeWidthChar::width(ch).unwrap_or(1);
+            width += display_width(ch);
         }
     }
 

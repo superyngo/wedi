@@ -10,7 +10,7 @@ use crossterm::{
 };
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use wedi_core::utils::visual_width;
+use wedi_core::utils::{display_width, visual_width};
 
 // 對話框期間發生過視窗大小改變（事件已被對話框取走，編輯器需自行同步尺寸）
 static RESIZED: AtomicBool = AtomicBool::new(false);
@@ -41,7 +41,7 @@ fn truncate_to_width(s: &str, max_width: usize) -> (String, usize) {
     let mut result = String::new();
     let mut width = 0;
     for ch in s.chars() {
-        let w = visual_width(ch.encode_utf8(&mut [0u8; 4]));
+        let w = display_width(ch);
         if width + w > max_width {
             break;
         }
