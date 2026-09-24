@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Undo removed one character at a time and needed several steps for one multi-line indent or comment toggle, and undoing back to the last save still showed the file as modified; undo now goes one word or one command at a time and clears the modified flag at the save point (B15)
 - Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
+- Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)

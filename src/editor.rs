@@ -22,6 +22,7 @@ pub struct Editor {
     terminal: Terminal,
     clipboard: ClipboardManager,
     internal_clipboard: String, // 內部剪貼簿作為後備
+    line_copy: Option<String>,  // 最近一次「無選取複製整行」的內容；只有貼上相同文字時才整行貼上
     search: Search,
     search_mode: bool, // 搜尋模式開關（Ctrl+F 開啟，ESC 關閉）
     comment_handler: CommentHandler,
@@ -180,6 +181,7 @@ impl Editor {
             terminal,
             clipboard,
             internal_clipboard: String::new(), // 初始化內部剪貼簿
+            line_copy: None,
             search: Search::new(),
             search_mode: false, // 預設關閉搜尋模式
             comment_handler,
@@ -1184,18 +1186,21 @@ impl Editor {
 
     /// 獲取要複製/剪切的文本
     /// 如果有選擇範圍，返回選擇的文本；否則返回當前整行（帶換行符）
-    fn get_copy_text(&self) -> String {
+    fn get_copy_text(&mut self) -> String {
         if self.has_selection() {
+            self.line_copy = None;
             self.get_selected_text()
         } else {
             // 複製當前整行（完整內容，包括尾部空格和換行符）
             let line_text = self.buffer.get_line_full(self.cursor.row);
             // 確保以換行符結尾（用於識別整行貼上）
-            if line_text.ends_with('\n') {
+            let text = if line_text.ends_with('\n') {
                 line_text
             } else {
                 format!("{}\n", line_text)
-            }
+            };
+            self.line_copy = Some(text.replace("\r\n", "\n"));
+            text
         }
     }
 
@@ -1258,8 +1263,8 @@ impl Editor {
             text.replace('\n', eol)
         };
 
-        // 檢查是否為整行貼上（文字以換行結尾）
-        let is_whole_line = text.ends_with('\n');
+        // 只有貼上 wedi 自己「複製整行」的內容才整行貼上；外部多行文字插入在游標處
+        let is_whole_line = self.line_copy.as_deref() == Some(text.as_str());
 
         if is_whole_line {
             // 整行貼上：在光標所在行的開始處插入
@@ -1729,5 +1734,27 @@ mod tests {
         run(&mut editor, vec![Command::Undo]);
         assert_eq!(text(&editor), body);
         assert_eq!(editor.get_highlighted_lines(0, 2), code);
+    }
+
+    #[test]
+    fn test_external_paste_ending_in_newline_inserts_at_cursor() {
+        // 稽核 F21：以換行結尾的外部貼上不應被當成整行貼上
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "a.txt", b"hello world\nsecond\n");
+        run(&mut editor, vec![Command::MoveRight; 5]);
+        run(
+            &mut editor,
+            vec![Command::PasteText("AA\nBB\n".to_string())],
+        );
+        assert_eq!(text(&editor), "helloAA\nBB\n world\nsecond\n");
+        assert_eq!((editor.cursor.row, editor.cursor.col), (2, 0));
+        // 自己複製的整行仍貼在行首
+        let mut editor = editor_with(&dir, "b.txt", b"one\ntwo\n");
+        run(&mut editor, vec![Command::CopyInternal, Command::MoveDown]);
+        run(
+            &mut editor,
+            vec![Command::MoveRight, Command::PasteInternal],
+        );
+        assert_eq!(text(&editor), "one\none\ntwo\n");
     }
 }

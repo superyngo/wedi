@@ -43,7 +43,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 
 | Key | Command |
 |---|---|
-| Ctrl+C / Ctrl+X / Ctrl+V | Copy / cut / paste via **System clipboard** (selection, or current line when none) |
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy / cut / paste via **System clipboard** (selection, or current line when none; a copied line pastes above the cursor line, any other text at the cursor) |
 | Alt+C / Alt+X / Alt+V | Same, **Internal clipboard** only |
 
 ## Search
