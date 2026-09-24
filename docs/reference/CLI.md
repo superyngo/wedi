@@ -27,6 +27,9 @@ wedi [OPTIONS] [FILE]
 
 Read encoding: `--from-encoding` > `--encoding` > auto-detected. Save encoding: `--to-encoding` >
 `--encoding` > `--from-encoding` > the file's detected encoding.
+A UTF-8 or UTF-16 byte-order mark is kept on save while the save encoding is unchanged. A character the
+save encoding can't represent makes the save fail with `Save failed: '<char>' (U+XXXX) can't be saved as <ENC>`;
+the file on disk is left untouched.
 Labels (`wedi_core::buffer::parse_encoding_label`, shared with Ctrl+E), case-insensitive:
 
 | Label | Encoding |

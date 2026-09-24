@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cargo clippy --workspace --all-targets -- -D warnings` passes again, with and without default features (B14)
 - Memory leak: every render leaked a cloned syntax theme (~9 KB per redraw); the highlighter now borrows the theme from the global theme set (B12)
 - Crash: copying or cutting after Tab/Shift+Tab/comment-toggle on a selection, or after Undo/Redo, panicked and lost unsaved work; block operations now keep a whole-line selection and Undo/Redo clear it (B3)
+- Save no longer damages encodings: UTF-16LE/BE files were written as UTF-8, a byte-order mark was dropped, and characters the save encoding can't hold were written as `&#NNNN;` while reporting "File saved"; such saves now fail with a message and leave the file untouched (B4)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)

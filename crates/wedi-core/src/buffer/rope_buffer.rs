@@ -15,6 +15,7 @@ pub struct RopeBuffer {
     in_undo_redo: bool,                            // 防止在撤銷/重做時記錄歷史
     read_encoding: &'static encoding_rs::Encoding, // 讀取編碼
     save_encoding: &'static encoding_rs::Encoding, // 存檔編碼
+    bom: bool,                                     // 原檔是否帶 BOM（存檔時保留）
 }
 
 impl RopeBuffer {
@@ -37,6 +38,7 @@ impl RopeBuffer {
             in_undo_redo: false,
             read_encoding: system_enc,
             save_encoding: system_enc,
+            bom: false,
         }
     }
 
@@ -257,7 +259,7 @@ impl RopeBuffer {
 
     pub fn from_file_with_encoding(path: &Path, encoding_config: &EncodingConfig) -> Result<Self> {
         // 如果文件存在，讀取內容；否則創建空緩衝區
-        let (rope, detected_encoding, modified) = if path.exists() {
+        let (rope, detected_encoding, modified, bom) = if path.exists() {
             let bytes = fs::read(path)
                 .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
@@ -308,7 +310,12 @@ impl RopeBuffer {
                 );
             }
 
-            (Rope::from_str(&decoded), read_encoding, false)
+            (
+                Rope::from_str(&decoded),
+                read_encoding,
+                false,
+                bom_length > 0,
+            )
         } else {
             // 文件不存在，創建空緩衝區
             // 使用用戶指定編碼，否則使用系統默認編碼
@@ -331,7 +338,7 @@ impl RopeBuffer {
                 }
             }
 
-            (Rope::new(), encoding_to_use, true)
+            (Rope::new(), encoding_to_use, true, false)
         };
 
         // 確定存檔編碼：優先級 --en > --dec > 實際讀取編碼
@@ -353,6 +360,7 @@ impl RopeBuffer {
             in_undo_redo: false,
             read_encoding: detected_encoding,
             save_encoding,
+            bom,
         })
     }
 
@@ -478,15 +486,7 @@ impl RopeBuffer {
                 eprintln!("[DEBUG]   save_encoding: {}", self.save_encoding.name());
             }
 
-            let contents = self.rope.to_string();
-            // 使用指定編碼編碼內容
-            let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
-            if had_errors {
-                eprintln!(
-                    "[WARN] Encoding errors occurred while saving file: {}",
-                    path.display()
-                );
-            }
+            let encoded = self.encode_contents()?;
             std::fs::write(path, encoded)?;
             self.modified = false;
 
@@ -503,17 +503,52 @@ impl RopeBuffer {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn save_to(&mut self, path: &Path) -> Result<()> {
+    /// 以存檔編碼編碼內容：UTF-16 手動編碼（encoding_rs 的 encode 會輸出 UTF-8），
+    /// 保留原檔 BOM，遇到無法表示的字元則回傳錯誤而非寫入 `&#NNNN;`
+    fn encode_contents(&self) -> Result<Vec<u8>> {
         let contents = self.rope.to_string();
-        // 使用指定編碼編碼內容
-        let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
+        let enc = self.save_encoding;
+        let write_bom = self.bom && enc == self.read_encoding;
+        let mut out = Vec::with_capacity(contents.len() + 3);
+        if enc == encoding_rs::UTF_16LE || enc == encoding_rs::UTF_16BE {
+            let le = enc == encoding_rs::UTF_16LE;
+            let units = write_bom
+                .then_some(0xFEFF)
+                .into_iter()
+                .chain(contents.encode_utf16());
+            for unit in units {
+                out.extend_from_slice(&if le {
+                    unit.to_le_bytes()
+                } else {
+                    unit.to_be_bytes()
+                });
+            }
+            return Ok(out);
+        }
+        if write_bom && enc == encoding_rs::UTF_8 {
+            out.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+        }
+        let (encoded, _, had_errors) = enc.encode(&contents);
         if had_errors {
-            eprintln!(
-                "[WARN] Encoding errors occurred while saving file: {}",
-                path.display()
+            // 找出第一個無法表示的字元，回報給使用者
+            let bad = contents
+                .chars()
+                .find(|c| enc.encode(c.encode_utf8(&mut [0; 4])).2)
+                .unwrap_or('?');
+            anyhow::bail!(
+                "'{}' (U+{:04X}) can't be saved as {}",
+                bad,
+                bad as u32,
+                enc.name()
             );
         }
+        out.extend_from_slice(&encoded);
+        Ok(out)
+    }
+
+    #[allow(dead_code)]
+    pub fn save_to(&mut self, path: &Path) -> Result<()> {
+        let encoded = self.encode_contents()?;
         std::fs::write(path, encoded)?;
         self.modified = false;
         self.file_path = Some(path.to_path_buf());
@@ -522,15 +557,7 @@ impl RopeBuffer {
 
     #[allow(dead_code)]
     pub fn save_as(&mut self, path: &Path) -> Result<()> {
-        let contents = self.rope.to_string();
-        // 使用指定編碼編碼內容
-        let (encoded, _, had_errors) = self.save_encoding.encode(&contents);
-        if had_errors {
-            eprintln!(
-                "[WARN] Encoding errors occurred while saving file: {}",
-                path.display()
-            );
-        }
+        let encoded = self.encode_contents()?;
         fs::write(path, encoded)
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
         self.file_path = Some(path.to_path_buf());
@@ -701,6 +728,7 @@ impl RopeBuffer {
             self.rope = new_buffer.rope;
             self.read_encoding = new_buffer.read_encoding;
             self.save_encoding = new_buffer.save_encoding;
+            self.bom = new_buffer.bom;
             self.modified = false;
             self.history.clear(); // 清除 undo/redo 歷史
 
@@ -886,5 +914,52 @@ mod tests {
         let (decoded, _, _) = big5_encoding.decode(&saved_bytes);
         // 注意：Big5 無法表示簡體中文字符，所以會有替換字符
         assert!(decoded.contains("Hello"));
+    }
+
+    fn round_trip(bytes: &[u8]) -> Vec<u8> {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("rt.txt");
+        fs::write(&path, bytes).unwrap();
+        let mut buffer = RopeBuffer::from_file_with_encoding(
+            &path,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        buffer.save().unwrap();
+        fs::read(&path).unwrap()
+    }
+
+    #[test]
+    fn test_unicode_files_round_trip_byte_identical() {
+        // 稽核 P1/P2：UTF-16 曾被存成 UTF-8、BOM 曾被丟棄
+        let utf16le = [0xFF, 0xFE, b'H', 0, b'i', 0, 0x2D, 0x4E, b'\n', 0];
+        let utf16be = [0xFE, 0xFF, 0, b'H', 0, b'i', 0x4E, 0x2D, 0, b'\n'];
+        let utf8_bom = b"\xEF\xBB\xBFhi \xE4\xB8\xAD\n";
+        assert_eq!(round_trip(&utf16le), utf16le);
+        assert_eq!(round_trip(&utf16be), utf16be);
+        assert_eq!(round_trip(utf8_bom), utf8_bom);
+    }
+
+    #[test]
+    fn test_unmappable_char_fails_save() {
+        // 稽核 P3：GBK 無法表示的 emoji 曾被寫成 &#128512;
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("gbk.txt");
+        fs::write(&path, b"ab").unwrap();
+        let mut buffer = RopeBuffer::from_file_with_encoding(
+            &path,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: Some(encoding_rs::GBK),
+            },
+        )
+        .unwrap();
+        buffer.insert(1, "😀");
+        let err = buffer.save().unwrap_err().to_string();
+        assert!(err.contains("U+1F600"), "{err}");
+        assert_eq!(fs::read(&path).unwrap(), b"ab");
     }
 }
