@@ -260,8 +260,8 @@ impl LineHighlighter {
                 if cfg!(debug_assertions) {
                     eprintln!("[WARN] Syntax highlighting failed: {}", e);
                 }
-                // 過濾換行符
-                strip_line_endings(line)
+                // 過濾換行符，Tab 展開與 View 一致
+                expand_tabs(&strip_line_endings(line)).into_owned()
             }
         }
     }
@@ -299,7 +299,8 @@ impl LineHighlighter {
                 last_color = Some(fg);
             }
 
-            output.push_str(&clean);
+            // Tab 展開為 TAB_WIDTH 個空格，與 View 的版面計算一致（原始 \t 會被終端展開到 8 欄）
+            output.push_str(&expand_tabs(&clean));
         }
 
         // 只在有輸出色碼時才需要 reset
@@ -308,6 +309,16 @@ impl LineHighlighter {
         }
 
         output
+    }
+}
+
+/// 將 Tab 展開為 TAB_WIDTH 個空格（與 View 的 expand_tabs_and_build_map 一致）
+fn expand_tabs(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.contains('\t') {
+        text.replace('\t', &" ".repeat(crate::view::TAB_WIDTH))
+            .into()
+    } else {
+        text.into()
     }
 }
 
@@ -417,6 +428,28 @@ mod tests {
         let result = highlighter.highlight_line("fn main() {}");
         assert!(!result.is_empty());
         assert!(result.contains("fn"));
+    }
+
+    #[test]
+    fn test_tabs_expanded_like_view() {
+        // 稽核 R5：原始 \t 由終端展開到 8 欄，但版面以 4 欄計算
+        let mut engine = HighlightEngine::new(None, true).unwrap();
+        engine.set_file(Some(Path::new("t.go")));
+        let mut highlighter = engine.create_highlighter().unwrap();
+        let result = highlighter.highlight_line("\tfoo := 1\n");
+        assert!(!result.contains('\t'));
+        // 去除 ANSI 色碼（\x1b[...m）
+        let mut plain = String::new();
+        let mut in_escape = false;
+        for ch in result.chars() {
+            match (in_escape, ch) {
+                (false, '\x1b') => in_escape = true,
+                (true, 'm') => in_escape = false,
+                (true, _) => {}
+                (false, c) => plain.push(c),
+            }
+        }
+        assert_eq!(plain, "    foo := 1");
     }
 
     #[test]

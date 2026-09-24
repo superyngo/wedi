@@ -13,7 +13,7 @@ use std::io::{self, Write};
 use unicode_width::UnicodeWidthChar;
 
 // 視圖配置常量
-const TAB_WIDTH: usize = 4; // Tab 寬度（空格數）
+pub(crate) const TAB_WIDTH: usize = 4; // Tab 寬度（空格數）
 const CACHE_MULTIPLIER: usize = 3; // 緩存大小倍數（螢幕行數 × 倍數）
 const HORIZONTAL_SCROLL_MARGIN: usize = 5; // 水平滾動邊界預留
 

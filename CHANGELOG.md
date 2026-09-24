@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Save no longer damages encodings: UTF-16LE/BE files were written as UTF-8, a byte-order mark was dropped, and characters the save encoding can't hold were written as `&#NNNN;` while reporting "File saved"; such saves now fail with a message and leave the file untouched (B4)
 - Search on a line with multi-byte text (e.g. CJK) put the cursor at the match's byte offset, so typing landed on the wrong column or line; the cursor now lands on the match (B8)
 - Cursor drawn on the wrong row after toggling wrap mode (Ctrl+O), line numbers (Ctrl+L), resizing, or Undo/Redo; moving up into a wrapped line above the viewport landed on its first visual line instead of its last (B9)
+- With syntax highlighting on, tab-indented lines were drawn with 8-column tabs while the cursor assumed 4, so the cursor sat inside the text; highlighted lines now expand tabs to 4 spaces like plain rendering (B10)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
