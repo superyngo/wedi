@@ -36,7 +36,7 @@ fn load_syntax_set() -> Result<SyntaxSet> {
 
 /// 語法高亮引擎
 pub struct HighlightEngine {
-    theme: Theme,
+    theme: &'static Theme,
     current_syntax: Option<&'static SyntaxReference>,
     true_color: bool,
 }
@@ -48,8 +48,7 @@ impl HighlightEngine {
         let theme = THEME_SET
             .themes
             .get(theme_name)
-            .context(format!("Theme '{}' not found", theme_name))?
-            .clone();
+            .context(format!("Theme '{}' not found", theme_name))?;
 
         Ok(Self {
             theme,
@@ -178,10 +177,10 @@ impl HighlightEngine {
 
     /// 建立新的高亮器（用於逐行高亮）
     ///
-    /// 注意：這會 clone theme，因為 HighlightLines 需要 'static 生命週期
+    /// 主題存於全域 THEME_SET，直接借用 'static 參照，不需 clone
     pub fn create_highlighter(&self) -> Option<LineHighlighter> {
         self.current_syntax
-            .map(|syntax| LineHighlighter::new(syntax, self.theme.clone(), self.true_color))
+            .map(|syntax| LineHighlighter::new(syntax, self.theme, self.true_color))
     }
 
     /// 是否已啟用語法高亮
@@ -237,13 +236,9 @@ pub struct LineHighlighter {
 }
 
 impl LineHighlighter {
-    fn new(syntax: &'static SyntaxReference, theme: Theme, true_color: bool) -> Self {
-        // 將 theme 洩漏到 'static 生命週期（接受小量記憶體洩漏以換取簡單性）
-        // 這是安全的，因為 theme 數量很少（只有幾個主題）
-        let theme_static: &'static Theme = Box::leak(Box::new(theme));
-
+    fn new(syntax: &'static SyntaxReference, theme: &'static Theme, true_color: bool) -> Self {
         Self {
-            inner: HighlightLines::new(syntax, theme_static),
+            inner: HighlightLines::new(syntax, theme),
             true_color,
         }
     }
