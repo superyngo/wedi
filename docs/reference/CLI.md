@@ -16,7 +16,7 @@ wedi [OPTIONS] [FILE]
 | `-e`, `--encoding <ENC>` | Read and save encoding |
 | `-f`, `--from-encoding <ENC>` | Read encoding (overrides `-e`) |
 | `-t`, `--to-encoding <ENC>` | Save encoding (overrides `-e`) |
-| `--theme <NAME>` | Syntax **Theme** ¹ |
+| `--theme <NAME>` | Syntax **Theme**; an unknown name exits with an error ¹ |
 | `-l`, `--language <NAME>` | Force the syntax, e.g. `-l rust script` ¹ |
 | `--list-themes` | List themes, exit ¹ |
 | `--list-languages` | List syntaxes, exit ¹ |

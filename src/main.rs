@@ -95,7 +95,14 @@ impl Args {
 
         // 解析主題參數
         #[cfg(feature = "syntax-highlighting")]
-        let theme = pargs.opt_value_from_str("--theme")?;
+        let theme: Option<String> = pargs.opt_value_from_str("--theme")?;
+        // 無效主題直接報錯，不要靜默停用語法高亮
+        #[cfg(feature = "syntax-highlighting")]
+        if let Some(name) = &theme {
+            if !wedi_core::highlight::HighlightEngine::available_themes().contains(name) {
+                anyhow::bail!("Unknown theme '{}'; see --list-themes", name);
+            }
+        }
         #[cfg(feature = "syntax-highlighting")]
         let language = pargs.opt_value_from_str(["-l", "--language"])?;
         #[cfg(feature = "syntax-highlighting")]
