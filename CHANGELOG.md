@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AGENTS.md` holds conduct only; CI notes corrected (CI is disabled)
 - README: syntax-highlight toggle is Ctrl+T (was listed as Ctrl+J); added Ctrl+E, Ctrl+PageUp/Down, mouse wheel, `-e`, `-l/--language`, `--list-languages`; corrected ESC behavior and technical stack
 - Fixed v0.2.0 release date
+- docs: code audit record (`docs/audit/2026-09-24-code-audit.md`) — 34 findings, 18 confirmed by probes or real-binary repros; scheduled as backlog rows B3–B21
 
 ### Removed
 - Stale `Cargo.toml.backup` and unused duplicate root `assets/syntaxes.bin`

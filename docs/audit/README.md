@@ -5,7 +5,9 @@ written, never rewritten. Current behavior lives in [`../reference/`](../referen
 
 ## In progress
 
-_None._
+| Date | Document | Status |
+|---|---|---|
+| 2026-09-24 | [2026-09-24-code-audit.md](2026-09-24-code-audit.md) | In progress — findings scheduled as BACKLOG B3–B21 |
 
 ## Landed
 
