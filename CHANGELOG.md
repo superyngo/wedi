@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Stale `Cargo.toml.backup` and unused duplicate root `assets/syntaxes.bin`
+- The `wedi-widget` crate: its `EditorConfig` and `ScreenLayout` moved to `wedi_core::config` and `wedi_core::screen_layout`; the `LineLayout` and other re-exports are available from `wedi_core` directly (B20)
 
 ## [v0.10.0] - 2026-07-18
 

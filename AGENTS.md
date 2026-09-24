@@ -161,14 +161,14 @@ mod tests {
 ## Adding a Feature
 
 1. Core behavior → `wedi-core`
-2. Config options → `EditorConfig` and CLI flags
+2. Config options → CLI flags in `src/main.rs`, passed to `Editor::new`
 3. Key bindings → `Command` enum and `handle_key_event`
 4. UI wiring → command execution in `src/editor.rs`
 5. Docs → `CHANGELOG.md` `[Unreleased]`, README, and the affected `docs/reference/` file
 
 ## Releasing
 
-1. Bump `[workspace.package] version` and the `wedi-core` / `wedi-widget` dependency versions in the root `Cargo.toml` and `crates/wedi-widget/Cargo.toml`.
+1. Bump `[workspace.package] version` and the `wedi-core` dependency version in the root `Cargo.toml`.
 2. Rename `## [Unreleased]` in `CHANGELOG.md` to `## [vX.Y.Z] - YYYY-MM-DD` and add a fresh `## [Unreleased]`.
 3. Commit, tag `vX.Y.Z`, push; `.github/workflows/release.yml` builds and publishes the GitHub Release.
 

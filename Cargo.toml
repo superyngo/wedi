@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/wedi-core", "crates/wedi-widget", "."]
+members = ["crates/wedi-core", "."]
 
 [workspace.package]
 version = "0.10.0"
@@ -18,7 +18,6 @@ description = "A cross-platform minimalist lightweight CLI text editor"
 
 [dependencies]
 wedi-core = { path = "crates/wedi-core", version = "0.10.0", default-features = false }
-wedi-widget = { path = "crates/wedi-widget", version = "0.10.0", default-features = false, features = ["crossterm"] }
 crossterm = "0.27"
 pico-args = "0.5"      # CLI 參數解析
 anyhow = "1.0"          # 錯誤處理
@@ -35,7 +34,7 @@ tempfile = "3.8"        # 臨時文件測試
 [features]
 default = ["syntax-highlighting", "mouse-support"]
 mouse-support = ["wedi-core/mouse-support"]
-syntax-highlighting = ["wedi-core/syntax-highlighting", "wedi-widget/syntax-highlighting"]
+syntax-highlighting = ["wedi-core/syntax-highlighting"]
 
 [profile.release]
 strip = true            # 移除符號以減小二進制文件大小

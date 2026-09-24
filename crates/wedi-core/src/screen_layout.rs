@@ -5,7 +5,7 @@
 /// # 範例
 ///
 /// ```rust
-/// use wedi_widget::ScreenLayout;
+/// use wedi_core::ScreenLayout;
 ///
 /// let mut layout = ScreenLayout::new(24, 80);
 /// layout.scroll_to(10, 0); // 滾動到第 10 行

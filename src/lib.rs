@@ -4,4 +4,3 @@
 
 // 重新匯出 crates 供內部使用
 pub use wedi_core;
-pub use wedi_widget;

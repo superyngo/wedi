@@ -5,8 +5,10 @@
 pub mod buffer;
 pub mod clipboard;
 pub mod comment;
+pub mod config;
 pub mod cursor;
 pub mod keymap;
+pub mod screen_layout;
 pub mod search;
 pub mod terminal;
 pub mod utils;
@@ -17,8 +19,10 @@ pub mod highlight;
 
 // 重新匯出常用類型
 pub use buffer::RopeBuffer;
+pub use config::EditorConfig;
 pub use cursor::Cursor;
 pub use keymap::{Command, Direction, Keymap};
+pub use screen_layout::ScreenLayout;
 pub use search::Search;
 pub use terminal::{InputEvent, Terminal};
 pub use view::{SearchHighlight, Selection, View};

@@ -5,7 +5,7 @@
 /// # 範例
 ///
 /// ```rust
-/// use wedi_widget::EditorConfig;
+/// use wedi_core::EditorConfig;
 ///
 /// let config = EditorConfig::new()
 ///     .with_line_numbers(true)
