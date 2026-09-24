@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With syntax highlighting on, tab-indented lines were drawn with 8-column tabs while the cursor assumed 4, so the cursor sat inside the text; highlighted lines now expand tabs to 4 spaces like plain rendering (B10)
 - In CRLF files, Backspace/Delete at a line break took two presses to join lines, and Enter, paste and comment toggling inserted LF; lines now join in one press and edits keep CRLF (B7)
 - Opening a file with bytes invalid in its encoding replaced them with `�` silently, and saving destroyed them; the status bar now warns on open, and saving needs a second Ctrl+S (B5)
+- Saving truncated and rewrote the file in place, so a crash or full disk mid-save could lose it; saves now write a temp file and rename it over the original, keeping symlinks and permissions (B6)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)

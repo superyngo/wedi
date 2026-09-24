@@ -504,7 +504,7 @@ impl RopeBuffer {
             }
 
             let encoded = self.encode_contents()?;
-            std::fs::write(path, encoded)?;
+            write_atomic(path, &encoded)?;
             self.modified = false;
             self.lossy = false; // 檔案已改寫，不再與原位元組不一致
 
@@ -567,7 +567,7 @@ impl RopeBuffer {
     #[allow(dead_code)]
     pub fn save_to(&mut self, path: &Path) -> Result<()> {
         let encoded = self.encode_contents()?;
-        std::fs::write(path, encoded)?;
+        write_atomic(path, &encoded)?;
         self.modified = false;
         self.file_path = Some(path.to_path_buf());
         Ok(())
@@ -576,7 +576,7 @@ impl RopeBuffer {
     #[allow(dead_code)]
     pub fn save_as(&mut self, path: &Path) -> Result<()> {
         let encoded = self.encode_contents()?;
-        fs::write(path, encoded)
+        write_atomic(path, &encoded)
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
         self.file_path = Some(path.to_path_buf());
         self.modified = false;
@@ -779,6 +779,49 @@ impl Default for RopeBuffer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// 原子寫檔：先寫入同目錄的暫存檔並 fsync，再 rename 覆蓋目標。
+/// 符號連結寫入其指向的檔案；保留原檔權限；唯讀檔案維持拒絕寫入。
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write;
+
+    // 符號連結：改寫連結目標，保留連結本身
+    let target = match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() => fs::canonicalize(path)
+            .with_context(|| format!("Failed to resolve symlink: {}", path.display()))?,
+        _ => path.to_path_buf(),
+    };
+    let existing = fs::metadata(&target).ok();
+    if existing
+        .as_ref()
+        .is_some_and(|m| m.permissions().readonly())
+    {
+        anyhow::bail!("File is read-only: {}", target.display());
+    }
+
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = target.with_file_name(format!(".{}.wedi-{}.tmp", name, std::process::id()));
+
+    let result = (|| -> Result<()> {
+        let mut file = fs::File::create(&temp)
+            .with_context(|| format!("Failed to create temp file: {}", temp.display()))?;
+        file.write_all(bytes)?;
+        if let Some(meta) = &existing {
+            fs::set_permissions(&temp, meta.permissions())?;
+        }
+        file.sync_all()?;
+        fs::rename(&temp, &target)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        // 失敗時移除暫存檔，原檔不受影響
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -985,5 +1028,45 @@ mod tests {
         let err = buffer.save().unwrap_err().to_string();
         assert!(err.contains("U+1F600"), "{err}");
         assert_eq!(fs::read(&path).unwrap(), b"ab");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_save_is_atomic_and_keeps_mode_and_symlink() {
+        // 稽核 F6：fs::write 原地截斷；改為暫存檔 + rename
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let temp_dir = TempDir::new().unwrap();
+        let real = temp_dir.path().join("real.sh");
+        let link = temp_dir.path().join("link.sh");
+        fs::write(&real, "a\n").unwrap();
+        fs::set_permissions(&real, fs::Permissions::from_mode(0o750)).unwrap();
+        symlink(&real, &link).unwrap();
+
+        let mut buffer = RopeBuffer::from_file_with_encoding(
+            &link,
+            &EncodingConfig {
+                read_encoding: None,
+                save_encoding: None,
+            },
+        )
+        .unwrap();
+        buffer.insert(0, "b");
+        buffer.save().unwrap();
+
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(fs::read_to_string(&real).unwrap(), "ba\n");
+        let mode = fs::metadata(&real).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o750);
+        // 不留暫存檔
+        assert_eq!(fs::read_dir(temp_dir.path()).unwrap().count(), 2);
+
+        // 唯讀檔案仍拒絕寫入
+        fs::set_permissions(&real, fs::Permissions::from_mode(0o444)).unwrap();
+        buffer.insert(0, "c");
+        assert!(buffer.save().is_err());
+        assert_eq!(fs::read_to_string(&real).unwrap(), "ba\n");
     }
 }
