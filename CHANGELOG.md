@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ctrl+D on a last line without a trailing newline removes the line instead of leaving an empty one behind (B21)
 - Opening a file that does not exist yet no longer marks it modified, so quitting without typing needs no confirmation (B21)
 - No underflow panic in debug builds when the window is narrower than about 5 columns (horizontal scroll margin, dialog cursor) (B21)
+- Ctrl+F jumps to the first match at or after the cursor, wrapping to the top, instead of always the first match in the file (B21)
 - Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
 - Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)

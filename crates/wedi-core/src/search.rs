@@ -46,9 +46,16 @@ impl Search {
         }
     }
 
-    /// 回傳第一個匹配（不移動 current），供搜尋後的初次跳轉使用
-    pub fn first_match(&self) -> Option<(usize, usize)> {
-        self.matches.first().copied()
+    /// Make the first match at or after `(row, byte_col)` current, wrapping to the
+    /// first match of the file, and return it.
+    pub fn select_from(&mut self, row: usize, byte_col: usize) -> Option<(usize, usize)> {
+        if self.matches.is_empty() {
+            return None;
+        }
+        // matches 依 (行, byte) 排序，二分搜尋游標之後的第一個
+        let idx = self.matches.partition_point(|&pos| pos < (row, byte_col));
+        self.current_match = if idx == self.matches.len() { 0 } else { idx };
+        Some(self.matches[self.current_match])
     }
 
     pub fn next_match(&mut self) -> Option<(usize, usize)> {
@@ -94,5 +101,28 @@ impl Search {
 impl Default for Search {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_select_from_starts_at_cursor_and_wraps() {
+        // 稽核 F32：搜尋從游標處開始，而非永遠從檔首
+        let mut buffer = RopeBuffer::new();
+        buffer.insert(0, "ab\nxx\nab ab\nxx\n");
+        let mut search = Search::new();
+        search.set_query("ab".to_string());
+        search.find_matches(&buffer);
+        assert_eq!(search.select_from(1, 0), Some((2, 0)));
+        assert_eq!(search.current_index(), 1);
+        assert_eq!(search.next_match(), Some((2, 3)));
+        // 游標正好在匹配上時選中該匹配
+        assert_eq!(search.select_from(2, 3), Some((2, 3)));
+        // 最後一個匹配之後回到檔首
+        assert_eq!(search.select_from(3, 0), Some((0, 0)));
+        assert_eq!(search.current_index(), 0);
     }
 }

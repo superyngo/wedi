@@ -74,7 +74,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
     sections.push((
         "Search",
         vec![
-            ("Ctrl+F", "Find text (with last search term pre-filled)"),
+            ("Ctrl+F", "Find from cursor (last search term pre-filled)"),
             (
                 "Ctrl+N / F3 / PgDn",
                 "Find next match (PageDown if no active search)",

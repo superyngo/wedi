@@ -50,7 +50,7 @@ table. Terms are defined in [glossary.md](glossary.md). CLI flags are in [CLI.md
 
 | Key | Command |
 |---|---|
-| Ctrl+F | Find (last query pre-filled); jumps to the first match and enters **Search mode** |
+| Ctrl+F | Find (last query pre-filled); jumps to the first match at or after the cursor (wrapping to the top) and enters **Search mode** |
 | Ctrl+N / F3 / PageDown | Next match in Search mode, else page down |
 | Ctrl+P / Shift+F3 / PageUp | Previous match in Search mode, else page up |
 

@@ -741,12 +741,22 @@ impl Editor {
                         self.search_mode = true; // 開啟搜尋模式
 
                         if self.search.match_count() > 0 {
-                            // 跳到第一個匹配（不推進 current，避免 off-by-one）
-                            if let Some((row, byte_col)) = self.search.first_match() {
+                            // 從游標處開始：跳到游標之後（含）的第一個匹配，沒有則回到檔首
+                            let cursor_byte: usize = self
+                                .buffer
+                                .get_line_content(self.cursor.row)
+                                .chars()
+                                .take(self.cursor.col)
+                                .map(char::len_utf8)
+                                .sum();
+                            if let Some((row, byte_col)) =
+                                self.search.select_from(self.cursor.row, cursor_byte)
+                            {
                                 self.jump_to_match(row, byte_col);
                                 self.message = Some(format!(
-                                    "Found {} matches (ESC to exit search mode)",
-                                    self.search.match_count()
+                                    "Found {} matches, at {} (ESC to exit search mode)",
+                                    self.search.match_count(),
+                                    self.search.current_index() + 1
                                 ));
                             }
                         } else {

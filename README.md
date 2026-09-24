@@ -276,7 +276,7 @@ The canonical table is [docs/reference/KEYMAP.md](docs/reference/KEYMAP.md).
 
 ### Search
 
-- **Ctrl+F**: Find text (shows search dialog with previous search term)
+- **Ctrl+F**: Find text (shows search dialog with previous search term; jumps to the first match at or after the cursor, wrapping to the top)
 - **Ctrl+N** / **F3** / **Page Down**: Smart jump down - next search match in search mode, page down otherwise
 - **Ctrl+P** / **Shift+F3** / **Page Up**: Smart jump up - previous search match in search mode, page up otherwise
 - **ESC**: Exit search mode (preserves search results)
