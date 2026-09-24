@@ -712,10 +712,8 @@ impl Editor {
 
                         if self.search.match_count() > 0 {
                             // 跳到第一個匹配（不推進 current，避免 off-by-one）
-                            if let Some((row, col)) = self.search.first_match() {
-                                self.cursor.row = row;
-                                self.cursor.col = col;
-                                self.cursor.desired_visual_col = col;
+                            if let Some((row, byte_col)) = self.search.first_match() {
+                                self.jump_to_match(row, byte_col);
                                 self.message = Some(format!(
                                     "Found {} matches (ESC to exit search mode)",
                                     self.search.match_count()
@@ -731,10 +729,8 @@ impl Editor {
 
             Command::FindNext => {
                 if self.search_mode && self.search.match_count() > 0 {
-                    if let Some((row, col)) = self.search.next_match() {
-                        self.cursor.row = row;
-                        self.cursor.col = col;
-                        self.cursor.desired_visual_col = col;
+                    if let Some((row, byte_col)) = self.search.next_match() {
+                        self.jump_to_match(row, byte_col);
                         self.message = Some(format!(
                             "Match {}/{} (ESC to exit search mode)",
                             self.search.current_index() + 1,
@@ -749,10 +745,8 @@ impl Editor {
 
             Command::FindPrev => {
                 if self.search_mode && self.search.match_count() > 0 {
-                    if let Some((row, col)) = self.search.prev_match() {
-                        self.cursor.row = row;
-                        self.cursor.col = col;
-                        self.cursor.desired_visual_col = col;
+                    if let Some((row, byte_col)) = self.search.prev_match() {
+                        self.jump_to_match(row, byte_col);
                         self.message = Some(format!(
                             "Match {}/{} (ESC to exit search mode)",
                             self.search.current_index() + 1,
@@ -1254,6 +1248,16 @@ impl Editor {
         }
     }
 
+    /// 跳到搜尋匹配：Search 以行內 byte 位置記錄，游標需要字元欄位
+    fn jump_to_match(&mut self, row: usize, byte_col: usize) {
+        let line = self.buffer.get_line_content(row);
+        let col = line
+            .char_indices()
+            .take_while(|&(i, _)| i < byte_col)
+            .count();
+        self.cursor.set_position(&self.buffer, &self.view, row, col);
+    }
+
     /// 將選取範圍設為 start_row..=end_row 的整行
     fn select_whole_lines(&mut self, start_row: usize, end_row: usize) {
         self.selection = Some(Selection {
@@ -1605,5 +1609,17 @@ mod tests {
         );
         assert!(editor.selection.is_none());
         run(&mut editor, vec![Command::CopyInternal]);
+    }
+
+    #[test]
+    fn test_find_next_lands_on_char_column() {
+        // 稽核 R2：CJK 行上匹配的 byte 位置曾被當成字元欄位
+        let dir = TempDir::new().unwrap();
+        let mut editor = editor_with(&dir, "s.txt", "中文abc\nxyz\n".as_bytes());
+        editor.search.set_query("abc".to_string());
+        editor.search.find_matches(&editor.buffer);
+        editor.search_mode = true;
+        run(&mut editor, vec![Command::FindNext, Command::Insert('X')]);
+        assert_eq!(text(&editor), "中文Xabc\nxyz\n");
     }
 }
