@@ -849,6 +849,12 @@ impl View {
             .saturating_sub(1)
     }
 
+    /// 取得快取中的行佈局；row 在 offset_row 之上或超出快取範圍時回傳 None
+    fn cached_layout(&self, row: usize) -> Option<&LineLayout> {
+        let cache_index = row.checked_sub(self.offset_row)?;
+        self.line_layout_cache.get(cache_index)?.as_ref()
+    }
+
     /// 計算指定邏輯行的視覺行分割（給其他模組用，不依賴 cache 也可以）
     pub fn calculate_visual_lines_for_row(&self, buffer: &RopeBuffer, row: usize) -> Vec<String> {
         if row >= buffer.line_count() {
@@ -856,8 +862,7 @@ impl View {
         }
 
         // 如果 row 剛好在快取範圍內，優先使用快取
-        let cache_index = row.saturating_sub(self.offset_row);
-        if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
+        if let Some(layout) = self.cached_layout(row) {
             return layout.visual_lines.clone();
         }
 
@@ -903,8 +908,7 @@ impl View {
         visual_col: usize,
     ) -> usize {
         // 優先使用快取（如果該行目前在視窗 cache 內）
-        let cache_index = row.saturating_sub(self.offset_row);
-        if let Some(Some(layout)) = self.line_layout_cache.get(cache_index) {
+        if let Some(layout) = self.cached_layout(row) {
             if visual_line_index >= layout.visual_lines.len() {
                 return 0;
             }

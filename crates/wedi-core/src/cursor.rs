@@ -244,3 +244,28 @@ impl Default for Cursor {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_move_up_into_row_above_viewport_uses_its_own_layout() {
+        // 稽核 P5：viewport 上方的行曾誤用頂端行的快取佈局
+        let mut buffer = RopeBuffer::new();
+        buffer.insert(0, &format!("{}\n{}", "a".repeat(50), "b\n".repeat(10)));
+        let mut view = View::new_simple(5, 20);
+        let row0_lines = view.calculate_visual_lines_for_row(&buffer, 0).len();
+        assert!(row0_lines > 1);
+
+        let mut cursor = Cursor::new();
+        cursor.row = 1;
+        view.offset_row = 1;
+        view.scroll_if_needed(&cursor, &buffer, false);
+        assert_eq!(view.offset_row, 1);
+
+        cursor.move_up(&buffer, &view);
+        assert_eq!(cursor.row, 0);
+        assert_eq!(cursor.visual_line_index, row0_lines - 1);
+    }
+}

@@ -657,6 +657,7 @@ impl Editor {
             Command::Resize => {
                 self.terminal.update_size()?; // 對話框依賴 terminal.size()，必須同步更新
                 self.view.update_size();
+                self.resync_cursor();
             }
 
             // 撤銷/重做
@@ -668,10 +669,8 @@ impl Editor {
                     let line_start = self.buffer.line_to_char(row);
                     let col = pos - line_start;
 
-                    self.cursor.row = row;
-                    self.cursor.col = col;
+                    self.cursor.set_position(&self.buffer, &self.view, row, col);
                     self.selection = None;
-                    self.cursor.desired_visual_col = col;
                     self.message = Some("Undo".to_string());
                 } else {
                     self.message = Some("Nothing to undo".to_string());
@@ -686,10 +685,8 @@ impl Editor {
                     let line_start = self.buffer.line_to_char(row);
                     let col = pos - line_start;
 
-                    self.cursor.row = row;
-                    self.cursor.col = col;
+                    self.cursor.set_position(&self.buffer, &self.view, row, col);
                     self.selection = None;
-                    self.cursor.desired_visual_col = col;
                     self.message = Some("Redo".to_string());
                 } else {
                     self.message = Some("Nothing to redo".to_string());
@@ -762,11 +759,13 @@ impl Editor {
             // 視圖控制
             Command::ToggleLineNumbers => {
                 self.view.toggle_line_numbers();
+                self.resync_cursor();
             }
 
             // 切換顯示模式（單行/多行）
             Command::ToggleDisplayMode => {
                 self.view.toggle_display_mode();
+                self.resync_cursor();
                 self.message = Some(format!(
                     "Display Mode: {}",
                     self.view.get_display_mode_name()
@@ -1248,6 +1247,12 @@ impl Editor {
         }
     }
 
+    /// 版面改變後（換行模式、行號、視窗大小）重新同步游標的視覺行
+    fn resync_cursor(&mut self) {
+        let (row, col) = (self.cursor.row, self.cursor.col);
+        self.cursor.set_position(&self.buffer, &self.view, row, col);
+    }
+
     /// 跳到搜尋匹配：Search 以行內 byte 位置記錄，游標需要字元欄位
     fn jump_to_match(&mut self, row: usize, byte_col: usize) {
         let line = self.buffer.get_line_content(row);
@@ -1621,5 +1626,18 @@ mod tests {
         editor.search_mode = true;
         run(&mut editor, vec![Command::FindNext, Command::Insert('X')]);
         assert_eq!(text(&editor), "中文Xabc\nxyz\n");
+    }
+
+    #[test]
+    fn test_toggle_display_mode_resyncs_visual_line() {
+        // 稽核 R6：切換換行模式後 visual_line_index 仍停在舊值
+        let dir = TempDir::new().unwrap();
+        let long = format!("{}\n", "x".repeat(250));
+        let mut editor = editor_with(&dir, "w.txt", long.as_bytes());
+        run(&mut editor, vec![Command::MoveEnd]);
+        assert!(editor.cursor.visual_line_index > 0);
+        run(&mut editor, vec![Command::ToggleDisplayMode]);
+        assert!(!editor.view.wrap_mode);
+        assert_eq!(editor.cursor.visual_line_index, 0);
     }
 }
