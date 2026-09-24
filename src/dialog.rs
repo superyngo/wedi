@@ -3,7 +3,7 @@
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     execute, queue,
     style::{self, Color},
     terminal::{self, ClearType},
@@ -20,18 +20,142 @@ pub fn take_resized() -> bool {
     RESIZED.swap(false, Ordering::Relaxed)
 }
 
-/// 讀取下一個按鍵事件；視窗大小改變時更新尺寸並回傳 None（呼叫端重繪）
-fn next_key(size: &mut (u16, u16)) -> Result<Option<event::KeyEvent>> {
+/// 對話框收到的輸入
+enum DialogEvent {
+    Key(KeyEvent),
+    Paste(String),
+    // 視窗大小改變：尺寸已更新，呼叫端清除舊位置後重繪
+    Resize,
+}
+
+/// 讀取下一個對話框事件；只回傳 Press / Repeat 按鍵，忽略 Release 以免重複輸入
+fn next_event(size: &mut (u16, u16)) -> Result<DialogEvent> {
     loop {
         match event::read()? {
-            Event::Key(key_event) => return Ok(Some(key_event)),
+            Event::Key(key) if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) => {
+                return Ok(DialogEvent::Key(key))
+            }
+            Event::Paste(text) => return Ok(DialogEvent::Paste(text)),
             Event::Resize(w, h) => {
                 *size = (w, h);
                 RESIZED.store(true, Ordering::Relaxed);
-                return Ok(None);
+                return Ok(DialogEvent::Resize);
             }
             _ => {}
         }
+    }
+}
+
+/// 單行輸入框按鍵的結果
+#[derive(Debug, PartialEq)]
+enum PromptAction {
+    Continue,
+    Submit(String),
+    Cancel,
+}
+
+/// 單行輸入框的狀態（不含 I/O，可單元測試）；cursor 為字元索引
+struct LineInput {
+    text: String,
+    cursor: usize,
+}
+
+impl LineInput {
+    fn new(default: &str) -> Self {
+        Self {
+            text: default.to_string(),
+            cursor: default.chars().count(),
+        }
+    }
+
+    fn byte_at(&self, char_idx: usize) -> usize {
+        self.text
+            .char_indices()
+            .nth(char_idx)
+            .map_or(self.text.len(), |(b, _)| b)
+    }
+
+    fn handle_key(&mut self, key: KeyEvent) -> PromptAction {
+        match key.code {
+            KeyCode::Enter => return PromptAction::Submit(self.text.clone()),
+            KeyCode::Esc => return PromptAction::Cancel,
+            KeyCode::Char(c) => {
+                let b = self.byte_at(self.cursor);
+                self.text.insert(b, c);
+                self.cursor += 1;
+            }
+            KeyCode::Backspace if self.cursor > 0 => {
+                self.cursor -= 1;
+                let b = self.byte_at(self.cursor);
+                self.text.remove(b);
+            }
+            KeyCode::Delete if self.cursor < self.text.chars().count() => {
+                let b = self.byte_at(self.cursor);
+                self.text.remove(b);
+            }
+            KeyCode::Left => self.cursor = self.cursor.saturating_sub(1),
+            KeyCode::Right => self.cursor = (self.cursor + 1).min(self.text.chars().count()),
+            KeyCode::Home => self.cursor = 0,
+            KeyCode::End => self.cursor = self.text.chars().count(),
+            _ => {}
+        }
+        PromptAction::Continue
+    }
+
+    /// 單行輸入框：只取貼上內容的第一行（終端貼上的換行常為 \r，與 \n 一併視為行尾）
+    fn paste(&mut self, pasted: &str) {
+        let line = pasted.split(['\r', '\n']).next().unwrap_or("");
+        let b = self.byte_at(self.cursor);
+        self.text.insert_str(b, line);
+        self.cursor += line.chars().count();
+    }
+
+    /// 游標前文字的視覺寬度（CJK 雙寬）
+    fn cursor_width(&self) -> usize {
+        visual_width(&self.text[..self.byte_at(self.cursor)])
+    }
+}
+
+/// 確認框按鍵：Y/Enter = 是（預設，以大寫 Y 標示），N/ESC = 否，其他忽略
+fn confirm_answer(key: KeyEvent) -> Option<bool> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => Some(true),
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => Some(false),
+        _ => None,
+    }
+}
+
+/// 幫助/關於面板的頁籤與捲動狀態（不含 I/O，可單元測試）
+struct HelpPanelState {
+    tab: usize,
+    scroll: usize,
+}
+
+impl HelpPanelState {
+    const TABS: usize = 2;
+
+    /// 處理按鍵；回傳 false 表示關閉面板
+    fn handle_key(&mut self, key: KeyEvent, visible: usize, total: usize) -> bool {
+        let max_scroll = total.saturating_sub(visible);
+        match key.code {
+            KeyCode::Esc => return false,
+            KeyCode::Tab | KeyCode::Right => {
+                self.tab = (self.tab + 1) % Self::TABS;
+                self.scroll = 0;
+            }
+            KeyCode::BackTab | KeyCode::Left => {
+                self.tab = (self.tab + Self::TABS - 1) % Self::TABS;
+                self.scroll = 0;
+            }
+            KeyCode::Up => self.scroll = self.scroll.saturating_sub(1),
+            KeyCode::Down => self.scroll = (self.scroll + 1).min(max_scroll),
+            KeyCode::PageUp => self.scroll = self.scroll.saturating_sub(visible / 2),
+            KeyCode::PageDown => self.scroll = (self.scroll + visible / 2).min(max_scroll),
+            KeyCode::Home => self.scroll = 0,
+            KeyCode::End => self.scroll = max_scroll,
+            _ => {}
+        }
+        true
     }
 }
 
@@ -127,23 +251,25 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
     let mut size = terminal_size;
     let tabs = ["Help", "About"];
     let pages = [build_help_panel_lines(), build_about_panel_lines()];
-    let mut active_tab = 0usize;
-    let mut scroll_offset = 0usize;
+    let mut state = HelpPanelState { tab: 0, scroll: 0 };
 
     loop {
         let (cols, rows) = size;
         // 頁籤列 + 分隔線 + 底部狀態列
         let max_display_lines = (rows.saturating_sub(3)) as usize;
-        let lines = &pages[active_tab];
+        let lines = &pages[state.tab];
         let total_lines = lines.len();
-        scroll_offset = scroll_offset.min(total_lines.saturating_sub(max_display_lines));
+        state.scroll = state
+            .scroll
+            .min(total_lines.saturating_sub(max_display_lines));
+        let scroll_offset = state.scroll;
 
         execute!(io::stdout(), terminal::Clear(ClearType::All))?;
 
         // 頁籤列
         queue!(io::stdout(), cursor::MoveTo(0, 0))?;
         for (i, tab) in tabs.iter().enumerate() {
-            if i == active_tab {
+            if i == state.tab {
                 queue!(
                     io::stdout(),
                     style::SetBackgroundColor(Color::Cyan),
@@ -231,57 +357,17 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
 
         io::stdout().flush()?;
 
-        // 處理按鍵
+        // 處理按鍵；視窗大小改變時重繪
         loop {
-            let Some(key_event) = next_key(&mut size)? else {
-                break; // 視窗大小改變：重繪
-            };
-            {
-                if key_event.kind != KeyEventKind::Press {
-                    continue;
+            match next_event(&mut size)? {
+                DialogEvent::Key(key) => {
+                    if !state.handle_key(key, max_display_lines, total_lines) {
+                        return Ok(());
+                    }
+                    break;
                 }
-
-                match key_event.code {
-                    KeyCode::Esc => return Ok(()),
-                    KeyCode::Tab | KeyCode::Right => {
-                        active_tab = (active_tab + 1) % tabs.len();
-                        scroll_offset = 0;
-                        break;
-                    }
-                    KeyCode::BackTab | KeyCode::Left => {
-                        active_tab = (active_tab + tabs.len() - 1) % tabs.len();
-                        scroll_offset = 0;
-                        break;
-                    }
-                    KeyCode::Up => {
-                        scroll_offset = scroll_offset.saturating_sub(1);
-                        break;
-                    }
-                    KeyCode::Down => {
-                        if scroll_offset + max_display_lines < total_lines {
-                            scroll_offset += 1;
-                        }
-                        break;
-                    }
-                    KeyCode::PageUp => {
-                        scroll_offset = scroll_offset.saturating_sub(max_display_lines / 2);
-                        break;
-                    }
-                    KeyCode::PageDown => {
-                        scroll_offset = (scroll_offset + max_display_lines / 2)
-                            .min(total_lines.saturating_sub(max_display_lines));
-                        break;
-                    }
-                    KeyCode::Home => {
-                        scroll_offset = 0;
-                        break;
-                    }
-                    KeyCode::End => {
-                        scroll_offset = total_lines.saturating_sub(max_display_lines);
-                        break;
-                    }
-                    _ => break,
-                }
+                DialogEvent::Resize => break,
+                DialogEvent::Paste(_) => {}
             }
         }
     }
@@ -298,8 +384,7 @@ pub fn prompt_with_default(
     default: &str,
     terminal_size: (u16, u16),
 ) -> Result<Option<String>> {
-    let mut input = default.to_string();
-    let mut cursor_pos = input.chars().count(); // 光標位置（字符索引）
+    let mut input = LineInput::new(default);
     let mut size = terminal_size;
 
     loop {
@@ -320,7 +405,7 @@ pub fn prompt_with_default(
             cursor::MoveTo(0, dialog_row),
         )?;
 
-        let display = format!(" {} {}", prompt_text, input);
+        let display = format!(" {} {}", prompt_text, input.text);
         let (display, display_width) = truncate_to_width(&display, cols as usize);
 
         queue!(io::stdout(), style::Print(&display))?;
@@ -334,105 +419,27 @@ pub fn prompt_with_default(
         queue!(io::stdout(), style::ResetColor)?;
 
         // 設置光標位置（以視覺寬度計算，正確處理 CJK 雙寬字元）
-        let input_before_cursor: String = input.chars().take(cursor_pos).collect();
-        let cursor_x = (visual_width(prompt_text) + 2 + visual_width(&input_before_cursor))
+        let cursor_x = (visual_width(prompt_text) + 2 + input.cursor_width())
             .min((cols as usize).saturating_sub(1)) as u16;
         execute!(io::stdout(), cursor::MoveTo(cursor_x, dialog_row))?;
         execute!(io::stdout(), cursor::Show)?;
 
         io::stdout().flush()?;
 
-        // 讀取按鍵,只處理 Press 和 Repeat 事件
-        loop {
-            let key_event = match event::read()? {
-                Event::Key(key_event) => key_event,
-                Event::Resize(w, h) => {
-                    // 清除舊位置的對話框，再以新尺寸重繪
-                    execute!(
-                        io::stdout(),
-                        cursor::MoveTo(0, dialog_row),
-                        terminal::Clear(ClearType::FromCursorDown)
-                    )?;
-                    size = (w, h);
-                    RESIZED.store(true, Ordering::Relaxed);
-                    break;
-                }
-                Event::Paste(text) => {
-                    // 單行輸入框：只取貼上內容的第一行
-                    let text = text.lines().next().unwrap_or("");
-                    let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
-                    input.insert_str(byte_pos, text);
-                    cursor_pos += text.chars().count();
-                    break;
-                }
-                _ => continue,
-            };
-            {
-                // 忽略 Release 事件,避免重複輸入
-                if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
-                    continue;
-                }
-
-                match key_event.code {
-                    KeyCode::Enter => {
-                        // 確認輸入
-                        return Ok(Some(input));
-                    }
-                    KeyCode::Esc => {
-                        // 取消
-                        return Ok(None);
-                    }
-                    KeyCode::Char(c) => {
-                        // 在光標位置插入字符
-                        let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
-                        input.insert(byte_pos, c);
-                        cursor_pos += 1;
-                        break;
-                    }
-                    KeyCode::Backspace => {
-                        // 刪除光標前的字符
-                        if cursor_pos > 0 {
-                            let byte_pos =
-                                input.chars().take(cursor_pos - 1).collect::<String>().len();
-                            input.remove(byte_pos);
-                            cursor_pos -= 1;
-                        }
-                        break;
-                    }
-                    KeyCode::Delete => {
-                        // 刪除光標後的字符
-                        if cursor_pos < input.chars().count() {
-                            let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
-                            input.remove(byte_pos);
-                        }
-                        break;
-                    }
-                    KeyCode::Left => {
-                        // 向左移動光標
-                        cursor_pos = cursor_pos.saturating_sub(1);
-                        break;
-                    }
-                    KeyCode::Right => {
-                        // 向右移動光標
-                        if cursor_pos < input.chars().count() {
-                            cursor_pos += 1;
-                        }
-                        break;
-                    }
-                    KeyCode::Home => {
-                        // 移動到開頭
-                        cursor_pos = 0;
-                        break;
-                    }
-                    KeyCode::End => {
-                        // 移動到結尾
-                        cursor_pos = input.chars().count();
-                        break;
-                    }
-                    _ => {
-                        break;
-                    }
-                }
+        match next_event(&mut size)? {
+            DialogEvent::Key(key) => match input.handle_key(key) {
+                PromptAction::Submit(text) => return Ok(Some(text)),
+                PromptAction::Cancel => return Ok(None),
+                PromptAction::Continue => {}
+            },
+            DialogEvent::Paste(text) => input.paste(&text),
+            DialogEvent::Resize => {
+                // 清除舊位置的對話框，再以新尺寸重繪
+                execute!(
+                    io::stdout(),
+                    cursor::MoveTo(0, dialog_row),
+                    terminal::Clear(ClearType::FromCursorDown)
+                )?;
             }
         }
     }
@@ -474,31 +481,23 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
         queue!(io::stdout(), style::ResetColor)?;
         io::stdout().flush()?;
 
-        // 讀取按鍵,只處理 Press 事件
+        // 讀取按鍵；其他按鍵忽略，視窗大小改變時清除舊位置後重繪
         loop {
-            let Some(key_event) = next_key(&mut size)? else {
-                // 視窗大小改變：清除舊位置的對話框，再重繪
-                execute!(
-                    io::stdout(),
-                    cursor::MoveTo(0, dialog_row),
-                    terminal::Clear(ClearType::FromCursorDown)
-                )?;
-                break;
-            };
-            {
-                // 忽略 Release 事件
-                if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
-                    continue;
-                }
-
-                match key_event.code {
-                    // Enter = 確認（預設為 yes，以大寫 Y 標示）
-                    KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => return Ok(true),
-                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => return Ok(false),
-                    _ => {
-                        break;
+            match next_event(&mut size)? {
+                DialogEvent::Key(key) => {
+                    if let Some(answer) = confirm_answer(key) {
+                        return Ok(answer);
                     }
                 }
+                DialogEvent::Resize => {
+                    execute!(
+                        io::stdout(),
+                        cursor::MoveTo(0, dialog_row),
+                        terminal::Clear(ClearType::FromCursorDown)
+                    )?;
+                    break;
+                }
+                DialogEvent::Paste(_) => {}
             }
         }
     }
@@ -506,7 +505,8 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::truncate_to_width;
+    use super::*;
+    use crossterm::event::KeyModifiers;
 
     #[test]
     fn truncate_cjk_at_boundary_does_not_panic() {
@@ -529,5 +529,105 @@ mod tests {
         let (out, w) = truncate_to_width("abc", 10);
         assert_eq!(out, "abc");
         assert_eq!(w, 3);
+    }
+
+    fn k(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn type_str(input: &mut LineInput, s: &str) {
+        for c in s.chars() {
+            input.handle_key(k(KeyCode::Char(c)));
+        }
+    }
+
+    #[test]
+    fn test_line_input_cjk_edit_and_cursor_width() {
+        // 稽核 B13/B17：CJK 輸入的插入、退格與游標寬度
+        let mut input = LineInput::new("");
+        type_str(&mut input, "中文ab");
+        assert_eq!(input.cursor_width(), 6);
+        input.handle_key(k(KeyCode::Left));
+        input.handle_key(k(KeyCode::Left));
+        input.handle_key(k(KeyCode::Backspace));
+        assert_eq!(input.text, "中ab");
+        assert_eq!(input.cursor_width(), 2);
+        type_str(&mut input, "字");
+        assert_eq!(input.text, "中字ab");
+    }
+
+    #[test]
+    fn test_line_input_delete_and_bounds() {
+        let mut input = LineInput::new("ab");
+        // 游標在結尾：Delete 與 Right 不動
+        input.handle_key(k(KeyCode::Delete));
+        input.handle_key(k(KeyCode::Right));
+        assert_eq!((input.text.as_str(), input.cursor), ("ab", 2));
+        input.handle_key(k(KeyCode::Home));
+        input.handle_key(k(KeyCode::Backspace));
+        input.handle_key(k(KeyCode::Delete));
+        assert_eq!((input.text.as_str(), input.cursor), ("b", 0));
+        input.handle_key(k(KeyCode::End));
+        assert_eq!(input.cursor, 1);
+    }
+
+    #[test]
+    fn test_line_input_default_submit_and_cancel() {
+        let mut input = LineInput::new("abc");
+        type_str(&mut input, "d");
+        assert_eq!(
+            input.handle_key(k(KeyCode::Enter)),
+            PromptAction::Submit("abcd".to_string())
+        );
+        assert_eq!(input.handle_key(k(KeyCode::Esc)), PromptAction::Cancel);
+    }
+
+    #[test]
+    fn test_line_input_paste_keeps_first_line() {
+        let mut input = LineInput::new("[]");
+        input.handle_key(k(KeyCode::Left));
+        input.paste("中x\nsecond");
+        assert_eq!(input.text, "[中x]");
+        assert_eq!(input.cursor, 3);
+        // 終端（含 tmux）貼上時換行送成 \r，不可把 \r 插入輸入框
+        input.paste("y\rz");
+        assert_eq!(input.text, "[中xy]");
+    }
+
+    #[test]
+    fn test_confirm_answer_keys() {
+        for (code, want) in [
+            (KeyCode::Char('y'), Some(true)),
+            (KeyCode::Char('Y'), Some(true)),
+            (KeyCode::Enter, Some(true)),
+            (KeyCode::Char('n'), Some(false)),
+            (KeyCode::Char('N'), Some(false)),
+            (KeyCode::Esc, Some(false)),
+            (KeyCode::Char('x'), None),
+        ] {
+            assert_eq!(confirm_answer(k(code)), want, "{code:?}");
+        }
+    }
+
+    #[test]
+    fn test_help_panel_tabs_and_scroll_bounds() {
+        let mut state = HelpPanelState { tab: 0, scroll: 0 };
+        // 10 行可見、共 25 行：最多捲到 15
+        state.handle_key(k(KeyCode::End), 10, 25);
+        assert_eq!(state.scroll, 15);
+        state.handle_key(k(KeyCode::Down), 10, 25);
+        state.handle_key(k(KeyCode::PageDown), 10, 25);
+        assert_eq!(state.scroll, 15);
+        state.handle_key(k(KeyCode::PageUp), 10, 25);
+        assert_eq!(state.scroll, 10);
+        // 切換頁籤回到頂端，左右循環
+        state.handle_key(k(KeyCode::Left), 10, 25);
+        assert_eq!((state.tab, state.scroll), (1, 0));
+        state.handle_key(k(KeyCode::Tab), 10, 25);
+        assert_eq!(state.tab, 0);
+        // 內容比視窗短時不捲動
+        state.handle_key(k(KeyCode::Down), 10, 5);
+        assert_eq!(state.scroll, 0);
+        assert!(!state.handle_key(k(KeyCode::Esc), 10, 5));
     }
 }

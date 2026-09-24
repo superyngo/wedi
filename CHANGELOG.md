@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No underflow panic in debug builds when the window is narrower than about 5 columns (horizontal scroll margin, dialog cursor) (B21)
 - Ctrl+F jumps to the first match at or after the cursor, wrapping to the top, instead of always the first match in the file (B21)
 - The help panel now lists Enter / Ctrl+J / Ctrl+M (insert newline) and Shift+Ctrl+PgUp/Dn (select 1/10 of the file), which were bound and in `KEYMAP.md` but missing from the panel (B2)
+- Pasting a multi-line text into a prompt (Search, Go to line, Change encoding) keeps only the first line again when the terminal sends the line break as `\r`, as tmux and most terminals do; the `\r` was inserted and garbled the prompt row. The help panel scrolls while an arrow key is held (B17)
 - Syntax highlighting: a block comment or string opened more than 100 lines above the screen no longer shows as code in files over 500 lines, and Undo, paste, indent and comment toggling now re-colour the lines below. Highlighting resumes from saved parser checkpoints every 64 lines, so scrolling and typing no longer re-parse the file from the top (B16)
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
 - Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
 - CI re-enabled (`.github/workflows/ci.yml`): fmt, clippy `-D warnings` with and without default features, and `cargo test --workspace` on Ubuntu, Windows and macOS for pushes and PRs to `main` (B1)
 - Help panel, `KEYMAP.md` and `handle_key_event` are checked against each other: every documented key must be bound, both lists must name the same keys, and every bound shortcut must be documented (`src/help.rs` tests) (B2)
+- Dialog key handling is unit-tested: `src/dialog.rs` splits the prompt, confirm and help-panel state out of the event loops (`LineInput`, `confirm_answer`, `HelpPanelState`), with tests for CJK editing and cursor width, bounds, paste, confirm keys and help-panel scroll limits (B17)
 
 ### Docs
 - docs: reorganize into `docs/` layout (`CONTEXT.md` index, `docs/reference/` glossary, architecture, keymap, CLI; `docs/plan/BACKLOG.md`; documentation audit record)
