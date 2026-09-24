@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 2026-09-24
 
+### Fixed
+- `cargo clippy --workspace --all-targets -- -D warnings` passes again, with and without default features (B14)
+
 ### Docs
 - docs: reorganize into `docs/` layout (`CONTEXT.md` index, `docs/reference/` glossary, architecture, keymap, CLI; `docs/plan/BACKLOG.md`; documentation audit record)
 - `CLAUDE.md` is now a pointer; its architecture overview moved to `docs/reference/ARCHITECTURE.md` with corrections (pico-args not clap, native clipboard not arboard, undo/redo stacks)

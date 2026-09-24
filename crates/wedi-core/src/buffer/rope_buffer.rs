@@ -723,6 +723,12 @@ impl RopeBuffer {
     }
 }
 
+impl Default for RopeBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,11 +886,5 @@ mod tests {
         let (decoded, _, _) = big5_encoding.decode(&saved_bytes);
         // 注意：Big5 無法表示簡體中文字符，所以會有替換字符
         assert!(decoded.contains("Hello"));
-    }
-}
-
-impl Default for RopeBuffer {
-    fn default() -> Self {
-        Self::new()
     }
 }

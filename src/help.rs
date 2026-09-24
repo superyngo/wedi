@@ -25,6 +25,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
         ],
     ));
 
+    #[cfg_attr(not(feature = "mouse-support"), allow(unused_mut))]
     let mut navigation = vec![
         ("Arrow Keys", "Move cursor"),
         ("Ctrl+Left/Home", "Move to line start"),
@@ -86,6 +87,7 @@ pub fn get_help_sections() -> Vec<HelpSection> {
         ],
     ));
 
+    #[cfg_attr(not(feature = "syntax-highlighting"), allow(unused_mut))]
     let mut code = vec![
         ("Ctrl+/ \\ K", "Toggle line comment"),
         ("Ctrl+L", "Toggle line numbers (& display mode)"),
