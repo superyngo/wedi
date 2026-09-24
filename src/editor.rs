@@ -268,6 +268,11 @@ impl Editor {
                     self.handle_command(Command::PasteText(text))?;
                 }
             }
+
+            // 對話框取走了 Resize 事件：同步編輯器尺寸
+            if crate::dialog::take_resized() {
+                self.handle_command(Command::Resize)?;
+            }
         }
 
         Terminal::exit_raw_mode()?;

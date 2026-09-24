@@ -9,7 +9,31 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use std::io::{self, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use wedi_core::utils::visual_width;
+
+// 對話框期間發生過視窗大小改變（事件已被對話框取走，編輯器需自行同步尺寸）
+static RESIZED: AtomicBool = AtomicBool::new(false);
+
+/// Returns whether the terminal was resized while a dialog was open, and clears the flag.
+pub fn take_resized() -> bool {
+    RESIZED.swap(false, Ordering::Relaxed)
+}
+
+/// 讀取下一個按鍵事件；視窗大小改變時更新尺寸並回傳 None（呼叫端重繪）
+fn next_key(size: &mut (u16, u16)) -> Result<Option<event::KeyEvent>> {
+    loop {
+        match event::read()? {
+            Event::Key(key_event) => return Ok(Some(key_event)),
+            Event::Resize(w, h) => {
+                *size = (w, h);
+                RESIZED.store(true, Ordering::Relaxed);
+                return Ok(None);
+            }
+            _ => {}
+        }
+    }
+}
 
 /// 依視覺寬度截斷字串，回傳（截斷後字串, 實際視覺寬度）
 /// 以字元為單位處理，避免 byte 切割造成 panic，並正確計算 CJK 雙寬字元
@@ -101,15 +125,16 @@ fn build_about_panel_lines() -> Vec<PanelLine> {
 /// 顯示幫助/關於面板（Tab 或 ←/→ 切換頁籤，ESC 關閉）
 #[allow(dead_code)]
 pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
-    let (cols, rows) = terminal_size;
+    let mut size = terminal_size;
     let tabs = ["Help", "About"];
     let pages = [build_help_panel_lines(), build_about_panel_lines()];
     let mut active_tab = 0usize;
-    // 頁籤列 + 分隔線 + 底部狀態列
-    let max_display_lines = (rows.saturating_sub(3)) as usize;
     let mut scroll_offset = 0usize;
 
     loop {
+        let (cols, rows) = size;
+        // 頁籤列 + 分隔線 + 底部狀態列
+        let max_display_lines = (rows.saturating_sub(3)) as usize;
         let lines = &pages[active_tab];
         let total_lines = lines.len();
         scroll_offset = scroll_offset.min(total_lines.saturating_sub(max_display_lines));
@@ -209,7 +234,10 @@ pub fn show_help(terminal_size: (u16, u16)) -> Result<()> {
 
         // 處理按鍵
         loop {
-            if let Event::Key(key_event) = event::read()? {
+            let Some(key_event) = next_key(&mut size)? else {
+                break; // 視窗大小改變：重繪
+            };
+            {
                 if key_event.kind != KeyEventKind::Press {
                     continue;
                 }
@@ -275,10 +303,11 @@ pub fn prompt_with_default(
 ) -> Result<Option<String>> {
     let mut input = default.to_string();
     let mut cursor_pos = input.chars().count(); // 光標位置（字符索引）
-    let (cols, rows) = terminal_size;
-    let dialog_row = rows.saturating_sub(2);
+    let mut size = terminal_size;
 
     loop {
+        let (cols, rows) = size;
+        let dialog_row = rows.saturating_sub(2);
         // 清除對話框行
         execute!(
             io::stdout(),
@@ -318,7 +347,30 @@ pub fn prompt_with_default(
 
         // 讀取按鍵,只處理 Press 和 Repeat 事件
         loop {
-            if let Event::Key(key_event) = event::read()? {
+            let key_event = match event::read()? {
+                Event::Key(key_event) => key_event,
+                Event::Resize(w, h) => {
+                    // 清除舊位置的對話框，再以新尺寸重繪
+                    execute!(
+                        io::stdout(),
+                        cursor::MoveTo(0, dialog_row),
+                        terminal::Clear(ClearType::FromCursorDown)
+                    )?;
+                    size = (w, h);
+                    RESIZED.store(true, Ordering::Relaxed);
+                    break;
+                }
+                Event::Paste(text) => {
+                    // 單行輸入框：只取貼上內容的第一行
+                    let text = text.lines().next().unwrap_or("");
+                    let byte_pos = input.chars().take(cursor_pos).collect::<String>().len();
+                    input.insert_str(byte_pos, text);
+                    cursor_pos += text.chars().count();
+                    break;
+                }
+                _ => continue,
+            };
+            {
                 // 忽略 Release 事件,避免重複輸入
                 if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
                     continue;
@@ -392,10 +444,11 @@ pub fn prompt_with_default(
 /// 顯示確認對話框
 #[allow(dead_code)]
 pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
-    let (cols, rows) = terminal_size;
-    let dialog_row = rows.saturating_sub(2);
+    let mut size = terminal_size;
 
     loop {
+        let (cols, rows) = size;
+        let dialog_row = rows.saturating_sub(2);
         // 清除對話框行
         execute!(
             io::stdout(),
@@ -427,7 +480,16 @@ pub fn confirm(message: &str, terminal_size: (u16, u16)) -> Result<bool> {
 
         // 讀取按鍵,只處理 Press 事件
         loop {
-            if let Event::Key(key_event) = event::read()? {
+            let Some(key_event) = next_key(&mut size)? else {
+                // 視窗大小改變：清除舊位置的對話框，再重繪
+                execute!(
+                    io::stdout(),
+                    cursor::MoveTo(0, dialog_row),
+                    terminal::Clear(ClearType::FromCursorDown)
+                )?;
+                break;
+            };
+            {
                 // 忽略 Release 事件
                 if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
                     continue;

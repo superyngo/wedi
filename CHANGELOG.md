@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opening a file with bytes invalid in its encoding replaced them with `�` silently, and saving destroyed them; the status bar now warns on open, and saving needs a second Ctrl+S (B5)
 - Saving truncated and rewrote the file in place, so a crash or full disk mid-save could lose it; saves now write a temp file and rename it over the original, keeping symlinks and permissions (B6)
 - Toggling a comment turned tab indentation into spaces (breaking Makefiles), and unknown file types such as JSON, HTML, CSS and Markdown got `#` comments; indentation is now kept as-is and those types show "No comment style" (B11)
+- Pasting into the search, go-to-line and encoding prompts did nothing, and resizing the window while a prompt, confirmation or the help panel was open left it drawn at the old size; prompts now accept paste (first line) and dialogs redraw at the new size (B13)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
