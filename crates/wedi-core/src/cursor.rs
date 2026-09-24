@@ -229,13 +229,15 @@ impl Cursor {
 
     /// 獲取指定行的長度（不包含換行符）
     fn line_len(&self, buffer: &RopeBuffer, row: usize) -> usize {
-        if let Some(line) = buffer.line(row) {
-            let text = line.to_string();
-            let text = text.trim_end_matches(['\n', '\r']);
-            text.chars().count()
-        } else {
-            0
+        // 直接在 RopeSlice 上計數，不轉成 String
+        let Some(line) = buffer.line(row) else {
+            return 0;
+        };
+        let mut len = line.len_chars();
+        while len > 0 && matches!(line.char(len - 1), '\n' | '\r') {
+            len -= 1;
         }
+        len
     }
 }
 
@@ -267,5 +269,16 @@ mod tests {
         cursor.move_up(&buffer, &view);
         assert_eq!(cursor.row, 0);
         assert_eq!(cursor.visual_line_index, row0_lines - 1);
+    }
+
+    #[test]
+    fn test_line_len_excludes_crlf() {
+        let mut buffer = RopeBuffer::new();
+        buffer.insert(0, "ab\r\ncd\nxyz");
+        let cursor = Cursor::new();
+        assert_eq!(cursor.line_len(&buffer, 0), 2);
+        assert_eq!(cursor.line_len(&buffer, 1), 2);
+        assert_eq!(cursor.line_len(&buffer, 2), 3);
+        assert_eq!(cursor.line_len(&buffer, 9), 0);
     }
 }

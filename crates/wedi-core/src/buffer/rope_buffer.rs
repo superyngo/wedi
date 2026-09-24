@@ -10,6 +10,7 @@ use crate::debug_log;
 pub struct RopeBuffer {
     rope: Rope,
     file_path: Option<PathBuf>,
+    display_path: String, // 狀態列顯示的絕對路徑；載入與存檔時計算，避免每幀 canonicalize
     modified: bool,
     history: History,
     saved_id: u64,               // 存檔時最新的歷史群組 id（用於判斷是否回到存檔點）
@@ -33,6 +34,7 @@ impl RopeBuffer {
         Self {
             rope: Rope::new(),
             file_path: None,
+            display_path: "[No Name]".to_string(),
             modified: false,
             history: History::default(),
             saved_id: 0,
@@ -195,8 +197,7 @@ impl RopeBuffer {
             Some((encoding_rs::UTF_16BE, 2))
         } else {
             // 沒有 BOM，檢查是否為有效的 UTF-8
-            let (_, _, had_errors) = encoding_rs::UTF_8.decode(bytes);
-            if !had_errors {
+            if std::str::from_utf8(bytes).is_ok() {
                 // 如果是有效的 UTF-8，使用 UTF-8
                 Some((encoding_rs::UTF_8, 0))
             } else {
@@ -307,6 +308,7 @@ impl RopeBuffer {
         Ok(Self {
             rope,
             file_path: Some(path.to_path_buf()),
+            display_path: display_path_of(path),
             modified,
             history: History::default(),
             saved_id: 0,
@@ -474,6 +476,7 @@ impl RopeBuffer {
             self.modified = false;
             self.saved_id = self.history.top_id();
             self.lossy = false; // 檔案已改寫，不再與原位元組不一致
+            self.display_path = display_path_of(path); // 新檔首次存檔後才能 canonicalize
 
             crate::debug_log!(
                 "  File saved successfully with {} encoding",
@@ -536,6 +539,7 @@ impl RopeBuffer {
         self.modified = false;
         self.saved_id = self.history.top_id();
         self.file_path = Some(path.to_path_buf());
+        self.display_path = display_path_of(path);
         Ok(())
     }
 
@@ -545,6 +549,7 @@ impl RopeBuffer {
         write_atomic(path, &encoded)
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
         self.file_path = Some(path.to_path_buf());
+        self.display_path = display_path_of(path);
         self.modified = false;
         self.saved_id = self.history.top_id();
         Ok(())
@@ -568,18 +573,9 @@ impl RopeBuffer {
             .to_string()
     }
 
-    /// 返回顯示用的完整檔案路徑（絕對路徑）
-    pub fn file_display_path(&self) -> String {
-        match &self.file_path {
-            None => "[No Name]".to_string(),
-            Some(path) => {
-                // 優先使用 canonicalize 取得標準絕對路徑，若失敗則直接用儲存的路徑
-                path.canonicalize()
-                    .unwrap_or_else(|_| path.to_path_buf())
-                    .to_string_lossy()
-                    .into_owned()
-            }
-        }
+    /// 返回顯示用的完整檔案路徑（絕對路徑；載入與存檔時計算）
+    pub fn file_display_path(&self) -> &str {
+        &self.display_path
     }
 
     pub fn len_chars(&self) -> usize {
@@ -805,6 +801,14 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
         let _ = fs::remove_file(&temp);
     }
     result
+}
+
+/// 顯示用路徑：優先 canonicalize 取得標準絕對路徑，失敗（檔案尚不存在）則用原路徑
+fn display_path_of(path: &Path) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[cfg(test)]
@@ -1051,5 +1055,22 @@ mod tests {
         buffer.insert(0, "c");
         assert!(buffer.save().is_err());
         assert_eq!(fs::read_to_string(&real).unwrap(), "ba\n");
+    }
+
+    #[test]
+    fn test_display_path_refreshes_on_first_save() {
+        // 稽核 F24：顯示路徑改為快取；新檔首次存檔後要換成 canonical 路徑
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("new.txt");
+        let config = EncodingConfig {
+            read_encoding: None,
+            save_encoding: None,
+        };
+        let mut buffer = RopeBuffer::from_file_with_encoding(&path, &config).unwrap();
+        assert_eq!(buffer.file_display_path(), path.to_string_lossy());
+        buffer.insert(0, "x");
+        buffer.save().unwrap();
+        let canonical = path.canonicalize().unwrap();
+        assert_eq!(buffer.file_display_path(), canonical.to_string_lossy());
     }
 }

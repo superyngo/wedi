@@ -6,7 +6,7 @@ use crate::utils::slice_ansi_text;
 use crate::utils::visual_width;
 use anyhow::Result;
 use crossterm::{
-    cursor, execute, queue,
+    cursor, queue,
     style::{self, Attribute, Color},
 };
 use std::io::{self, Write};
@@ -100,7 +100,7 @@ pub struct Selection {
     pub end: (usize, usize),   // (row, col)
 }
 
-/// 搜尋高亮資訊：匹配位置為 (行, 行內 byte 起點)
+/// 搜尋高亮資訊：匹配位置為 (行, 行內 byte 起點)，必須依行排序（`Search` 即如此產生）
 #[derive(Debug, Clone, Copy)]
 pub struct SearchHighlight<'a> {
     pub matches: &'a [(usize, usize)],
@@ -244,10 +244,12 @@ impl View {
 
         self.scroll_if_needed(cursor, buffer, has_debug_ruler);
 
-        let mut stdout = io::stdout();
+        // 整個畫面寫入同一個緩衝區，每幀只 flush 一次（減少系統呼叫與閃爍）
+        let out = io::stdout();
+        let mut stdout = io::BufWriter::with_capacity(64 * 1024, out.lock());
 
-        execute!(stdout, cursor::Hide)?;
-        execute!(stdout, cursor::MoveTo(0, 0))?;
+        queue!(stdout, cursor::Hide)?;
+        queue!(stdout, cursor::MoveTo(0, 0))?;
 
         let ruler_offset = if has_debug_ruler {
             self.render_column_ruler(&mut stdout, buffer)?;
@@ -304,44 +306,52 @@ impl View {
                 queue!(stdout, style::ResetColor)?;
             }
 
+            // 先補上快取，之後以參照借用，不必每行複製 LineLayout
             let cache_index = file_row.saturating_sub(self.offset_row);
-            let layout_opt = self
+            if cache_index < self.line_layout_cache.len()
+                && self.line_layout_cache[cache_index].is_none()
+            {
+                self.line_layout_cache[cache_index] =
+                    LineLayout::new(buffer, file_row, available_width, self.wrap_mode);
+            }
+            let uncached;
+            let layout: &LineLayout = match self
                 .line_layout_cache
                 .get(cache_index)
                 .and_then(|l| l.as_ref())
-                .cloned();
-
-            let layout = if let Some(layout) = layout_opt {
-                layout
-            } else if let Some(new_layout) =
-                LineLayout::new(buffer, file_row, available_width, self.wrap_mode)
             {
-                if cache_index < self.line_layout_cache.len() {
-                    self.line_layout_cache[cache_index] = Some(new_layout.clone());
-                }
-                new_layout
-            } else {
-                // 空行或超出範圍
-                LineLayout {
-                    visual_lines: vec![String::new()],
-                    visual_height: 1,
-                    logical_to_visual: vec![0],
+                Some(layout) => layout,
+                None => {
+                    // 空行或超出範圍
+                    uncached = LineLayout::new(buffer, file_row, available_width, self.wrap_mode)
+                        .unwrap_or_else(|| LineLayout {
+                            visual_lines: vec![String::new()],
+                            visual_height: 1,
+                            logical_to_visual: vec![0],
+                        });
+                    &uncached
                 }
             };
 
             // 該邏輯行上的搜尋匹配（轉為視覺列區間，is_current 標記當前匹配）
             let row_matches: Vec<(usize, usize, bool)> = search
                 .map(|s| {
+                    // matches 依行排序：二分搜尋該行的區間，不必每行掃描全部匹配
+                    let first = s.matches.partition_point(|&(row, _)| row < file_row);
+                    let count = s.matches[first..].partition_point(|&(row, _)| row == file_row);
+                    if count == 0 {
+                        return Vec::new();
+                    }
                     let line = buffer
                         .line(file_row)
                         .map(|l| l.to_string())
                         .unwrap_or_default();
                     let line = line.trim_end_matches(['\n', '\r']);
-                    s.matches
+                    s.matches[first..first + count]
                         .iter()
                         .enumerate()
-                        .filter(|(_, &(row, _))| row == file_row)
-                        .map(|(i, &(_, byte_col))| {
+                        .map(|(k, &(_, byte_col))| {
+                            let i = first + k;
                             let start = byte_col_to_visual_col(line, byte_col);
                             let end = byte_col_to_visual_col(line, byte_col + s.query_len);
                             (start, end, i == s.current)
@@ -552,15 +562,15 @@ impl View {
             screen_row += 1;
         }
 
-        self.render_status_bar(buffer, selection.is_some(), message, cursor)?;
+        self.render_status_bar(&mut stdout, buffer, selection.is_some(), message, cursor)?;
 
         // 移動終端光標到當前cursor位置
         let ruler_offset = if has_debug_ruler { 1 } else { 0 };
         let (cursor_x, cursor_y) = self.get_cursor_visual_position(cursor, buffer);
         let cursor_y = cursor_y + ruler_offset;
-        execute!(stdout, cursor::MoveTo(cursor_x as u16, cursor_y as u16))?;
+        queue!(stdout, cursor::MoveTo(cursor_x as u16, cursor_y as u16))?;
 
-        execute!(stdout, cursor::Show)?;
+        queue!(stdout, cursor::Show)?;
         stdout.flush()?;
         Ok(())
     }
@@ -678,12 +688,12 @@ impl View {
 
     fn render_status_bar(
         &self,
+        stdout: &mut impl Write,
         buffer: &RopeBuffer,
         selection_mode: bool,
         message: Option<&str>,
         cursor: &Cursor,
     ) -> Result<()> {
-        let mut stdout = io::stdout();
         queue!(stdout, cursor::MoveTo(0, self.screen_rows as u16))?;
 
         queue!(stdout, style::SetBackgroundColor(Color::DarkGrey))?;
@@ -1003,29 +1013,19 @@ impl View {
 
         while file_row < cursor.row && screen_y < self.screen_rows {
             let cache_index = file_row.saturating_sub(self.offset_row);
-            let layout_opt = self
-                .line_layout_cache
-                .get(cache_index)
-                .and_then(|l| l.as_ref())
-                .cloned();
-
-            let layout = if let Some(layout) = layout_opt {
-                layout
-            } else {
-                LineLayout::new(
+            // 只需要高度：優先借用快取，不複製 LineLayout
+            let height = match self.line_layout_cache.get(cache_index) {
+                Some(Some(layout)) => layout.visual_height,
+                _ => LineLayout::new(
                     buffer,
                     file_row,
                     self.get_available_width(buffer),
                     self.wrap_mode,
                 )
-                .unwrap_or_else(|| LineLayout {
-                    visual_lines: vec![String::new()],
-                    visual_height: 1,
-                    logical_to_visual: vec![0],
-                })
+                .map_or(1, |layout| layout.visual_height),
             };
 
-            screen_y += layout.visual_height;
+            screen_y += height;
             file_row += 1;
         }
 
@@ -1072,7 +1072,7 @@ impl View {
     }
 
     /// 渲染列標尺（顯示列位置個位數字）
-    fn render_column_ruler(&self, stdout: &mut io::Stdout, buffer: &RopeBuffer) -> Result<()> {
+    fn render_column_ruler(&self, stdout: &mut impl Write, buffer: &RopeBuffer) -> Result<()> {
         queue!(stdout, cursor::MoveTo(0, 0))?;
         queue!(stdout, style::SetForegroundColor(Color::DarkGrey))?;
 

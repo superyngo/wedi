@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An unknown `--theme` name exits with `Unknown theme '…'; see --list-themes` instead of silently opening without highlighting (B19)
 - Pasting multi-line text from outside wedi that ends in a newline inserts it at the cursor; only a line wedi copied itself (Ctrl+C with no selection) still pastes above the current line (B19)
 - Debug output no longer writes over the editor screen: `debug_log!` appends to `wedi-debug.log` in the system temp directory and only with `--debug` (debug builds no longer log by default); an unknown `-l` language now shows its warning in the status bar instead of flashing on stderr (B19)
+- Rendering: each frame is written to one buffer and flushed once (it used to go through a 1 KiB line buffer with several flushes, which flickers over SSH); rows find their search matches by binary search; the status-bar path is resolved at load and save instead of every frame; layouts are borrowed, not cloned, per row; line length and UTF-8 detection no longer copy text (B19)
 
 ### Tests
 - `Editor` command dispatch now runs headless (`Editor::with_terminal`, `Terminal::with_size`), with regression tests in `src/editor.rs` (B17, in progress)
