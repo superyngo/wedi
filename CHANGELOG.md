@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 2026-09-29
+## [v0.10.1] - 2026-09-29
 
 ### Changed
 - AGENTS.md: the import-order rule now matches the code (`std` sorted alphabetically with external crates, then internal modules); dropped naming, `&str`/lifetime and assertion rules that restate Rust defaults already enforced by rustc lints and `clippy -D warnings`
