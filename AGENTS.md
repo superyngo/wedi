@@ -49,7 +49,7 @@ cargo clippy -- -D warnings    # Treat warnings as errors (CI mode)
 ## Code Style Guidelines
 
 ### Imports
-- Group imports in this order: std, external crates, internal modules
+- Imports: `std` and external crates in one alphabetical block (rustfmt's order), then internal `crate::`/`super::` modules
 - Use `use crate::` for internal module imports
 - Prefer explicit imports over glob imports (`*`)
 - Re-export commonly used types in `lib.rs` for convenience
@@ -64,10 +64,6 @@ use crate::debug_log;
 ```
 
 ### Naming Conventions
-- **Structs/Enums/Traits**: `PascalCase` (e.g., `RopeBuffer`, `HighlightEngine`)
-- **Functions/Methods**: `snake_case` (e.g., `get_line_content`, `move_cursor`)
-- **Constants**: `SCREAMING_SNAKE_CASE`
-- **Modules**: `snake_case` (e.g., `rope_buffer`, `ansi_slice`)
 - **Feature flags**: `kebab-case` (e.g., `syntax-highlighting`)
 
 ### Error Handling
@@ -109,9 +105,7 @@ debug_log!("Loading file: {:?}", path);
 
 ### Type Patterns
 - Prefer explicit types over `impl Trait` in public APIs
-- Use `&str` for input strings, `String` for owned output
 - Use `Option<T>` for optional values, never null-like patterns
-- Lifetime annotations only when necessary
 
 ### Struct Design
 - Fields should be private by default
@@ -150,11 +144,6 @@ mod tests {
     }
 }
 ```
-
-### Test Assertions
-- Use `assert_eq!` for equality checks
-- Use `assert!` for boolean conditions
-- Include descriptive messages for complex assertions
 
 ## Adding a Feature
 
