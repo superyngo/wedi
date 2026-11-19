@@ -8,7 +8,7 @@ investigation — lives in `../spec/`, `../plan/`, `../debug/`, or `../audit/`, 
 - **[KEYMAP.md](KEYMAP.md)** — every key binding and the mode it depends on.
 - **[CLI.md](CLI.md)** — command-line flags, encodings, themes.
 
-Machine-checked: none yet. `KEYMAP.md` is written against `keymap::bindings::handle_key_event`
-and `src/help.rs` `get_help_sections`; re-check both when a binding changes.
+Machine-checked: `KEYMAP.md` by `help::tests` in `src/help.rs` (help panel ↔ `KEYMAP.md` ↔
+`handle_key_event`).
 
 See also [`../adr/`](../adr/README.md) for decision records.

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 2026-11-19
+
+### Changed
+- Docs: `CONTEXT.md` declares `Profile: dev`; the code audit's and the backlog's `Status:` lines use exact values (`Resolved (2026-09-24)`; the B18 caveat stays in BACKLOG Pending verification); `docs/reference/README.md` names the `help::tests` check that keeps `KEYMAP.md` in sync
+
 ## [v0.10.1] - 2026-09-29
 
 ### Changed
