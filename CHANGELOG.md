@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 2026-11-20
+
+### Changed
+- Docs: BACKLOG dependency-drift row promoted from Watching to Open as B22 (its trigger fired); Done rows carry commit hashes; Watching rows re-read. AGENTS.md links to `ARCHITECTURE.md` for cache invalidation, the release profile and the feature module map (moved there) instead of restating them. The code audit's library probes are committed at `docs/audit/2026-09-24-code-audit/probe.rs`. CONTEXT tmp row: scratch is swept at each release
+
 ### 2026-11-19
 
 ### Changed

@@ -12,7 +12,7 @@ they are addressed.
 - `cargo clippy --workspace --all-targets -- -D warnings`, with and without default features, plus
   a `clippy::pedantic` / `clippy::nursery` pass (leads only — most pedantic hits are style).
 - **Library probes** (P1–P11): a throwaway crate linking `wedi-core` by path, run in release. Kept at
-  `docs/tmp/claude-scratch/audit-probe/` (gitignored); each probe is restated under its finding.
+  `docs/audit/2026-09-24-code-audit/probe.rs`; each probe is restated under its finding.
 - **Real-binary repros** (R1–R7): `target/debug/wedi` driven through a private tmux server
   (`tmux -L wediaudit`), reading back the saved file, the pane, and `#{cursor_x},#{cursor_y}`.
 - Findings marked *by inspection* were not executed; *pending verification* ones need Linux or

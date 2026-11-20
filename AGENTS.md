@@ -147,11 +147,9 @@ mod tests {
 
 ## Adding a Feature
 
-1. Core behavior → `wedi-core`
-2. Config options → CLI flags in `src/main.rs`, passed to `Editor::new`
-3. Key bindings → `Command` enum and `handle_key_event`
-4. UI wiring → command execution in `src/editor.rs`
-5. Docs → `CHANGELOG.md` `[Unreleased]`, README, and the affected `docs/reference/` file
+Where each kind of change goes (core, flags, bindings, UI wiring) is in
+[ARCHITECTURE.md §Adding a feature](docs/reference/ARCHITECTURE.md#adding-a-feature). In the same
+commit, update `CHANGELOG.md` `[Unreleased]`, README, and the affected `docs/reference/` file.
 
 ## Releasing
 
@@ -169,12 +167,9 @@ debug_log!("Starting wedi with file: {:?}", args.file);
 ```
 
 ### Cache Invalidation
-When modifying the buffer, invalidate the layout cache. The syntax cache needs nothing: every
-`RopeBuffer` edit records its first changed row, and `Editor::get_highlighted_lines` invalidates
-from it before rendering.
-```rust
-self.view.invalidate_cache();       // Layout cache
-```
+After modifying the buffer, call `self.view.invalidate_cache()` (or `invalidate_line()` when only one
+line changed). The syntax cache needs no call; how it invalidates itself is in
+[ARCHITECTURE.md §Flows](docs/reference/ARCHITECTURE.md#flows).
 
 ### Selection Handling
 ```rust
@@ -185,10 +180,8 @@ if self.has_selection() {
 
 ## Performance Considerations
 
-- Release builds use aggressive optimizations (`opt-level = "z"`, LTO, strip)
 - Avoid allocations in hot paths (rendering, key handling)
 - Use `invalidate_line()` over `invalidate_cache()` when possible
-- Syntax highlighting uses caching to avoid re-parsing
 
 ## CI/CD Notes
 

@@ -47,6 +47,9 @@ unused `EditorConfig` and `ScreenLayout` were then removed (backlog B20, B21).
 
 `cargo build --no-default-features` must compile.
 
+The release profile (root `Cargo.toml` `[profile.release]`) optimizes for size: `opt-level = "z"`,
+LTO, `strip`.
+
 ## Flows
 
 **Startup.** `Args::parse` → resolve `EncodingConfig` → `RopeBuffer` loads the file (encoding
@@ -72,6 +75,15 @@ reload) records the first changed row; `Editor::get_highlighted_lines` takes it
 (`take_changed_from`) before each render and calls `invalidate_from`, the only invalidation path.
 
 **Save.** `RopeBuffer` encodes the rope with the save encoding (`encoding_rs`) and writes the file.
+
+## Adding a feature
+
+| Change | Goes in |
+|---|---|
+| Core editing behavior | `wedi-core` |
+| Config option | CLI flag in `src/main.rs` (`Args::parse`), passed to `Editor::new` |
+| Key binding | `Command` enum and `handle_key_event` (`wedi-core` `keymap`) |
+| UI wiring | `Command` execution in `src/editor.rs` |
 
 ## Assets
 

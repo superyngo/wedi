@@ -13,3 +13,6 @@ None.
 |---|---|---|
 | 2026-09-24 | [2026-09-24-code-audit.md](2026-09-24-code-audit.md) | Resolved (2026-09-24) |
 | 2026-09-24 | [2026-09-24-documentation-audit.md](2026-09-24-documentation-audit.md) | Resolved (2026-09-24) |
+
+The 2026-09-24 code audit's library probes (P1–P11) are committed in
+[`2026-09-24-code-audit/probe.rs`](2026-09-24-code-audit/probe.rs); its real-binary repros (R1–R7) stayed in scratch and are restated in the record.
